@@ -95,7 +95,7 @@ def test_analyse_complete_extrait(client, monkeypatch):
     monkeypatch.setattr(service_analyse, "_client_llm", lambda: mock)
     client.post("/projets", data={"titre": "Mon roman"}, follow_redirects=True)
 
-    identifiant = _lancer(client, {"texte": TEXTE, "categorie": "auto"})
+    identifiant = _lancer(client, {"texte": TEXTE, "categorie": "extrait"})
     assert _attendre(client, identifiant) == "terminee"
 
     page = client.get(f"/analyses/{identifiant}")
@@ -109,7 +109,7 @@ def test_analyse_complete_extrait(client, monkeypatch):
     assert "m-style" not in appels and "m-technique" not in appels
 
 
-def test_chapitre_conforme_matrice_chapitre(client, monkeypatch, dossier_donnees):
+def test_chapitre_declaratif_respecte(client, monkeypatch, dossier_donnees):
     _modeles_distincts(monkeypatch)
     _projet_courant(dossier_donnees, 3)
     mock = MockLLM(reponses={
@@ -118,34 +118,36 @@ def test_chapitre_conforme_matrice_chapitre(client, monkeypatch, dossier_donnees
     })
     monkeypatch.setattr(service_analyse, "_client_llm", lambda: mock)
 
-    texte = "4 : La nuit tombe\n\nLes cavaliers part à l'aube vers la cité."
-    identifiant = _lancer(client, {"texte": texte, "categorie": "auto"})
+    texte = "Les cavaliers part à l'aube vers la cité."
+    identifiant = _lancer(client, {"texte": texte, "categorie": "chapitre", "numero_chapitre": "4"})
     assert _attendre(client, identifiant) == "terminee"
 
     page = client.get(f"/analyses/{identifiant}")
-    assert "chapitre officiel conforme" in page.text
+    assert "ins--forme" in page.text
     appels = [modele for modele, _ in mock.appels]
-    # Matrice Chapitre (v6 §5.4) : forme + style + technique, PAS d'embellissement
+    # Matrice Chapitre : forme + style + technique, PAS d'embellissement
     assert "m-style" in appels and "m-technique" in appels
     assert "m-embellissement" not in appels
-    assert "Lecture Embellissement" not in page.text  # bouton absent sans suggestions
 
 
-def test_rupture_reclassement_en_extrait(client, monkeypatch, dossier_donnees):
+def test_chapitre_hors_sequence_non_bloque_ni_reclasse(client, monkeypatch, dossier_donnees):
+    # J2.3 : Si l'utilisateur soumet un chapitre hors séquence, Python ne bloque pas et ne reclasse pas
     _modeles_distincts(monkeypatch)
     _projet_courant(dossier_donnees, 3)
-    mock = MockLLM(reponses={"m-forme": '{"corrections": []}',
-                            "m-embellissement": REPONSE_EMBELLISSEMENT})
+    mock = MockLLM(reponses={
+        "m-forme": REPONSE_FORME, "m-style": '{"corrections": []}',
+        "m-technique": '{"corrections": []}',
+    })
     monkeypatch.setattr(service_analyse, "_client_llm", lambda: mock)
 
-    texte = "5 : Hors séquence\n\nLes cavaliers part à l'aube vers la cité."
-    identifiant = _lancer(client, {"texte": texte, "categorie": "auto"})
-    assert _attendre(client, identifiant) == "terminee"  # jamais bloquée (v6 §6.5)
+    texte = "Hors séquence\n\nLes cavaliers part à l'aube vers la cité."
+    identifiant = _lancer(client, {"texte": texte, "categorie": "chapitre", "numero_chapitre": "7"})
+    assert _attendre(client, identifiant) == "terminee"
 
     page = client.get(f"/analyses/{identifiant}")
-    assert "hors séquence" in page.text        # bannière reclassement_extrait
-    assert "traité comme Extrait" in page.text
-    assert "Embellissement" in page.text
+    # Aucun reclassement automatique en Extrait (J2.3)
+    assert "hors séquence" not in page.text
+    assert "traité comme Extrait" not in page.text
 
 
 def test_fail_fast_rejetee_zero_token(client, monkeypatch):
@@ -154,7 +156,7 @@ def test_fail_fast_rejetee_zero_token(client, monkeypatch):
     monkeypatch.setattr(service_analyse, "_client_llm", lambda: mock)
     client.post("/projets", data={"titre": "Mon roman"}, follow_redirects=True)
 
-    identifiant = _lancer(client, {"texte": TEXTE, "categorie": "auto"})
+    identifiant = _lancer(client, {"texte": TEXTE, "categorie": "chapitre"})
     assert _attendre(client, identifiant) == "rejetee"
     page = client.get(f"/analyses/{identifiant}")
     assert "ne répond pas" in page.text           # gabarit v6 §4.2
@@ -186,17 +188,32 @@ def test_sortie_non_parsable_panne_de_phase(client, monkeypatch):
     assert _attendre(client, identifiant) == "echec"  # PannePhase -> Option B (v6 §8.5)
 
 
-def test_remplacement_refuse_chapitre_jamais_soumis(client, monkeypatch):
+def test_validation_avance_chaine_n_plus_un(client, monkeypatch):
+    # J2.3 : Vérifier que la validation enregistre le chapitre et avance le numéro attendu
     _modeles_distincts(monkeypatch)
-    mock = MockLLM()
+    mock = MockLLM(reponses={"m-forme": '{"corrections": []}'})
     monkeypatch.setattr(service_analyse, "_client_llm", lambda: mock)
     client.post("/projets", data={"titre": "Mon roman"}, follow_redirects=True)
 
-    identifiant = _lancer(client, {"texte": TEXTE, "categorie": "auto", "remplacement": "on"})
-    assert _attendre(client, identifiant) == "rejetee"  # refus zéro token (v6 §6.6)
-    page = client.get(f"/analyses/{identifiant}")
-    assert "impossible de remplacer" in page.text  # session vierge : aucun chapitre officiel
-    assert mock.appels == []
+    # 1. Soumettre et valider le Prologue (0)
+    identifiant0 = _lancer(client, {"texte": "Prologue\nTexte du prologue.", "categorie": "chapitre", "numero_chapitre": "0"})
+    assert _attendre(client, identifiant0) == "terminee"
+    client.post(f"/analyses/{identifiant0}/valider", data={"choix_json": "{}"})
+
+    # Prochain attendu doit être 1
+    page_nouveau = client.get("/analyses/nouveau")
+    assert 'value="1"' in page_nouveau.text
+    assert "attendu par la suite : 1" in page_nouveau.text
+
+    # 2. Soumettre un chapitre hors séquence (par ex 5) et valider -> 'Dernier validé gagne'
+    identifiant5 = _lancer(client, {"texte": "Chapitre 5\nTexte du chapitre 5.", "categorie": "chapitre", "numero_chapitre": "5"})
+    assert _attendre(client, identifiant5) == "terminee"
+    client.post(f"/analyses/{identifiant5}/valider", data={"choix_json": "{}"})
+
+    # Prochain attendu doit être 6
+    page_nouveau2 = client.get("/analyses/nouveau")
+    assert 'value="6"' in page_nouveau2.text
+    assert "attendu par la suite : 6" in page_nouveau2.text
 
 
 def test_garde_fou_taille_refus_explicite(client, monkeypatch):

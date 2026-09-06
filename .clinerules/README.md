@@ -21,14 +21,22 @@
 | J1 — Moteur métier | ✅ Terminé | `28f7b62` |
 | J2 — MVP de relecture | ✅ Terminé | `aa1d5f9` |
 | J2.1 — Correctifs retour utilisateur | ✅ Terminé | `569c784` |
-| J2.2 — Atelier interactif & Word | ✅ Terminé | — |
+| J2.2 — Atelier interactif & Word | ✅ Terminé | `22b7639` |
+| J2.3 — Catégorisation déclarative & Nettoyage Word | ✅ Terminé | En cours |
 | J3 — Chaîne & codex | ⏳ Prochain | — |
 | J4 — Confort | ⬜ À faire | — |
 | J5 — Mise en ligne | ⬜ À faire | — |
 
-**État des tests** : 89/89 verts (`pytest`)
+**État des tests** : 76/76 verts (`pytest`)
 
 ---
+
+## J2.3 — Catégorisation déclarative & Nettoyage Word ✅
+- Nettoyage strict au collage Word : suppression des sauts de ligne et balises fantômes (`o:p`, `&nbsp;`, `<br>`).
+- Fin de la détection automatique : l'utilisateur choisit la catégorie (Chapitre, Passage, Extrait).
+- Options Chapitre : numéro pré-rempli automatiquement avec $N+1$ (ou $0$ si vierge), indicateur purement informatif doux en cas d'écart.
+- Règle « Dernier validé gagne » à la validation sans aucun blocage ni reclassement intempestif.
+- Case à cocher opt-in pour la mise à jour du Codex/Journaux lors de la validation officielle.
 
 ## J0 — Socle ✅
 Squelette FastAPI + Jinja2, schéma SQLite complet (v6 §6.2, renommé sessions→projets),

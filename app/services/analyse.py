@@ -125,45 +125,25 @@ async def _executer_interne(identifiant: int) -> None:
     numero = titre[0] if titre else None
     categorie_naturelle = detecter_categorie(texte)
 
-    # Validation du remplacement (v6 §14.1 étape 4) — refus zéro token
-    remplacement_ok = False
-    if options.get("remplacement"):
-        existants = {
-            ligne["numero"]
-            for ligne in await db.interroger(
-                "SELECT numero FROM chapitres WHERE projet_id = ?", (projet["projet_id"],)
-            )
-        }
-        validation = chaine.valider_remplacement(projet, existants, None)
-        if validation.decision == "refus_remplacement":
-            await _maj(identifiant, statut="rejetee", decision=validation.decision,
-                       message=validation.message, erreur=validation.message,
-                       fini_a=_maintenant())
-            return
-        remplacement_ok = True
+    # Catégorisation déclarative (J2.3) : l'utilisateur choisit la catégorie, Python respecte son choix.
+    categorie_declaree = options.get("categorie", "chapitre")
+    if categorie_declaree not in ("chapitre", "passage", "extrait"):
+        categorie_declaree = "chapitre"
 
-    # Chaîne N+1 (v6 §6.5) -> catégorie définitive
-    await _maj(identifiant, etape="chaine")
-    arbitrage = chaine.arbitrer(
-        projet,
-        numero,
-        categorie_forcee=(
-            options["categorie"] if options.get("categorie") in ("passage", "extrait") else None
-        ),
-        remplacement_demande=remplacement_ok,
-        categorie_naturelle=categorie_naturelle,
-    )
-    if arbitrage.decision == "refus_remplacement":
-        await _maj(identifiant, statut="rejetee", decision=arbitrage.decision,
-                   message=arbitrage.message, erreur=arbitrage.message,
-                   fini_a=_maintenant())
-        return
-    await _maj(identifiant, categorie=arbitrage.categorie, decision=arbitrage.decision,
-               message=arbitrage.message)
+    numero_chapitre = options.get("numero_chapitre")
+    if categorie_declaree == "chapitre" and numero_chapitre is not None:
+        try:
+            numero = float(numero_chapitre)
+        except (ValueError, TypeError):
+            numero = None
+    else:
+        numero = None
+
+    await _maj(identifiant, categorie=categorie_declaree, decision=categorie_declaree, message=None)
 
     # Fail-fast (v6 §4) : zéro token d'analyse si un modèle indispensable manque
     await _maj(identifiant, etape="fail_fast")
-    actives = phases_actives(arbitrage.categorie, options)
+    actives = phases_actives(categorie_declaree, options)
     modeles = {phase: _MODELES[phase]() for phase in actives}
     non_configures = [phase for phase, modele in modeles.items() if not modele]
     if non_configures:

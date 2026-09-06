@@ -144,46 +144,31 @@ Validation Pydantic `extra='forbid'` : tout champ inconnu rejette l'entrée. La 
 
 * * *
 
-## 5. Catégorisation et chaîne N+1
+## 5. Catégorisation déclarative et chaîne séquentielle
 
-### 5.1 Détection de la catégorie
+### 5.1 Catégorisation déclarative (J2.3)
 
-Sur la première ligne uniquement : regex numérique `^\s*\d+(?:\.\d+)?\s*:\s*\S+`, ou mot exact `Prologue` (numéro 0, reconnu **dans tous les cas**). Toute autre occurrence de cette structure ailleurs dans le texte n'est jamais un titre.
+**L'utilisateur choisit explicitement** la catégorie du texte dans le formulaire (Chapitre, Passage ou Extrait). Python ne tente plus aucune détection automatique :
+* **Chapitre** : texte destiné à la chronologie du roman (Prologue ou chapitre numéroté). Donne accès aux options de numérotation et de mise à jour du Codex/Journaux.
+* **Passage** : scène ou fragment intermédiaire, sans mise à jour narrative ni contrainte de chaîne.
+* **Extrait** : court extrait de travail.
 
-* **Chapitre** : tout titre valide en première ligne, quel que soit le nombre de paragraphes ;
-* **Passage** : sans titre, ≥ 3 paragraphes ;
-* **Extrait** : défaut.
+### 5.2 Chaîne séquentielle déclarative et numéro attendu
 
-L'interface affiche la catégorie détectée **en direct pendant la frappe** et permet de forcer Passage ou Extrait (boutons radio) — aucune écriture, aucune contrainte de chaîne.
+* Le formulaire affiche un champ **« Numéro du chapitre »** pré-rempli automatiquement avec le numéro attendu (`numero_attendu(projet)`) :
+  - Si le projet est vierge (`current_chapter_num is None`) : `0` (Prologue) ;
+  - Sinon : `current_chapter_num + 1`.
+* **Indicateur purement informatif** : un libellé discret rappelle le numéro attendu par la suite. Si l'auteur saisit un autre numéro (ex. pour travailler sur un chapitre plus lointain), le libellé passe en orange informatif sans jamais bloquer ni reclasser le texte.
+* **Dernier validé gagne** : à la validation finale (« Valider la version actuelle »), le numéro validé met à jour `current_chapter_num` et devient la nouvelle référence pour le pré-remplissage du chapitre suivant.
+* **Option Codex/Journaux** : disponible uniquement pour les Chapitres, une case à cocher permet d'activer ou non l'extraction et l'historisation narrative lors de la validation officielle.
 
-### 5.2 Machine à états N+1 (`chaine.arbitrer`)
+### 5.3 Phases d'analyse — pré-sélection dérogable
 
-Numéro attendu : projet vierge → Prologue (0) ou 1 ; sinon `current_chapter_num + 1` (jamais modifié par un reclassement).
+La sélection des types de correction est pré-remplie selon la catégorie déclarée, tout en restant librement modifiable :
+* **Chapitre** : Forme, Style, Technique cochées ; Embellissement décochée.
+* **Passage & Extrait** : Forme, Embellissement cochées ; Style, Technique décochées.
 
-| Cas | Décision | Effet |
-|---|---|---|
-| N+1 conforme | `conforme` | Chapitre officiel — écritures narratives (J3) |
-| N=N **avec** remplacement coché | `remplacement_officiel` | Relecture-diff, remplacement du texte stocké, correction livrée (J3) |
-| N=N **sans** remplacement | `reclassement_extrait` | Traité comme Extrait, bannière, codex intact |
-| Trou, antérieur, décimal, Prologue hors séquence | `reclassement_extrait` | Idem — **jamais de blocage** |
-| Forçage Passage/Extrait | `forcage` | Aucune vérification de chaîne |
-| Sans titre | `hors_chaine` | Catégorie naturelle (Passage/Extrait) |
-
-### 5.3 Préconditions du remplacement officiel (`chaine.valider_remplacement`)
-
-Vérifiées par Python **avant toute analyse LLM** (refus zéro token) : le chapitre cible (celui du texte, ou le courant si non précisé) doit **exister** dans `chapitres` ET être **égal au chapitre courant** (N=N). Sinon refus explicite.
-
-### 5.4 Phases d'analyse — pré-sélection dérogable
-
-**Décision J2.1** : la matrice de la v6 n'est plus rigide — elle **pré-coche**, l'utilisateur décoche/coche librement. Un Chapitre peut ainsi être corrigé pour la seule Forme, ou le seul Embellissement. Seule contrainte : au moins un type sélectionné (refus explicite sinon).
-
-| Catégorie | Forme | Style | Technique | Embellissement |
-|---|---|---|---|---|
-| **Chapitre** | ✅ pré-cochée | ✅ pré-cochée | ✅ pré-cochée | ⬜ décochée |
-| **Passage** | ✅ pré-cochée | ⬜ décochée | ⬜ décochée | ✅ pré-cochée |
-| **Extrait** (y compris reclassé) | ✅ pré-cochée | ⬜ décochée | ⬜ décochée | ✅ pré-cochée |
-
-Le pré-cochage s'ajuste **en direct** selon la catégorie détectée ; une case touchée par l'utilisateur ne suit plus les changements de catégorie. Transmission : champ caché `phases` contenant un JSON d'état écrit par le JS (contournement du comportement FastAPI : valeur de formulaire vide → `None`, indistinguable d'un champ absent).
+Seule contrainte : au moins un type de correction doit être sélectionné avant soumission.
 
 * * *
 

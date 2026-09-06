@@ -86,10 +86,13 @@ async def _analyse(identifiant: int):
 
 
 def _contexte_nouveau(projet, erreur=None):
+    from app.services.chaine import numero_attendu
+    attendu = numero_attendu(projet) if projet else 0.0
     return {
         "projet": projet,
         "max_caracteres": settings.max_caracteres,
         "temperature_defaut": settings.temperature_embellissement,
+        "numero_attendu": int(attendu) if attendu == int(attendu) else attendu,
         "erreur": erreur,
     }
 
@@ -126,10 +129,11 @@ async def formulaire_analyse(request: Request):
 async def soumettre_analyse(
     request: Request,
     texte: str = Form(...),
-    categorie: str = Form("auto"),
+    categorie: str = Form("chapitre"),
+    numero_chapitre: str = Form(""),
+    avec_codex: str = Form(""),
     phases: str = Form(""),
     temperature_embellissement: str = Form(""),
-    remplacement: str = Form(""),
 ):
     projet = await _projet_actif()
     erreur = None
@@ -157,13 +161,23 @@ async def soumettre_analyse(
     except ValueError:
         temperature = None
 
+    cat_choisie = categorie if categorie in ("chapitre", "passage", "extrait") else "chapitre"
+    
+    num_chap = None
+    if cat_choisie == "chapitre" and numero_chapitre.strip():
+        try:
+            num_chap = float(numero_chapitre.strip())
+        except ValueError:
+            num_chap = None
+
     options = {
-        "categorie": categorie if categorie in ("auto", "passage", "extrait") else "auto",
+        "categorie": cat_choisie,
+        "numero_chapitre": num_chap,
+        "avec_codex": avec_codex == "on" if cat_choisie == "chapitre" else False,
         "forme": choix.get("forme"),
         "style": choix.get("style"),
         "technique": choix.get("technique"),
         "embellissement": choix.get("embellissement"),
-        "remplacement": remplacement == "on",
         "temperature_embellissement": temperature,
     }
     identifiant, _ = await db.executer(
@@ -322,11 +336,17 @@ async def valider_version_officielle(identifiant: int, choix_json: str = Form("{
     texte_complet = "\n".join(service_texte_riche.extraire_texte_brut_paragraphe(p) for p in paragraphes_riches)
     h = hashlib.sha256(texte_complet.encode("utf-8")).hexdigest()
 
-    # Extraire numéro du chapitre
-    from app.services.normalisation import extraire_titre_chapitre
-    titre_info = extraire_titre_chapitre(texte_complet)
-    numero = int(titre_info[0]) if titre_info else 1
-    titre_texte = titre_info[1] if titre_info else "Chapitre officiel"
+    # Numéro du chapitre : priorité aux options choisies lors de la soumission
+    options = json.loads(analyse["options_json"] or "{}")
+    num_option = options.get("numero_chapitre")
+    if num_option is not None:
+        numero = int(num_option)
+        titre_texte = "Prologue" if numero == 0 else f"Chapitre {numero}"
+    else:
+        from app.services.normalisation import extraire_titre_chapitre
+        titre_info = extraire_titre_chapitre(texte_complet)
+        numero = int(titre_info[0]) if titre_info else 1
+        titre_texte = titre_info[1] if titre_info else f"Chapitre {numero}"
 
     # Enregistrement dans chapitres
     await db.executer(

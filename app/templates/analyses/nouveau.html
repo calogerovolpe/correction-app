@@ -15,7 +15,7 @@
     <button type="button" class="btn-outil" onclick="document.execCommand('bold', false, null)"><strong>G</strong></button>
     <button type="button" class="btn-outil" onclick="document.execCommand('italic', false, null)"><em>I</em></button>
     <button type="button" class="btn-outil" onclick="document.execCommand('underline', false, null)"><u>S</u></button>
-    <span class="info-outil">Collez directement depuis Word : chaque paragraphe et style (gras, italique, souligné) est fidèlement préservé.</span>
+    <span class="info-outil">Collez depuis Word : les sauts de lignes et styles (gras, italique, souligné) sont nettoyés et préservés fidèlement.</span>
   </div>
 
   <div id="editeur-word" class="editeur-word" contenteditable="true" role="textbox" aria-multiline="true"></div>
@@ -23,33 +23,47 @@
 
   <p class="compteur-taille"><span id="compteur">0</span> / {{ max_caracteres }} caractères — au-delà : refus explicite, jamais de troncature.</p>
 
+  <!-- Choix de catégorie 100% déclaratif (J2.3) -->
   <fieldset>
-    <legend>Catégorie</legend>
-    <label><input type="radio" name="categorie" value="auto" checked> Détection automatique — <strong id="apercu-categorie">Extrait</strong></label>
-    <label><input type="radio" name="categorie" value="passage"> Forcer <strong>Passage</strong> — aucune écriture, aucune contrainte de chaîne</label>
-    <label><input type="radio" name="categorie" value="extrait"> Forcer <strong>Extrait</strong> — aucune écriture, aucune contrainte de chaîne</label>
+    <legend>Catégorie du texte</legend>
+    <label><input type="radio" name="categorie" value="chapitre" checked> <strong>Chapitre</strong> (officiel ou brouillon)</label>
+    <label><input type="radio" name="categorie" value="passage"> <strong>Passage</strong> (scène libre, aucune écriture narrative)</label>
+    <label><input type="radio" name="categorie" value="extrait"> <strong>Extrait</strong> (court fragment, aucune écriture narrative)</label>
   </fieldset>
 
+  <!-- Options Chapitre : numéro + case codex -->
+  <fieldset id="options-chapitre">
+    <legend>Options du Chapitre</legend>
+    <div class="groupe-num-chapitre">
+      <label for="numero-chapitre">Numéro du chapitre :</label>
+      <input type="number" id="numero-chapitre" name="numero_chapitre" step="1" min="0" value="{{ numero_attendu }}" style="width: 80px; padding: 0.3rem;">
+      <span class="indicateur-attendu" id="indicateur-attendu" data-attendu="{{ numero_attendu }}">
+        (attendu par la suite : {{ numero_attendu }})
+      </span>
+    </div>
+    <div style="margin-top: 0.5rem;">
+      <label>
+        <input type="checkbox" name="avec_codex" id="case-avec-codex" checked>
+        <strong>Mettre à jour le Codex et les Journaux</strong> lors de la validation officielle
+      </label>
+      <p class="aide-jauge">Si coché, les fiches de personnages, glossaires et évolutions seront extraits et enregistrés quand vous validerez ce chapitre.</p>
+    </div>
+  </fieldset>
+
+  <!-- Types de correction (dérogable) -->
   <fieldset>
-    <legend>Types de correction — pré-cochés selon la catégorie, librement modifiables</legend>
+    <legend>Types de correction</legend>
     <input type="hidden" name="phases" id="phases-json" value="">
-    <label><input type="checkbox" id="case-forme"> <strong>Forme</strong> — orthographe, grammaire (barré conservé)</label>
-    <label><input type="checkbox" id="case-style"> <strong>Style</strong> — répétitions, lourdeurs (alternatives à la demande)</label>
-    <label><input type="checkbox" id="case-technique"> <strong>Technique</strong> — temps, POV, cohérence (barre latérale)</label>
-    <label><input type="checkbox" id="case-embellissement"> <strong>Embellissement</strong> — créativité (suggestions à la demande)</label>
+    <label><input type="checkbox" id="case-forme" checked> <strong>Forme</strong> — orthographe, grammaire, typographie (barré conservé)</label>
+    <label><input type="checkbox" id="case-style" checked> <strong>Style</strong> — répétitions, lourdeurs (alternatives à la demande)</label>
+    <label><input type="checkbox" id="case-technique" checked> <strong>Technique</strong> — temps, POV, cohérence (barre latérale)</label>
+    <label><input type="checkbox" id="case-embellissement"> <strong>Embellissement</strong> — créativité & prosodie (suggestions à la demande)</label>
     <div class="jauge" id="jauge-embellissement" hidden>
       <label for="creativite">Créativité de l'Embellissement (température) : <strong id="valeur-creativite">{{ temperature_defaut }}</strong></label>
       <input type="range" id="creativite" name="temperature_embellissement"
              min="0" max="1.5" step="0.1" value="{{ temperature_defaut }}">
       <p class="aide-jauge">0 = sobre et prévisible · 1.5 = audacieux et inventif</p>
     </div>
-  </fieldset>
-
-  <fieldset>
-    <legend>Remplacement officiel</legend>
-    <label><input type="checkbox" name="remplacement">
-      Considérer ce texte comme le <strong>remplacement du chapitre courant</strong> (N=N) —
-      la validation finale mettra à jour le chapitre officiel.</label>
   </fieldset>
 
   <button type="submit">Lancer l'analyse</button>
@@ -60,7 +74,6 @@
   const editeur = document.getElementById('editeur-word');
   const texteJson = document.getElementById('texte-json');
   const compteur = document.getElementById('compteur');
-  const apercu = document.getElementById('apercu-categorie');
   const cases = {
     forme: document.getElementById('case-forme'),
     style: document.getElementById('case-style'),
@@ -71,7 +84,9 @@
   const creativite = document.getElementById('creativite');
   const valeurCreativite = document.getElementById('valeur-creativite');
   const phasesJson = document.getElementById('phases-json');
-  const touchee = { forme: false, style: false, technique: false, embellissement: false };
+  const optionsChapitre = document.getElementById('options-chapitre');
+  const inputNum = document.getElementById('numero-chapitre');
+  const indicateur = document.getElementById('indicateur-attendu');
 
   function ecrirePhases() {
     phasesJson.value = JSON.stringify({
@@ -79,6 +94,64 @@
       style: cases.style.checked,
       technique: cases.technique.checked,
       embellissement: cases.embellissement.checked,
+    });
+  }
+
+  // --- Nettoyage Word strict au collage (évite les sauts de ligne fantômes) ---
+  editeur.addEventListener('paste', (e) => {
+    e.preventDefault();
+    let clipboardData = e.clipboardData || window.clipboardData;
+    let html = clipboardData.getData('text/html');
+    let text = clipboardData.getData('text/plain');
+
+    if (html) {
+      let parser = new DOMParser();
+      let doc = parser.parseFromString(html, 'text/html');
+      
+      let tous = doc.body.querySelectorAll('*');
+      tous.forEach(el => {
+        if (el.tagName.toLowerCase().includes(':')) el.remove();
+        el.removeAttribute('class');
+        el.removeAttribute('style');
+        el.removeAttribute('lang');
+      });
+
+      let paragraphs = doc.body.querySelectorAll('p, div, h1, h2, h3, h4');
+      let cleanedElements = [];
+
+      if (paragraphs.length > 0) {
+        paragraphs.forEach(p => {
+          let inner = p.innerHTML.replace(/&nbsp;/g, ' ').trim();
+          if (inner && inner !== '<br>') {
+            let div = document.createElement('div');
+            div.innerHTML = p.innerHTML;
+            cleanedElements.push(div);
+          }
+        });
+      }
+
+      if (cleanedElements.length > 0) {
+        editeur.innerHTML = '';
+        cleanedElements.forEach(el => editeur.appendChild(el));
+      } else {
+        insererTexteLignes(text);
+      }
+    } else if (text) {
+      insererTexteLignes(text);
+    }
+    serialiserEditeur();
+  });
+
+  function insererTexteLignes(text) {
+    editeur.innerHTML = '';
+    let lignes = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+    lignes.forEach(l => {
+      let trimmed = l.trim();
+      if (trimmed) {
+        let div = document.createElement('div');
+        div.textContent = trimmed;
+        editeur.appendChild(div);
+      }
     });
   }
 
@@ -151,40 +224,50 @@
     return texteBrutTotal;
   }
 
-  function categorieDemandee(texteBrut) {
+  function majAffichageCat() {
     const radio = document.querySelector('input[name="categorie"]:checked');
-    if (radio && radio.value !== 'auto') return radio.value;
-    const premiereLigne = (texteBrut.split('\n')[0] || "").trim();
-    if (/^\s*\d+(?:\.\d+)?\s*:\s*\S/.test(premiereLigne) || premiereLigne === 'Prologue') return 'chapitre';
-    const blocs = texteBrut.split(/\n+/).filter(b => b.trim() !== '');
-    return blocs.length >= 3 ? 'passage' : 'extrait';
-  }
-
-  function ajuster() {
-    const texteBrut = serialiserEditeur();
-    const categorie = categorieDemandee(texteBrut);
-    const defauts = {
-      forme: true,
-      style: categorie === 'chapitre',
-      technique: categorie === 'chapitre',
-      embellissement: categorie === 'passage' || categorie === 'extrait',
-    };
-    for (const phase of Object.keys(cases)) {
-      if (!touchee[phase]) cases[phase].checked = defauts[phase];
+    const cat = radio ? radio.value : 'chapitre';
+    
+    if (optionsChapitre) {
+      optionsChapitre.style.display = (cat === 'chapitre') ? 'block' : 'none';
     }
-    apercu.textContent = categorie.charAt(0).toUpperCase() + categorie.slice(1);
+
+    if (cat === 'chapitre') {
+      cases.forme.checked = true;
+      cases.style.checked = true;
+      cases.technique.checked = true;
+      cases.embellissement.checked = false;
+    } else {
+      cases.forme.checked = true;
+      cases.style.checked = false;
+      cases.technique.checked = false;
+      cases.embellissement.checked = true;
+    }
     jauge.hidden = !cases.embellissement.checked;
     ecrirePhases();
   }
 
-  editeur.addEventListener('input', ajuster);
-  editeur.addEventListener('paste', () => setTimeout(ajuster, 20));
+  function verifIndicateur() {
+    if (!indicateur || !inputNum) return;
+    const attendu = parseFloat(indicateur.getAttribute('data-attendu'));
+    const saisi = parseFloat(inputNum.value);
+    if (!isNaN(saisi) && saisi !== attendu) {
+      indicateur.textContent = `(attendu : ${attendu} — vous avez saisi ${saisi})`;
+      indicateur.style.color = '#e65100';
+    } else {
+      indicateur.textContent = `(attendu par la suite : ${attendu})`;
+      indicateur.style.color = '#757575';
+    }
+  }
 
-  document.querySelectorAll('input[name="categorie"]').forEach(r => r.addEventListener('change', ajuster));
-  Object.entries(cases).forEach(([phase, element]) => {
-    element.addEventListener('change', () => { touchee[phase] = true; ajuster(); });
-  });
-  creativite.addEventListener('input', () => { valeurCreativite.textContent = creativite.value; });
+  editeur.addEventListener('input', serialiserEditeur);
+  document.querySelectorAll('input[name="categorie"]').forEach(r => r.addEventListener('change', majAffichageCat));
+  Object.values(cases).forEach(el => el.addEventListener('change', () => {
+    jauge.hidden = !cases.embellissement.checked;
+    ecrirePhases();
+  }));
+  if (creativite) creativite.addEventListener('input', () => { valeurCreativite.textContent = creativite.value; });
+  if (inputNum) inputNum.addEventListener('input', verifIndicateur);
 
   const form = document.getElementById('form-soumission');
   if (form) {
@@ -194,9 +277,11 @@
     });
   }
 
-  ajuster();
+  majAffichageCat();
+  verifIndicateur();
 })();
 </script>
+
 {% else %}
 <p><a href="/">Retour à l'accueil pour créer un projet</a></p>
 {% endif %}
