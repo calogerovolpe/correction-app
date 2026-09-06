@@ -7,16 +7,18 @@ corrigent (Forme, Style, Technique, Embellissement), le résultat s'affiche en d
 annoté interactif. Un codex narratif persistant (personnages, glossaire…) mémorise le
 roman au fil des chapitres officiels (chaîne N+1 stricte).
 
-## Documents de référence — source de vérité (PAS dans le repo, dans le dossier parent)
-1. **Spécification consolidée de l'application** : `..\..\Architecture application web — v1 (spécification consolidée).md`
+## Documents de référence — source de vérité
+1. **Spécification consolidée de l'application** : `docs/Architecture application web — v1 (spécification consolidée).md`
    → **LA source de vérité unique pour l'application** (métier + applicatif + état réel du code,
    jalons J0-J2.1 consolidés, registre des 26 décisions). **Tout doute : elle fait foi.**
-2. Documents historiques (ne pas coder avec) :
-   - `..\..\Architecture fonction correction de texte — v6.md` : spécification de la **fonction
-     OpenWebUI** (jamais développée) — archive de la genèse du métier ;
-   - `..\..\Architecture fonction correction de texte — v3/v4/v5.md` : historique des arbitrages ;
-   - `..\Cahier des charges — Application web de correction de manuscrit.md` : conception initiale
-     (remplacé par la spec consolidée, conservé pour mémoire).
+   Elle est versionnée dans le repo : **toute évolution métier/architecturale est committée
+   dans le même commit que le code correspondant.**
+2. Documents historiques (dans `docs/` aussi — ne pas coder avec) :
+   - `docs/Cahier des charges — Application web de correction de manuscrit.md` : conception
+     initiale (remplacé par la spec consolidée, bandeau l'indiquant en tête) ;
+   - **Hors repo, dans le dossier grand-parent** (`..\..\` côté disque, jamais dans le repo) :
+     `Architecture fonction correction de texte — v3/v4/v5/v6.md` — archive de la genèse
+     du métier (fonction OpenWebUI jamais développée).
 
 ## Stack (décisions A1-A9 du cahier des charges — ne pas changer sans arbitrage de l'auteur)
 - **Backend** : Python 3.11+ (3.14 en pratique), FastAPI, Uvicorn, Pydantic v2

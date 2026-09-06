@@ -1,7 +1,7 @@
 # correction-app — Application web de correction de manuscrit
 
-Implémentation du **cahier des charges** `../Cahier des charges — Application web de correction de manuscrit.md`.
-Le métier (normalisation, chaîne $N+1$, codex, déduplication, alertes) est défini par la **spécification v6** du dossier parent — elle fait foi.
+Implémentation de l'application décrite par **`docs/Architecture application web — v1 (spécification consolidée).md`** — LA source de vérité du projet (métier + applicatif), versionnée avec le code.
+Historique de conception : `docs/Cahier des charges — Application web de correction de manuscrit.md` (remplacé par la spec consolidée).
 
 **Jalon courant : J2 — MVP de relecture** : écran E3 (soumission, catégorisation auto, matrice de phases, forçage Passage/Extrait, remplacement officiel, garde-fou taille), jobs asynchrones suivis par HTMX (E4), phases 3-6 parallèles via l'API Mistral (fail-fast, Option B), document annoté E5 (couleurs WCAG AA, tooltips, pastilles filtres, bouton « Lecture Embellissement », navigation clavier, compteur de paragraphes masqués). **Validé de bout en bout avec Mistral Small sur un vrai chapitre.** Jalons J0 (socle) et J1 (moteur métier) validés.
 
@@ -45,4 +45,4 @@ docker compose up --build
 
 ## Structure
 
-Voir le cahier des charges §4.2. Résumé : `app/` (FastAPI, services, routes, templates), `tests/` (pytest), `data/` (SQLite + backups + logs, ignoré par git), `exports/`.
+Voir la spec consolidée §2.2 (`docs/`). Résumé : `app/` (FastAPI, services, routes, templates), `tests/` (pytest), `data/` (SQLite + backups + logs, ignoré par git), `exports/`, `docs/` (spécification versionnée).

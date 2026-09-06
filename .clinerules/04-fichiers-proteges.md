@@ -21,14 +21,17 @@
   précisément parce que la situation n'était pas testée).
 - Modifier le comportement Option B / fail-fast / liste-vide-jamais-panne (garde-fous v6).
 
-## Fichiers de l'auteur (hors repo, toujours dans le dossier parent)
-- **`Architecture application web — v1 (spécification consolidée).md`** : LA source de vérité
-  de l'application. Toute évolution métier/architecturale doit y être répercutée au même
-  jalon que sa réalisation (règle inscrite dans le document lui-même).
-- `Cahier des charges — Application web de correction de manuscrit.md` : historique de
-  conception, remplacé par la spec consolidée (bandeau l'indiquant en tête) — ne pas coder avec.
-- `Architecture fonction correction de texte — v3/v4/v5/v6.md` : archive de la genèse
-  (fonction OpenWebUI jamais développée) — ne pas coder avec.
+## Fichiers de l'auteur (documentation)
+- **`docs/Architecture application web — v1 (spécification consolidée).md`** (dans le repo) :
+  LA source de vérité de l'application. Versionnée avec le code : toute évolution
+  métier/architecturale est committée **dans le même commit** que le code correspondant.
+- `docs/Cahier des charges — Application web de correction de manuscrit.md` (dans le repo) :
+  historique de conception, remplacé par la spec consolidée (bandeau en tête) — ne pas coder avec.
+- Hors repo (dossier grand-parent sur le disque) : `Architecture fonction correction de
+  texte — v3/v4/v5/v6.md` — archive de la genèse (fonction OpenWebUI jamais développée) ;
+  ne pas coder avec, ne pas copier dans le repo.
+- **Le manuscrit de l'auteur** (`data/`, ignoré par git) ne quitte JAMAIS sa machine :
+  aucun texte soumis ne doit être committé, exporté ou copié hors de `data/` et `exports/`.
 
 ## Points sensibles à traiter avec prudence
 - `app/routes/web.py` : le déballage de `db.executer` (bug historique J2.1).
