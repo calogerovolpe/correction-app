@@ -16,6 +16,20 @@ uvicorn app.main:app --reload
 
 → http://localhost:8000 (la base `data/database.sqlite3` et les dossiers `backups/`/`logs/` sont créés automatiquement).
 
+## Configuration LLM (Mistral — clé API uniquement)
+
+L'application fonctionne **uniquement par clé API Mistral** (décision de l'auteur — aucun LLM local) :
+
+1. Copiez `.env.example` vers `.env` ;
+2. Renseignez `APP_LLM_API_KEY` avec votre clé Mistral ;
+3. Les cinq phases utilisent `mistral-small-latest` par défaut.
+
+Vérification de la connexion (ping fail-fast, `max_tokens=5`, coût négligeable) :
+
+```powershell
+python scripts/tester_llm.py
+```
+
 ## Tests
 
 ```powershell
