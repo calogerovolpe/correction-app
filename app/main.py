@@ -14,8 +14,17 @@ DOSSIER_APP = Path(__file__).parent
 
 @asynccontextmanager
 async def cycle_de_vie(_: FastAPI):
-    """Initialisation idempotente à chaque démarrage (v6 §3)."""
+    """Initialisation idempotente à chaque démarrage (v6 §3) + récupération des
+    jobs orphelins : une analyse interrompue par un redémarrage passe en `echec`
+    explicite — jamais de statut fantôme (cahier des charges §4.4)."""
     db.init_db()
+    await db.executer(
+        "UPDATE analyses SET statut = 'echec', "
+        "erreur = 'Interrompue par un redémarrage du serveur — resoumettez le texte.', "
+        "fini_a = datetime('now') "
+        "WHERE statut IN ('en_attente', 'en_cours')",
+        (),
+    )
     yield
 
 

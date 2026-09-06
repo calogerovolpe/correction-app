@@ -38,10 +38,14 @@ async def _projet_actif_id() -> str | None:
 @router.get("/")
 async def accueil(request: Request):
     projets = await db.interroger("SELECT * FROM projets ORDER BY created_at DESC, projet_id DESC")
+    analyses = await db.interroger(
+        "SELECT id, statut, categorie, substr(texte_source, 1, 60) AS extrait, cree_a "
+        "FROM analyses ORDER BY id DESC LIMIT 10"
+    )
     return TEMPLATES.TemplateResponse(
         request,
         "index.html",
-        {"projets": projets, "actif_id": await _projet_actif_id()},
+        {"projets": projets, "actif_id": await _projet_actif_id(), "analyses": analyses},
     )
 
 
@@ -82,7 +86,29 @@ def _contexte_nouveau(projet, erreur=None):
     return {
         "projet": projet,
         "max_caracteres": settings.max_caracteres,
+        "temperature_defaut": settings.temperature_embellissement,
         "erreur": erreur,
+    }
+
+
+def _choix_phases(brut: str) -> dict[str, bool | None]:
+    """Décode le champ caché `phases` du formulaire (JSON {"forme": true, ...} écrit par le JS).
+
+    Retourne {} si absent/vide → pré-sélection matrice (v6 §5.4).
+    Décision de l'auteur (J2) : la matrice n'est plus rigide — elle pré-coche,
+    l'utilisateur décoche/coche librement chaque phase."""
+    if not brut:
+        return {}
+    try:
+        donnees = json.loads(brut)
+    except ValueError:
+        return {}
+    if not isinstance(donnees, dict):
+        return {}
+    return {
+        phase: bool(donnees[phase])
+        for phase in ("forme", "style", "technique", "embellissement")
+        if phase in donnees
     }
 
 
@@ -98,9 +124,8 @@ async def soumettre_analyse(
     request: Request,
     texte: str = Form(...),
     categorie: str = Form("auto"),
-    activer_style: str = Form(""),
-    activer_technique: str = Form(""),
-    activer_embellissement: str = Form(""),
+    phases: str = Form(""),
+    temperature_embellissement: str = Form(""),
     remplacement: str = Form(""),
 ):
     projet = await _projet_actif()
@@ -114,20 +139,31 @@ async def soumettre_analyse(
             f"Texte de {len(texte)} caractères — la limite est de {settings.max_caracteres}. "
             "Refus explicite : aucune troncature silencieuse du contexte (v6 §2.3)."
         )
+    else:
+        choix = _choix_phases(phases)
+        if choix and not any(choix.values()):
+            erreur = "Sélectionnez au moins un type de correction (Forme, Style, Technique ou Embellissement)."
     if erreur:
         return TEMPLATES.TemplateResponse(
             request, "analyses/nouveau.html", _contexte_nouveau(projet, erreur),
             status_code=400,
         )
 
+    try:
+        temperature = float(temperature_embellissement) if temperature_embellissement else None
+    except ValueError:
+        temperature = None
+
     options = {
         "categorie": categorie if categorie in ("auto", "passage", "extrait") else "auto",
-        "style": activer_style == "on",
-        "technique": activer_technique == "on",
-        "embellissement": activer_embellissement == "on",
+        "forme": choix.get("forme"),
+        "style": choix.get("style"),
+        "technique": choix.get("technique"),
+        "embellissement": choix.get("embellissement"),
         "remplacement": remplacement == "on",
+        "temperature_embellissement": temperature,
     }
-    _, identifiant = await db.executer(
+    identifiant, _ = await db.executer(
         "INSERT INTO analyses (projet_id, texte_source, options_json) VALUES (?, ?, ?)",
         (projet["projet_id"], texte, json.dumps(options, ensure_ascii=False)),
     )

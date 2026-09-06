@@ -142,3 +142,15 @@ footer { border-top: 1px solid var(--bordure); color: var(--texte-secondaire); f
 
 .statut { font-size: 1.05rem; padding: 0.8rem; background: #f5f5f5; border-radius: 6px; }
 .actions-resultat { margin-top: 1.2rem; }
+
+/* E3 : jauge de créativité, note texte brut ; E1 : analyses récentes */
+.info-texte { font-size: 0.85rem; color: #757575; }
+.jauge { display: flex; flex-direction: column; gap: 0.2rem; padding: 0.4rem 0; border-top: 1px dashed #e0e0e0; margin-top: 0.4rem; }
+.jauge input[type="range"] { width: 100%; max-width: 360px; }
+.aide-jauge { font-size: 0.8rem; color: #757575; }
+.analyses-recentes { list-style: none; padding: 0; }
+.analyses-recentes li { padding: 0.35rem 0; border-bottom: 1px solid #e0e0e0; font-size: 0.95rem; }
+.statut-mini { display: inline-block; padding: 0 0.5rem; border-radius: 999px; font-size: 0.8rem; background: #eeeeee; }
+.statut-terminee { background: #e8f5e9; color: #2e7d32; }
+.statut-echec, .statut-rejetee { background: #fdecea; color: #c62828; }
+.statut-en_cours, .statut-en_attente { background: #e3f2fd; color: #1565c0; }

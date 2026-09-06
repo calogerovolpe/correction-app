@@ -51,17 +51,23 @@ _MODELES = {
 }
 
 
-def phases_actives(categorie: str, style: bool, technique: bool, embellissement: bool) -> list[str]:
-    """Matrice d'activation (v6 §5.4) : Forme toujours ; Style/Technique par défaut
-    sur Chapitre ; Embellissement par défaut sur Passage/Extrait ; les commandes
-    de l'utilisateur ne font que FORCER l'activation."""
-    actives = {
+def phases_actives(categorie: str, choix: dict) -> list[str]:
+    """Pré-sélection par défaut selon la matrice (v6 §5.4), DÉROGEABLE (décision de
+    l'auteur, jalon J2) : l'interface pré-coche les phases selon la catégorie et
+    l'utilisateur les coche/décoche librement — un Chapitre peut ainsi être corrigé
+    pour la seule Forme, ou le seul Embellissement.
+
+    `choix[phase]` : None = pré-sélection matrice ; True/False = choix explicite."""
+    defauts = {
         "forme": True,
-        "style": categorie == "chapitre" or bool(style),
-        "technique": categorie == "chapitre" or bool(technique),
-        "embellissement": categorie in ("passage", "extrait") or bool(embellissement),
+        "style": categorie == "chapitre",
+        "technique": categorie == "chapitre",
+        "embellissement": categorie in ("passage", "extrait"),
     }
-    return [phase for phase in ORDRE_PHASES if actives[phase]]
+    return [
+        phase for phase in ORDRE_PHASES
+        if (choix[phase] if choix.get(phase) is not None else defauts[phase])
+    ]
 
 
 def _client_llm() -> ClientLLM:
@@ -148,12 +154,7 @@ async def _executer_interne(identifiant: int) -> None:
 
     # Fail-fast (v6 §4) : zéro token d'analyse si un modèle indispensable manque
     await _maj(identifiant, etape="fail_fast")
-    actives = phases_actives(
-        arbitrage.categorie,
-        bool(options.get("style")),
-        bool(options.get("technique")),
-        bool(options.get("embellissement")),
-    )
+    actives = phases_actives(arbitrage.categorie, options)
     modeles = {phase: _MODELES[phase]() for phase in actives}
     non_configures = [phase for phase, modele in modeles.items() if not modele]
     if non_configures:
@@ -173,9 +174,13 @@ async def _executer_interne(identifiant: int) -> None:
 
     # Phases 3 à 6 parallèles (v6 §14.1 étape 8) — Option B en cas de panne
     await _maj(identifiant, etape="phases")
+    temperature_embellissement = options.get("temperature_embellissement")
     try:
         resultats = await asyncio.gather(
-            *(_executer_phase(client, phase, paragraphes) for phase in actives)
+            *(
+                _executer_phase(client, phase, paragraphes, temperature_embellissement)
+                for phase in actives
+            )
         )
     except PannePhase as panne:
         await _maj(identifiant, statut="echec",
@@ -200,17 +205,23 @@ async def _executer_interne(identifiant: int) -> None:
     await _maj(identifiant, statut="terminee", etape=None, fini_a=_maintenant())
 
 
-async def _executer_phase(client, phase: str, paragraphes) -> list:
+async def _executer_phase(client, phase: str, paragraphes, temperature_embellissement=None) -> list:
     """Une phase : prompt -> complétion -> extraction (PannePhase possible)
-    -> réconciliation par correction (rejets individuels, jamais d'arrêt)."""
+    -> réconciliation par correction (rejets individuels, jamais d'arrêt).
+
+    Jauge de créativité (décision de l'auteur, jalon J2) : la température de
+    l'Embellissement est choisie par l'utilisateur dans E3 (défaut : réglage global)."""
     messages = prompt_phase_correction(
         phase, CONSIGNES_PHASES[phase], paragraphes, settings.variante
     )
-    temperature = (
-        settings.temperature_embellissement
-        if phase == "embellissement"
-        else settings.temperature_correction
-    )
+    if phase == "embellissement":
+        temperature = (
+            temperature_embellissement
+            if temperature_embellissement is not None
+            else settings.temperature_embellissement
+        )
+    else:
+        temperature = settings.temperature_correction
     sortie = await client.completer(_MODELES[phase](), messages, temperature=temperature)
     corrections = reconciliation.extraire_corrections(sortie, phase)
     par_dict = {p.id: p for p in paragraphes}

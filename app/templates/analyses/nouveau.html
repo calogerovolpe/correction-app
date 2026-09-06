@@ -12,40 +12,102 @@
 {% if projet %}
 <form method="post" action="/analyses" class="formulaire-soumission">
   <label for="texte">Texte à corriger</label>
-  <textarea id="texte" name="texte" rows="14" required></textarea>
-  <p class="compteur-taille"><span id="compteur">0</span> / {{ max_caracteres }} caractères —
-    au-delà : refus explicite, jamais de troncature silencieuse.</p>
+  <textarea id="texte" name="texte" rows="16" required></textarea>
+  <p class="compteur-taille"><span id="compteur">0</span> / {{ max_caracteres }} caractères — au-delà : refus explicite, jamais de troncature.</p>
+  <p class="info-texte">ℹ️ Le texte est analysé en <strong>texte brut</strong> : espaces, indentation et sauts de ligne sont conservés et respectés à l'affichage. L'italique et le gras ne sont pas conservés (import .docx prévu au jalon J4).</p>
 
   <fieldset>
     <legend>Catégorie</legend>
-    <label><input type="radio" name="categorie" value="auto" checked> Détection automatique (Chapitre / Passage / Extrait)</label>
+    <label><input type="radio" name="categorie" value="auto" checked> Détection automatique — <strong id="apercu-categorie">Extrait</strong></label>
     <label><input type="radio" name="categorie" value="passage"> Forcer <strong>Passage</strong> — aucune écriture, aucune contrainte de chaîne</label>
     <label><input type="radio" name="categorie" value="extrait"> Forcer <strong>Extrait</strong> — aucune écriture, aucune contrainte de chaîne</label>
   </fieldset>
 
   <fieldset>
-    <legend>Phases d'analyse (matrice v6 §5.4)</legend>
-    <label><input type="checkbox" name="activer_style"> Activer <strong>Style</strong> (déjà actif par défaut sur les Chapitres)</label>
-    <label><input type="checkbox" name="activer_technique"> Activer <strong>Technique</strong> (déjà actif par défaut sur les Chapitres)</label>
-    <label><input type="checkbox" name="activer_embellissement"> Activer <strong>Embellissement</strong> (déjà actif par défaut sur Passages et Extraits)</label>
+    <legend>Types de correction — pré-cochés selon la catégorie, librement modifiables</legend>
+    <input type="hidden" name="phases" id="phases-json" value="">
+    <label><input type="checkbox" id="case-forme"> <strong>Forme</strong> — orthographe, grammaire, typographie</label>
+    <label><input type="checkbox" id="case-style"> <strong>Style</strong> — répétitions, rythme, fluidité</label>
+    <label><input type="checkbox" id="case-technique"> <strong>Technique</strong> — temps, POV, cohérence interne</label>
+    <label><input type="checkbox" id="case-embellissement"> <strong>Embellissement</strong> — suggestions créatives non contraignantes</label>
+    <div class="jauge" id="jauge-embellissement" hidden>
+      <label for="creativite">Créativité de l'Embellissement (température) : <strong id="valeur-creativite">{{ temperature_defaut }}</strong></label>
+      <input type="range" id="creativite" name="temperature_embellissement"
+             min="0" max="1.5" step="0.1" value="{{ temperature_defaut }}">
+      <p class="aide-jauge">0 = sobre et prévisible · 1.5 = audacieux et inventif</p>
+    </div>
   </fieldset>
 
   <fieldset>
-    <legend>Remplacement officiel (équivalent /maj, v6 §6.6)</legend>
+    <legend>Remplacement officiel (équivalent /maj)</legend>
     <label><input type="checkbox" name="remplacement">
       Considérer ce texte comme le <strong>remplacement du chapitre courant</strong> (N=N) —
-      la correction reste livrée intégralement. Refus si le chapitre courant n'a jamais été soumis.</label>
+      la correction reste livrée intégralement ; refus si le chapitre courant n'a jamais été soumis.</label>
   </fieldset>
 
   <button type="submit">Lancer l'analyse</button>
 </form>
 
 <script>
-  (() => {
-    const zone = document.getElementById('texte');
-    const compteur = document.getElementById('compteur');
-    zone.addEventListener('input', () => { compteur.textContent = zone.value.length; });
-  })();
+(() => {
+  const zone = document.getElementById('texte');
+  const compteur = document.getElementById('compteur');
+  const apercu = document.getElementById('apercu-categorie');
+  const cases = {
+    forme: document.getElementById('case-forme'),
+    style: document.getElementById('case-style'),
+    technique: document.getElementById('case-technique'),
+    embellissement: document.getElementById('case-embellissement'),
+  };
+  const jauge = document.getElementById('jauge-embellissement');
+  const creativite = document.getElementById('creativite');
+  const valeurCreativite = document.getElementById('valeur-creativite');
+  const phasesJson = document.getElementById('phases-json');
+  const touchee = { forme: false, style: false, technique: false, embellissement: false };
+
+  function ecrirePhases() {
+    phasesJson.value = JSON.stringify({
+      forme: cases.forme.checked,
+      style: cases.style.checked,
+      technique: cases.technique.checked,
+      embellissement: cases.embellissement.checked,
+    });
+  }
+
+  function categorieDemandee() {
+    const radio = document.querySelector('input[name="categorie"]:checked');
+    if (radio && radio.value !== 'auto') return radio.value;
+    const premiereLigne = zone.value.split('\n', 1)[0];
+    if (/^\s*\d+(?:\.\d+)?\s*:\s*\S/.test(premiereLigne) || premiereLigne.trim() === 'Prologue') return 'chapitre';
+    const blocs = zone.value.split(/\n{2,}/).filter((b) => b.trim() !== '');
+    return blocs.length >= 3 ? 'passage' : 'extrait';
+  }
+
+  // Pré-cochage matrice (v6 §5.4) — dérogable : seules les cases jamais touchées suivent la catégorie
+  function ajuster() {
+    const categorie = categorieDemandee();
+    const defauts = {
+      forme: true,
+      style: categorie === 'chapitre',
+      technique: categorie === 'chapitre',
+      embellissement: categorie === 'passage' || categorie === 'extrait',
+    };
+    for (const phase of Object.keys(cases)) {
+      if (!touchee[phase]) cases[phase].checked = defauts[phase];
+    }
+    apercu.textContent = categorie.charAt(0).toUpperCase() + categorie.slice(1);
+    jauge.hidden = !cases.embellissement.checked;
+    ecrirePhases();
+  }
+
+  zone.addEventListener('input', () => { compteur.textContent = zone.value.length; ajuster(); });
+  document.querySelectorAll('input[name="categorie"]').forEach((r) => r.addEventListener('change', ajuster));
+  Object.entries(cases).forEach(([phase, element]) => {
+    element.addEventListener('change', () => { touchee[phase] = true; ajuster(); });
+  });
+  creativite.addEventListener('input', () => { valeurCreativite.textContent = creativite.value; });
+  ajuster();
+})();
 </script>
 {% else %}
 <p><a href="/">Retour à l'accueil pour créer un projet</a></p>

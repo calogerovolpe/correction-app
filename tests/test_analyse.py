@@ -208,7 +208,100 @@ def test_garde_fou_taille_refus_explicite(client, monkeypatch):
     assert "la limite est de 50" in page.text   # refus explicite, pas de troncature (v6 §2.3)
 
 
+def test_redirection_identifiant_incremental(client, monkeypatch):
+    """Régression (bug remonté par l'auteur) : la redirection après soumission
+    pointait systématiquement vers /analyses/1 (déballage inversé : rowcount
+    au lieu de lastrowid) — invisible en base vierge, où id=1 était toujours correct."""
+    _modeles_distincts(monkeypatch)
+    mock = MockLLM(reponses={"m-forme": REPONSE_FORME, "m-embellissement": '{"corrections": []}'})
+    monkeypatch.setattr(service_analyse, "_client_llm", lambda: mock)
+    client.post("/projets", data={"titre": "Mon roman"}, follow_redirects=True)
+
+    id1 = _lancer(client, {"texte": TEXTE, "categorie": "auto"})
+    assert _attendre(client, id1) == "terminee"
+    id2 = _lancer(client, {"texte": "Un second texte distinct, sans rapport.", "categorie": "extrait"})
+    assert id2 == 2  # le bug renvoyait toujours 1
+    assert _attendre(client, id2) == "terminee"
+    assert "Résultat de l'analyse" in client.get("/analyses/2").text
+
+
+def test_derogation_matrice_phases_libres(client, monkeypatch, dossier_donnees):
+    """Décision de l'auteur (J2) : la matrice ne fait que pré-cocher — l'utilisateur
+    peut tout décocher sauf ce qu'il veut (ex. un Chapitre corrigé Forme + Embellissement)."""
+    _modeles_distincts(monkeypatch)
+    _projet_courant(dossier_donnees, 3)
+    mock = MockLLM(reponses={"m-forme": REPONSE_FORME, "m-embellissement": '{"corrections": []}'})
+    monkeypatch.setattr(service_analyse, "_client_llm", lambda: mock)
+
+    texte = "4 : La nuit tombe\n\nLes cavaliers part à l'aube vers la cité."
+    identifiant = _lancer(client, {
+        "texte": texte, "categorie": "auto",
+        "phases": '{"forme": true, "style": false, "technique": false, "embellissement": true}',
+    })
+    assert _attendre(client, identifiant) == "terminee"
+    appels = [modele for modele, _ in mock.appels]
+    assert "m-forme" in appels and "m-embellissement" in appels   # choisis par l'utilisateur
+    assert "m-style" not in appels and "m-technique" not in appels  # décochés : dérogation matrice
+
+
+def test_aucune_phase_selectionnee_refusee(client, monkeypatch):
+    _modeles_distincts(monkeypatch)
+    mock = MockLLM()
+    monkeypatch.setattr(service_analyse, "_client_llm", lambda: mock)
+    client.post("/projets", data={"titre": "Mon roman"}, follow_redirects=True)
+
+    page = client.post("/analyses", data={
+        "texte": TEXTE, "categorie": "extrait",
+        "phases": '{"forme": false, "style": false, "technique": false, "embellissement": false}',
+    })
+    assert page.status_code == 400
+    assert "au moins un type de correction" in page.text
+    assert mock.appels == []  # rien n'a été consommé
+
+
+def test_temperature_choisie_par_l_utilisateur(client, monkeypatch):
+    """Jauge de créativité : la température de l'Embellissement vient du formulaire."""
+    _modeles_distincts(monkeypatch)
+    mock = MockLLM(reponses={"m-forme": '{"corrections": []}', "m-embellissement": '{"corrections": []}'})
+    monkeypatch.setattr(service_analyse, "_client_llm", lambda: mock)
+    client.post("/projets", data={"titre": "Mon roman"}, follow_redirects=True)
+
+    identifiant = _lancer(client, {
+        "texte": TEXTE, "categorie": "extrait",
+        "phases": '{"forme": true, "embellissement": true}',
+        "temperature_embellissement": "1.3",
+    })
+    assert _attendre(client, identifiant) == "terminee"
+    temperatures = {modele: temperature for modele, temperature in mock.appels}
+    assert temperatures["m-embellissement"] == 1.3   # jauge utilisateur
+    assert temperatures["m-forme"] == 0.0            # correction : toujours 0.0
+
+
 def test_texte_sans_projet_refuse(client):
     page = client.post("/analyses", data={"texte": TEXTE, "categorie": "auto"})
     assert page.status_code == 400
     assert "Aucun projet actif" in page.text
+
+
+def test_jobs_orphelins_recuperes_au_demarrage(dossier_donnees):
+    """Un job en attente ne survit pas à un redémarrage : au démarrage suivant,
+    il passe en `echec` explicite (jamais de statut fantôme, cahier §4.4)."""
+    import asyncio
+
+    from fastapi.testclient import TestClient
+
+    from app import db
+    from app.main import app
+
+    db.init_db()
+    asyncio.run(db.executer(
+        "INSERT INTO projets (projet_id, titre) VALUES ('P-ORPH', 'Orphelin')", ()))
+    asyncio.run(db.executer(
+        "INSERT INTO analyses (projet_id, texte_source, statut) "
+        "VALUES ('P-ORPH', 'Texte interrompu', 'en_cours')", ()))
+
+    with TestClient(app):  # le cycle de vie démarre -> récupération
+        lignes = asyncio.run(db.interroger(
+            "SELECT statut, erreur FROM analyses WHERE projet_id = 'P-ORPH'"))
+    assert lignes[0]["statut"] == "echec"
+    assert "redémarrage" in lignes[0]["erreur"]

@@ -23,4 +23,18 @@
   <input type="text" id="titre" name="titre" required maxlength="200">
   <button type="submit">Créer</button>
 </form>
+
+{% if analyses %}
+<h2>Analyses récentes</h2>
+<ul class="analyses-recentes">
+  {% for a in analyses %}
+  <li>
+    <a href="/analyses/{{ a.id }}">#{{ a.id }}</a> —
+    <span class="statut-mini statut-{{ a.statut }}">{{ a.statut }}</span>
+    {% if a.categorie %}· {{ a.categorie }}{% endif %}
+    · « {{ a.extrait }}… »
+  </li>
+  {% endfor %}
+</ul>
+{% endif %}
 {% endblock %}
