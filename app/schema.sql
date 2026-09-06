@@ -69,6 +69,7 @@ CREATE TABLE IF NOT EXISTS alertes (
   numero_projet INTEGER NOT NULL,
   niveau        TEXT NOT NULL CHECK (niveau IN ('avertissement', 'information', 'confirmation')),
   code          TEXT NOT NULL,
+  cible         TEXT,                            -- cible de l'alerte : double barrière /nopb (v6 §6.7)
   motif         TEXT NOT NULL,
   statut        TEXT NOT NULL DEFAULT 'active' CHECK (statut IN ('active', 'validee')),
   created_at    TEXT NOT NULL DEFAULT (datetime('now')),

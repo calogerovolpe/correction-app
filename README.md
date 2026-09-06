@@ -3,7 +3,7 @@
 Implémentation du **cahier des charges** `../Cahier des charges — Application web de correction de manuscrit.md`.
 Le métier (normalisation, chaîne $N+1$, codex, déduplication, alertes) est défini par la **spécification v6** du dossier parent — elle fait foi.
 
-**Jalon courant : J0 — Socle** : squelette FastAPI, schéma SQLite complet (v6 §6.2, renommé projets), page d'accueil E1 minimale, Docker, tests de schéma.
+**Jalon courant : J1 — Moteur métier** : normalisation (§8.1), réconciliation des offsets et déduplication Style prioritaire (§8.3-8.5), machine d'états $N+1$ et remplacement officiel (§6.5-6.6), alertes à numérotation stable avec double barrière `/nopb` (§6.7), couche LLM compatible OpenAI (fail-fast, timeouts) et mock LLM déterministe pour les tests. Le jalon J0 (socle FastAPI, schéma SQLite, écran E1, Docker) est validé.
 
 ## Lancement local
 
