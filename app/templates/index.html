@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block titre %}Projets — Correction de manuscrit{% endblock %}
+{% block contenu %}
+<h2>Projets</h2>
+
+{% if projets %}
+<ul class="projets">
+  {% for p in projets %}
+  <li class="projet">
+    <strong>{{ p.titre }}</strong>
+    <span class="projet__id">{{ p.projet_id }}</span>
+    {% if p.projet_id == actif_id %}<span class="projet__actif">(actif)</span>{% endif %}
+    — chaîne : {{ p.chain_status }}
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+<p>Aucun projet pour l'instant.</p>
+{% endif %}
+
+<form method="post" action="/projets" class="formulaire-projet">
+  <label for="titre">Nouveau projet (roman)</label>
+  <input type="text" id="titre" name="titre" required maxlength="200">
+  <button type="submit">Créer</button>
+</form>
+{% endblock %}
