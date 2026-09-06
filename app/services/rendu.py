@@ -1,16 +1,11 @@
-"""Préparation du document annoté — v6 §7 et §13.
+"""Préparation du document annoté et des données pour la barre latérale et les bulles contextuelles (J2.2).
 
-Fonctions PURES : fusion des chevauchements en blocs contigus, identifiants
-`g-XXXX` calculés par Python (jamais fournis par les LLM — v6 §0-8), compteur
-des paragraphes masqués. Seuls les paragraphes comportant au moins une correction
-sont affichés (v6 §7.1). L'échappement HTML est assuré par Jinja2 (autoévasion).
-
-Rendu (v6 §7.3) :
-- correction simple : <del> barré + <ins> coloré + tooltip ;
-- bloc multi : <del class="del--multi"> (union des intervalles, jamais barré)
-  + <ins> ordonnés Forme -> Style -> Technique -> Embellissement + tooltip multi-cas ;
-- embellissement isolé : <mark class="sugg"> jamais barré + tooltip ;
-- embellissement migré : section « Embellissement — suggestions » du tooltip Style (v6 §8.4)."""
+Modèle interactif J2.2 :
+1. Forme (rouge) : barré conservé (`<del>` original + `<ins>` correction). Affichage détails dans la barre latérale.
+2. Technique (violet) : pas d'altération dans le corps, uniquement listé dans la barre latérale (section Technique).
+3. Style (bleu) : soulignement bleu pointillé sur le fragment original (non barré). Clic -> bulle contextuelle + bouton "Demander des alternatives".
+4. Embellissement (vert) : surlignage/soulignage discret vert pointillé. Clic -> bulle contextuelle + bouton "Demander des suggestions".
+"""
 
 from app.models import CorrectionFusionnee
 from app.services.normalisation import Paragraphe
@@ -24,109 +19,146 @@ LIBELLES = {
 }
 
 
-def _cas(fusion: CorrectionFusionnee) -> dict:
-    """Un cas de tooltip : titre, explication, règle, variantes (+ embellissement migré)."""
-    correction = fusion.correction
-    cas = {
-        "phase": correction.phase,
-        "titre": f"{LIBELLES[correction.phase]} — {correction.type.replace('_', ' ')}",
-        "explication": correction.explication,
-        "regle": correction.regle,
-        "variantes": list(correction.variantes),
-        "non_contraignante": correction.phase == "embellissement",
+def _info_correction(fusion: CorrectionFusionnee, groupe: str) -> dict:
+    c = fusion.correction
+    return {
+        "id": c.id,
+        "groupe": groupe,
+        "phase": c.phase,
+        "type": c.type,
+        "paragraphe_id": c.paragraphe_id,
+        "debut": c.debut,
+        "fin": c.fin,
+        "original": c.original,
+        "correction": c.correction,
+        "explication": c.explication,
+        "regle": c.regle,
+        "titre": f"{LIBELLES.get(c.phase, c.phase.capitalize())} — {c.type.replace('_', ' ')}",
     }
-    if fusion.embellissement_migre is not None:
-        migre = fusion.embellissement_migre
-        cas["embellissement"] = {
-            "suggestion": migre.suggestion,
-            "variantes": list(migre.variantes),
-            "explication": migre.explication,
-        }
-    return cas
 
 
 def preparer_document(
     fusionnees: list[CorrectionFusionnee], paragraphes: list[Paragraphe]
 ) -> dict:
-    """Retourne {'paragraphes': [...segments...], 'nb_masques': int} pour le template E5."""
+    """Construit le document annoté avec les segments pour le texte,
+    et la liste structurée des corrections pour la barre latérale."""
+    
+    # Isoler les corrections techniques (qui vont exclusivement dans la barre latérale)
+    corrections_techniques = [
+        _info_correction(f, f"tech-{i+1:04d}")
+        for i, f in enumerate(f for f in fusionnees if f.correction.phase == "technique")
+    ]
+
+    # Corrections in-text : Forme, Style, Embellissement
+    in_text_fusions = [f for f in fusionnees if f.correction.phase != "technique"]
+
     par_corrections: dict[str, list[CorrectionFusionnee]] = {}
-    for fusion in fusionnees:
+    for fusion in in_text_fusions:
         par_corrections.setdefault(fusion.correction.paragraphe_id, []).append(fusion)
 
     affiches: list[dict] = []
+    toutes_corrections_barre: list[dict] = []
     nb_masques = 0
     numero_groupe = 0
+
     for paragraphe in paragraphes:
         items = par_corrections.get(paragraphe.id)
         if not items:
             nb_masques += 1
             continue
+
         tries = sorted(items, key=lambda f: (f.correction.debut, f.correction.fin))
-        numero_groupe, segments = _construire_segments(tries, paragraphe, numero_groupe)
+        numero_groupe, segments, corrections_groupe = _construire_segments(tries, paragraphe, numero_groupe)
         affiches.append({"id": paragraphe.id, "segments": segments})
-    return {"paragraphes": affiches, "nb_masques": nb_masques}
+        toutes_corrections_barre.extend(corrections_groupe)
+
+    return {
+        "paragraphes": affiches,
+        "nb_masques": nb_masques,
+        "corrections_barre": toutes_corrections_barre,
+        "corrections_techniques": corrections_techniques,
+    }
 
 
 def _construire_segments(items, paragraphe, numero_groupe):
-    """Regroupe les corrections qui se chevauchent (union contiguë) puis découpe
-    le paragraphe en segments texte/correction."""
     blocs: list[dict] = []
     for fusion in items:
         correction = fusion.correction
-        if blocs and correction.debut < blocs[-1]["fin"]:  # intersection
+        if blocs and correction.debut < blocs[-1]["fin"]:
             blocs[-1]["items"].append(fusion)
             blocs[-1]["fin"] = max(blocs[-1]["fin"], correction.fin)
         else:
             blocs.append({"items": [fusion], "debut": correction.debut, "fin": correction.fin})
 
     segments: list[dict] = []
+    corrections_creees: list[dict] = []
     position = 0
+
     for bloc in blocs:
         if bloc["debut"] > position:
             segments.append({"type": "texte", "texte": paragraphe.texte[position:bloc["debut"]]})
+
         numero_groupe += 1
-        segments.append(_segment_du_bloc(bloc, paragraphe, f"g-{numero_groupe:04d}"))
+        groupe_id = f"g-{numero_groupe:04d}"
+        segment, infos = _segment_du_bloc(bloc, paragraphe, groupe_id)
+        segments.append(segment)
+        corrections_creees.extend(infos)
         position = bloc["fin"]
+
     if position < len(paragraphe.texte):
         segments.append({"type": "texte", "texte": paragraphe.texte[position:]})
-    return numero_groupe, segments
+
+    return numero_groupe, segments, corrections_creees
 
 
-def _segment_du_bloc(bloc, paragraphe, groupe: str) -> dict:
-    """Bloc d'une ou plusieurs corrections chevauchantes (v6 §7.3)."""
+def _segment_du_bloc(bloc, paragraphe, groupe: str) -> tuple[dict, list[dict]]:
     original = paragraphe.texte[bloc["debut"]:bloc["fin"]]
     items = bloc["items"]
 
+    infos_corrections = [_info_correction(f, groupe) for f in items]
+
     if len(items) == 1:
         fusion = items[0]
-        correction = fusion.correction
-        if correction.phase == "embellissement":
-            # Suggestion isolée, jamais barrée (v6 §7.3.3)
+        c = fusion.correction
+        info = infos_corrections[0]
+
+        if c.phase == "style":
+            # Répétitions / Style : soulignement pointillé bleu, original non altéré par défaut
             return {
-                "type": "suggestion",
+                "type": "style",
                 "groupe": groupe,
                 "original": original,
-                "suggestion": correction.correction,
-                "explication": correction.explication,
-                "regle": correction.regle,
-                "variantes": list(correction.variantes),
-            }
-        return {
-            "type": "simple",
-            "groupe": groupe,
-            "phase": correction.phase,
-            "original": original,
-            "texte": correction.correction,
-            "cas": [_cas(fusion)],
-        }
+                "paragraphe_id": c.paragraphe_id,
+                "info": info,
+            }, infos_corrections
 
-    tries = sorted(items, key=lambda f: ORDRE_PHASES.index(f.correction.phase))
+        elif c.phase == "embellissement":
+            # Embellissement : discret pointillé vert, original non altéré par défaut
+            return {
+                "type": "embellissement",
+                "groupe": groupe,
+                "original": original,
+                "paragraphe_id": c.paragraphe_id,
+                "info": info,
+            }, infos_corrections
+
+        else:
+            # Forme : barré + ins rouge
+            return {
+                "type": "forme",
+                "groupe": groupe,
+                "original": original,
+                "correction": c.correction,
+                "paragraphe_id": c.paragraphe_id,
+                "info": info,
+            }, infos_corrections
+
+    # Bloc multi (ex: Forme + Style)
     return {
         "type": "multi",
         "groupe": groupe,
         "original": original,
-        "ins": [
-            {"phase": f.correction.phase, "texte": f.correction.correction} for f in tries
-        ],
-        "cas": [_cas(f) for f in tries],
-    }
+        "paragraphe_id": items[0].correction.paragraphe_id,
+        "infos": infos_corrections,
+    }, infos_corrections
+

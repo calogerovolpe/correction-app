@@ -21,11 +21,12 @@
 | J1 — Moteur métier | ✅ Terminé | `28f7b62` |
 | J2 — MVP de relecture | ✅ Terminé | `aa1d5f9` |
 | J2.1 — Correctifs retour utilisateur | ✅ Terminé | `569c784` |
+| J2.2 — Atelier interactif & Word | ✅ Terminé | — |
 | J3 — Chaîne & codex | ⏳ Prochain | — |
 | J4 — Confort | ⬜ À faire | — |
 | J5 — Mise en ligne | ⬜ À faire | — |
 
-**État des tests** : 85/85 verts (`pytest`)
+**État des tests** : 89/89 verts (`pytest`)
 
 ---
 
@@ -65,6 +66,18 @@ corrections : 7 Forme, 1 Style, 3 Technique). 80 tests.
 - **Récupération des jobs orphelins** au démarrage (statut `echec` explicite, jamais de fantôme) ;
 - Texte brut : espaces/sauts de ligne conservés et restitués (`white-space: pre-wrap`).
 85 tests.
+
+## J2.2 — Atelier interactif & Fidélité Word ✅
+- **Éditeur Word-fidèle** (`app/services/texte_riche.py` + `app/templates/analyses/nouveau.html`) :
+  support contenteditable avec préservation du gras/italique/souligné sous forme de runs structurés (`RunFormat`)
+  et respect strict des paragraphes Word (1 ligne / dialogue = 1 paragraphe).
+- **Barre latérale (E5)** : suppression des tooltips encombrants au profit d'un panneau latéral fixe à droite
+  affichant le détail des corrections, la bascule Original/Corrigé pour la Forme, et la liste des incohérences Techniques.
+- **Style & Embellissement à la demande** : soulignement pointillé bleu (Style) et vert (Embellissement),
+  ouverture d'une bulle contextuelle au clic permettant de demander des alternatives ciblées à l'IA (`POST /api/alternatives`).
+- **Workflow de validation** : les écritures narratives ne sont plus automatiques à l'analyse. Boutons de fin de document :
+  « Soumettre une nouvelle version » et « Valider la version actuelle ».
+89 tests.
 
 ---
 

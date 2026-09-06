@@ -154,3 +154,154 @@ footer { border-top: 1px solid var(--bordure); color: var(--texte-secondaire); f
 .statut-terminee { background: #e8f5e9; color: #2e7d32; }
 .statut-echec, .statut-rejetee { background: #fdecea; color: #c62828; }
 .statut-en_cours, .statut-en_attente { background: #e3f2fd; color: #1565c0; }
+
+/* ===== NOUVEAU STYLE J2.2 : Éditeur Word & Atelier interactif ===== */
+.editeur-barre-outils {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  background: #f5f5f5;
+  border: 1px solid #bdbdbd;
+  border-bottom: none;
+  border-radius: 4px 4px 0 0;
+  padding: 0.4rem 0.6rem;
+}
+.btn-outil {
+  background: #ffffff;
+  border: 1px solid #bdbdbd;
+  border-radius: 3px;
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+  font-family: inherit;
+}
+.btn-outil:hover { background: #e0e0e0; }
+.info-outil { font-size: 0.8rem; color: #757575; margin-left: 0.6rem; }
+.editeur-word {
+  border: 1px solid #bdbdbd;
+  border-radius: 0 0 4px 4px;
+  min-height: 220px;
+  max-height: 480px;
+  overflow-y: auto;
+  padding: 0.8rem;
+  font-family: inherit;
+  font-size: 1rem;
+  line-height: 1.6;
+  background: #ffffff;
+  white-space: pre-wrap;
+}
+.editeur-word:focus { outline: 2px solid #212121; }
+
+/* Atelier 2 colonnes (E5) */
+.relecture-atelier {
+  display: flex;
+  gap: 1.5rem;
+  align-items: flex-start;
+  margin-top: 1rem;
+}
+.colonne-texte { flex: 1 1 65%; min-width: 0; }
+.barre-laterale {
+  flex: 0 0 320px;
+  position: sticky;
+  top: 1rem;
+  background: #fcfcfc;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  padding: 1rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+.barre-section + .barre-section {
+  margin-top: 1.2rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e0e0e0;
+}
+.barre-section h3 { margin: 0 0 0.5rem; font-size: 1rem; }
+.barre-section h4 { margin: 0.2rem 0; font-size: 0.95rem; color: #1565c0; }
+.barre-section .explication { margin: 0.3rem 0; font-size: 0.85rem; }
+.barre-section .regle { font-size: 0.8rem; color: #757575; }
+.choix-options { display: flex; flex-direction: column; gap: 0.3rem; margin-top: 0.6rem; font-size: 0.85rem; }
+
+/* Rendu in-text interactif J2.2 */
+.corr-forme { cursor: pointer; }
+.corr-style {
+  color: var(--corr-style);
+  border-bottom: 2px dotted var(--corr-style);
+  cursor: pointer;
+  padding: 0 1px;
+}
+.corr-embellissement {
+  color: var(--corr-embellissement);
+  border-bottom: 2px dotted var(--corr-embellissement);
+  cursor: pointer;
+  padding: 0 1px;
+}
+.corr-style:hover, .corr-embellissement:hover { background: #f0f4f8; }
+
+/* Bulle contextuelle popover (Style / Embellissement) */
+.bulle-contexte {
+  position: absolute;
+  z-index: 100;
+  background: #ffffff;
+  border: 1px solid #bdbdbd;
+  border-radius: 6px;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.18);
+  width: 320px;
+  padding: 0.8rem;
+  font-size: 0.85rem;
+}
+.bulle-entete {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #eeeeee;
+  padding-bottom: 0.4rem;
+  margin-bottom: 0.4rem;
+}
+.btn-fermer { background: none; border: none; font-size: 1.2rem; cursor: pointer; color: #757575; }
+.btn-demander-alternatives {
+  background: #1565c0;
+  color: #ffffff;
+  border: none;
+  border-radius: 4px;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  width: 100%;
+}
+.btn-demander-alternatives:hover { background: #0d47a1; }
+.liste-alternatives { list-style: none; padding: 0; margin: 0.4rem 0; display: flex; flex-direction: column; gap: 0.3rem; }
+.btn-choix-alt {
+  width: 100%;
+  text-align: left;
+  background: #f5f5f5;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  padding: 0.35rem 0.5rem;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.85rem;
+}
+.btn-choix-alt:hover { background: #e3f2fd; border-color: #90caf9; }
+.btn-revenir-original { background: #fafafa; color: #616161; font-style: italic; }
+
+/* Actions finales de relecture */
+.actions-fin-chapitre {
+  margin-top: 2rem;
+  padding-top: 1rem;
+  border-top: 2px solid #e0e0e0;
+  display: flex;
+  gap: 1rem;
+}
+.btn-action {
+  padding: 0.6rem 1.2rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  border-radius: 5px;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+.btn-nouvelle-version { background: #f5f5f5; border-color: #bdbdbd; color: #212121; }
+.btn-nouvelle-version:hover { background: #e0e0e0; }
+.btn-valider { background: #2e7d32; color: #ffffff; }
+.btn-valider:hover { background: #1b5e20; }
+

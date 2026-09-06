@@ -145,7 +145,7 @@ def test_rupture_reclassement_en_extrait(client, monkeypatch, dossier_donnees):
     page = client.get(f"/analyses/{identifiant}")
     assert "hors séquence" in page.text        # bannière reclassement_extrait
     assert "traité comme Extrait" in page.text
-    assert "Lecture Embellissement" in page.text  # bouton présent (suggestions actives en Extrait)
+    assert "Embellissement" in page.text
 
 
 def test_fail_fast_rejetee_zero_token(client, monkeypatch):

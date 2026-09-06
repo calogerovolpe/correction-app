@@ -88,3 +88,34 @@ class ReponseDeltas(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     deltas: list[DeltaRelecture]
+
+# --- Modèles du texte riche (J2.2) ---
+
+class RunFormat(BaseModel):
+    """Segment de texte avec attributs de mise en forme Word (gras, italique, souligné)."""
+    texte: str
+    gras: bool = False
+    italique: bool = False
+    souligne: bool = False
+
+
+class ParagrapheRiche(BaseModel):
+    """Paragraphe au format riche (un paragraphe Word = un bloc de runs)."""
+    id: str = Field(pattern=r"^p-\d+$")
+    runs: list[RunFormat] = []
+
+
+class DemandeAlternatives(BaseModel):
+    """Requête de l'utilisateur pour demander des alternatives ciblées à l'IA."""
+    fragment: str
+    paragraphe_texte: str
+    phase: Literal["style", "embellissement"] = "style"
+    mots_a_eviter: list[str] = []
+
+
+class ReponseAlternatives(BaseModel):
+    """Alternatives générées par le LLM."""
+    model_config = ConfigDict(extra="forbid")
+    alternatives: list[str] = []
+    explication: str = ""
+

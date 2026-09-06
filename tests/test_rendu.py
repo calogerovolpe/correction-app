@@ -23,27 +23,26 @@ def test_correction_simple_segments():
     )
     assert doc["nb_masques"] == 0
     segments = doc["paragraphes"][0]["segments"]
-    assert [s["type"] for s in segments] == ["texte", "simple", "texte"]
+    assert [s["type"] for s in segments] == ["texte", "forme", "texte"]
     assert segments[0]["texte"] == "Les sentinelles "
     assert segments[1]["original"] == "veille"
-    assert segments[1]["texte"] == "veillent"
-    assert segments[1]["groupe"].startswith("g-")  # calculé par Python (v6 §0-8)
+    assert segments[1]["correction"] == "veillent"
+    assert segments[1]["groupe"].startswith("g-")
 
 
 def test_bloc_multi_ordre_fixe():
-    # Deux corrections sur le même fragment : bloc multi, ordre Forme -> Technique (v6 §7.3.2)
+    # Deux corrections sur le même fragment
     doc = rendu.preparer_document(
         [
-            _fusion("c-2", "technique", 16, 22, "veille", "veillaient"),
+            _fusion("c-2", "style", 16, 22, "veille", "veillaient"),
             _fusion("c-1", "forme", 16, 22, "veille", "veillent"),
         ],
         [P1],
     )
     segments = doc["paragraphes"][0]["segments"]
     assert [s["type"] for s in segments] == ["texte", "multi", "texte"]
-    assert [i["phase"] for i in segments[1]["ins"]] == ["forme", "technique"]
     assert segments[1]["original"] == "veille"
-    assert [cas["phase"] for cas in segments[1]["cas"]] == ["forme", "technique"]
+    assert len(segments[1]["infos"]) == 2
 
 
 def test_embellissement_isole_suggestion_jamais_barre():
@@ -53,22 +52,17 @@ def test_embellissement_isole_suggestion_jamais_barre():
         [P1],
     )
     seg = doc["paragraphes"][0]["segments"][1]
-    assert seg["type"] == "suggestion"  # <mark class="sugg">, jamais barré (v6 §7.3.3)
-    assert seg["suggestion"] == "silencieux et sombre"
-    assert seg["variantes"] == ["muets"]
+    assert seg["type"] == "embellissement"
+    assert seg["original"] == "silencieux"
 
 
-def test_style_hote_embellissement_migre():
-    migre = EmbellissementMigre(
-        suggestion="veillent sans relâche", variantes=["veillaient"], explication="Prosodie."
-    )
+def test_style_interactif():
     doc = rendu.preparer_document(
-        [_fusion("c-4", "style", 16, 22, "veille", "veillent", migre=migre)], [P1]
+        [_fusion("c-4", "style", 16, 22, "veille", "veillent")], [P1]
     )
     seg = doc["paragraphes"][0]["segments"][1]
-    assert seg["type"] == "simple"  # correction Style normale (v6 §8.4 : Style prioritaire)
-    cas = seg["cas"][0]
-    assert cas["embellissement"]["suggestion"] == "veillent sans relâche"
+    assert seg["type"] == "style"
+    assert seg["original"] == "veille"
 
 
 def test_compteur_de_paragraphes_masques():

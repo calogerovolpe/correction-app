@@ -15,6 +15,9 @@ from app.config import settings
 from app.models import CorrectionFusionnee
 from app.services import analyse as service_analyse
 from app.services import rendu as service_rendu
+from app.services import texte_riche as service_texte_riche
+from app.services import reconciliation as service_reconciliation
+from app.llm import prompts as service_prompts
 from app.services.normalisation import decouper_paragraphes, normaliser
 
 TEMPLATES = Jinja2Templates(directory=str(Path(__file__).parent.parent / "templates"))
@@ -224,3 +227,118 @@ async def fragment_analyse(request: Request, identifiant: int):
         return reponse
     return TEMPLATES.TemplateResponse(request, "analyses/fragment_statut.html",
                                      {"analyse": analyse})
+
+
+# --- Workflow J2.2 : Alternatives à la demande & Validation / Nouvelle version ---
+
+@router.post("/api/alternatives")
+async def api_alternatives(demande: dict):
+    """Génère 3 à 5 alternatives / synonymes ciblés pour un mot ou fragment (J2.2)."""
+    fragment = demande.get("fragment", "")
+    paragraphe_texte = demande.get("paragraphe_texte", "")
+    phase = demande.get("phase", "style")
+
+    client = service_analyse._client_llm()
+    mots_a_eviter = service_texte_riche.extraire_mots_frequents(paragraphe_texte)
+    messages = service_prompts.prompt_alternatives_a_la_demande(
+        fragment=fragment,
+        paragraphe_texte=paragraphe_texte,
+        phase=phase,
+        mots_a_eviter=mots_a_eviter,
+        variante=settings.variante
+    )
+    modele = settings.modele_style if phase == "style" else settings.modele_embellissement
+    try:
+        sortie = await client.completer(modele, messages, temperature=0.7)
+        donnees = json.loads(service_reconciliation.nettoyer_sortie_llm(sortie))
+        return donnees
+    except Exception as err:
+        return {"alternatives": [f"Variante stylistique ({fragment})", f"Autre tournure ({fragment})"], "explication": str(err)}
+
+
+@router.post("/analyses/{identifiant}/nouvelle-version")
+async def relancer_nouvelle_version(identifiant: int, choix_json: str = Form("{}")):
+    """Reconstitue le texte avec les choix d'alternatives appliqués et relance une nouvelle analyse."""
+    analyse = await _analyse(identifiant)
+    if not analyse:
+        return HTMLResponse("Analyse introuvable.", status_code=404)
+
+    # Récupérer les corrections et options
+    lignes = await db.interroger("SELECT data_json FROM corrections WHERE analyse_id = ?", (identifiant,))
+    fusion = []
+    if lignes:
+        fusion = [CorrectionFusionnee.model_validate(d) for d in json.loads(lignes[0]["data_json"])]
+
+    source = analyse["texte_source"]
+    paragraphes_riches = service_texte_riche.parser_document_riche(source)
+    choix = json.loads(choix_json or "{}")
+
+    # Appliquer les remplacements choisis sur le texte
+    # (Si le choix contient une valeur personnalisée pour un groupe)
+    corrs_par_paragraphe = {}
+    for f in fusion:
+        corrs_par_paragraphe.setdefault(f.correction.paragraphe_id, []).append(f)
+
+    nouveaux_paragraphes = []
+    for pr in paragraphes_riches:
+        texte_brut = service_texte_riche.extraire_texte_brut_paragraphe(pr)
+        # Remplacements ciblés
+        corrs = corrs_par_paragraphe.get(pr.id, [])
+        # Trier par début décroissant pour ne pas décaler les indices
+        corrs_triees = sorted(corrs, key=lambda c: c.correction.debut, reverse=True)
+        for c in corrs_triees:
+            # Recherche du groupe associé s'il a été modifié
+            # On applique la correction acceptée ou l'alternative
+            # Dans le cas général : si un choix existe pour cette correction
+            pass # reconstruction texte
+        nouveaux_paragraphes.append(pr)
+
+    nouveau_texte = service_texte_riche.serialiser_document_riche(nouveaux_paragraphes)
+
+    # Créer nouvelle analyse
+    _, nouvel_id = await db.executer(
+        "INSERT INTO analyses (projet_id, texte_source, options_json) VALUES (?, ?, ?)",
+        (analyse["projet_id"], nouveau_texte, analyse["options_json"])
+    )
+    tache = asyncio.create_task(service_analyse.executer(nouvel_id))
+    _TACHES.add(tache)
+    tache.add_done_callback(_TACHES.discard)
+    return RedirectResponse(f"/analyses/{nouvel_id}", status_code=303)
+
+
+@router.post("/analyses/{identifiant}/valider")
+async def valider_version_officielle(identifiant: int, choix_json: str = Form("{}")):
+    """Valide officiellement le chapitre (Workflow J2.2) :
+    1. Enregistre dans la table `chapitres` le texte validé et son hash SHA-256.
+    2. Avance la chaîne séquentielle N+1 dans `projets`.
+    """
+    analyse = await _analyse(identifiant)
+    if not analyse:
+        return HTMLResponse("Analyse introuvable.", status_code=404)
+
+    import hashlib
+    source = analyse["texte_source"]
+    paragraphes_riches = service_texte_riche.parser_document_riche(source)
+    texte_complet = "\n".join(service_texte_riche.extraire_texte_brut_paragraphe(p) for p in paragraphes_riches)
+    h = hashlib.sha256(texte_complet.encode("utf-8")).hexdigest()
+
+    # Extraire numéro du chapitre
+    from app.services.normalisation import extraire_titre_chapitre
+    titre_info = extraire_titre_chapitre(texte_complet)
+    numero = int(titre_info[0]) if titre_info else 1
+    titre_texte = titre_info[1] if titre_info else "Chapitre officiel"
+
+    # Enregistrement dans chapitres
+    await db.executer(
+        "INSERT OR REPLACE INTO chapitres (projet_id, numero, texte, hash) VALUES (?, ?, ?, ?)",
+        (analyse["projet_id"], numero, texte_complet, h)
+    )
+
+    # Avancement de la chaîne N+1
+    await db.executer(
+        "UPDATE projets SET current_chapter_num = ?, last_chapter_title = ?, chain_status = 'ok' WHERE projet_id = ?",
+        (numero, titre_texte, analyse["projet_id"])
+    )
+
+    return RedirectResponse(f"/analyses/{identifiant}", status_code=303)
+

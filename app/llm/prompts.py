@@ -34,10 +34,11 @@ CONSIGNES_PHASES = {
         "Ne modifie JAMAIS le style ni le vocabulaire : uniquement ce qui est objectivement faux."
     ),
     "style": (
-        "Améliore la lisibilité, le rythme et l'élégance sans trahir la voix de l'auteur : "
-        "répétitions rapprochées, lourdeurs, pléonasmes, verbes ternes, déséquilibres de "
-        "cadence. Propose OBLIGATOIREMENT 1 correction principale et 2 à 4 variantes "
-        "dans le champ variantes."
+        "Détecte les problèmes de style sans proposer de variantes immédiates : "
+        "répétitions rapprochées, tics d'écriture récurrents, lourdeurs, pléonasmes, "
+        "verbes ternes. Cible précisément le fragment concerné dans `original`. "
+        "Dans `correction`, propose une amélioration directe succincte. "
+        "Laisse `variantes` vide : les alternatives seront demandées à la demande par l'auteur."
     ),
     "technique": (
         "Assure la rigueur structurelle et logique interne au texte soumis : concordance "
@@ -47,11 +48,11 @@ CONSIGNES_PHASES = {
         "incohérent dans ce texte seul."
     ),
     "embellissement": (
-        "Propose des suggestions stylistiques créatives NON contraignantes : enrichissement "
-        "lexical, recherche de sonorités (prosodie, assonances discrètes), figures de style "
-        "subtiles. Propose OBLIGATOIREMENT 2 à 4 variantes ordonnées de la plus sobre à la "
-        "plus audacieuse. N'apporte aucune correction de faute : ce sont des suggestions "
-        "que l'auteur restera libre d'ignorer."
+        "Repère les passages propices à un enrichissement stylistique créatif ou une élévation poétique "
+        "(recherche de sonorités, prosodie, métaphores subtiles). "
+        "Cible le fragment dans `original`. Dans `explication`, décris l'intention poétique (ex: 'Recherche d'assonance', 'Élévation lexicale'). "
+        "Dans `correction`, laisse le texte original ou une brève suggestion indicative. "
+        "Laisse `variantes` vide : les suggestions concrètes seront générées à la demande par l'auteur."
     ),
 }
 
@@ -127,6 +128,42 @@ def prompt_phase2_coherence(
         f"{delimiter('CODEX', repr(fiches_codex) if fiches_codex else '(codex vide)')}"
         f"{bloc_exclusions}\n\n"
         f"{delimiter('MANUSCRIT', texte_paragraphes)}"
+    )
+    return [
+        {"role": "system", "content": systeme},
+        {"role": "user", "content": utilisateur},
+    ]
+
+
+
+def prompt_alternatives_a_la_demande(
+    fragment: str,
+    paragraphe_texte: str,
+    phase: str = "style",
+    mots_a_eviter: list[str] | None = None,
+    variante: str = "france",
+) -> list[dict[str, str]]:
+    """Prompt pour générer 3 à 5 alternatives / synonymes ciblés pour un fragment précis,
+    en tenant compte du contexte immédiat et en évitant les répétitions des mots fréquents."""
+    systeme = (
+        "Tu es un assistant littéraire de haut niveau expert en stylistique française.\n"
+        "L'auteur te soumet un fragment dans son paragraphe de contexte et demande des alternatives de réécriture.\n"
+        "Règles impératives :\n"
+        "1. Propose entre 3 et 5 alternatives élégantes, fluides et parfaitement adaptées au ton du récit ;\n"
+        "2. RESPECTE STRICTEMENT le sens et l'intégration grammaticale dans la phrase ;\n"
+        "3. ATTENTION AUX RÉPÉTITIONS : n'utilise pas de mots listés dans les 'mots à éviter' qui sont déjà trop présents dans le texte ;\n"
+        "4. Réponds UNIQUEMENT par un JSON strict respectant ce schéma :\n"
+        '{"alternatives": ["proposition 1", "proposition 2", "..."], "explication": "brève justification stylistique"}'
+    )
+
+    eviter_str = ", ".join(mots_a_eviter[:30]) if mots_a_eviter else "aucun"
+    utilisateur = (
+        f"{CONSIGNE_ANTI_INJECTION}\n\n"
+        f"Variante linguistique : {variante}.\n"
+        f"Phase : {phase}.\n"
+        f"Mots fréquents à ÉVITER pour ne pas créer de nouvelle répétition : {eviter_str}.\n\n"
+        f"{delimiter('PARAGRAPHE_CONTEXTE', paragraphe_texte)}\n\n"
+        f"Fragment à remplacer : « {fragment} »"
     )
     return [
         {"role": "system", "content": systeme},

@@ -100,11 +100,11 @@ Une soumission crée une ligne `analyses` (statut `en_attente`) puis lance `anal
 
 ### 4.1 Normalisation et base immuable
 
-**Ordre** : soumission → normalisation → cette version devient la **base immuable** analysée par toutes les phases et restituée à l'affichage.
+**Ordre** : soumission → normalisation / parsing riche → cette version devient la **base immuable** analysée par toutes les phases et restituée à l'affichage.
 
 * `\r\n` et `\r` → `\n` ; suppression du BOM ; suppression des espaces en fin de ligne. **Aucune autre transformation** (pas de normalisation Unicode NFC) — fidélité au texte de l'auteur.
-* **Paragraphes** : découpage sur `\n{2,}`, numérotation `p-1`, `p-2`… (base 1). Les sauts de ligne simples restent **au sein d'un même paragraphe**.
-* **Offsets** : indices de caractères Python sur le paragraphe normalisé ; `debut` inclusif, `fin` exclusif. Invariant : `paragraphe[debut:fin] == original`.
+* **Format riche (Word-fidèle, J2.2)** : chaque paragraphe Word (ligne, dialogue, bloc) correspond à un paragraphe indépendant (`p-1`, `p-2`…). Les mises en forme de base (gras, italique, souligné) sont préservées sous forme de runs structurés (`RunFormat`).
+* **Offsets** : indices de caractères Python sur le texte brut du paragraphe normalisé ; `debut` inclusif, `fin` exclusif. Invariant : `paragraphe[debut:fin] == original`.
 * **Garde-fou taille** : refus explicite au-delà de `max_caracteres` (défaut 30 000) — jamais de troncature silencieuse du contexte du modèle.
 
 ### 4.2 Contrat JSON des corrections LLM
@@ -194,9 +194,9 @@ Le pré-cochage s'ajuste **en direct** selon la catégorie détectée ; une case
 | Phase | Rôle | Température |
 |---|---|---|
 | **Forme** | Orthographe, grammaire, typographie objectives (coquilles, accords, homophones, insécables, guillemets « », tirets —) ; respect strict de la variante linguistique ; ne touche jamais au style | 0.0 |
-| **Style** | Lisibilité, rythme, répétitions rapprochées, lourdeurs, pléonasmes — sans trahir la voix de l'auteur ; contrat : 1 correction principale + 2 à 4 variantes | 0.0 |
-| **Technique** | Cohérence **intra-texte** : concordance des temps, stabilité du POV, détails factuels de l'extrait | 0.0 |
-| **Embellissement** | Suggestions créatives non contraignantes (lexique, prosodie, figures subtiles) ; contrat : 2 à 4 variantes ordonnées de la plus sobre à la plus audacieuse | **jauge utilisateur** (défaut 0.8) |
+| **Style** | Lisibilité, rythme, répétitions rapprochées, lourdeurs, pléonasmes. Détection ciblée ; les alternatives ne sont pas pré-générées mais produites à la demande au clic de l'auteur | 0.0 |
+| **Technique** | Cohérence **intra-texte** : concordance des temps, stabilité du POV, détails factuels de l'extrait. Affiché exclusivement dans la barre latérale | 0.0 |
+| **Embellissement** | Repérage de passages propices à élévation poétique/lexicale ; suggestions concrètes générées à la demande au clic de l'auteur | **jauge utilisateur** (défaut 0.8) |
 | **Phase 2** (rôle `modele_phase2`, jalon J3) | Extraction codex, cohérence inter-chapitres contre le codex, relecture-diff du remplacement | 0.0 |
 
 **Jauge de créativité** (décision J2.1) : la température de l'Embellissement est choisie par l'utilisateur à chaque soumission (curseur 0 = sobre → 1.5 = audacieux), transmise dans `options_json.temperature_embellissement` ; défaut : `APP_TEMPERATURE_EMBELLISSEMENT`.
@@ -270,9 +270,9 @@ Navigation clavier : `←`/`→` entre corrections visibles (centrage + `outline
 |---|---|---|
 | **E1 — Accueil/Projets** | ✅ Livré | Projets (statut de chaîne, chapitre courant), création, projet actif, **analyses récentes** (10 dernières : statut coloré, catégorie, extrait, lien) |
 | **E2 — Timeline de chaîne** | ⬜ J3 | Chapitres officiels (Prologue=0, 1..N), numéro attendu en évidence, reclassés grisés « hors chaîne » |
-| **E3 — Soumission** | ✅ Livré | Textarea + compteur live `max_caracteres` ; catégorie auto en direct + forçage ; 4 cases de phases pré-cochées décochables (§5.4) + **jauge de créativité** (si Embellissement) ; case remplacement officiel ; refus explicites (400) |
+| **E3 — Soumission** | ✅ Livré | Éditeur Word-fidèle (contenteditable, gras/italique/souligné) + compteur live `max_caracteres` ; catégorie auto en direct + forçage ; 4 cases de phases pré-cochées décochables (§5.4) + **jauge de créativité** (si Embellissement) ; case remplacement officiel ; refus explicites (400) |
 | **E4 — Suivi de job** | ✅ Livré | Polling HTMX 2 s, étape courante, redirection finale ; écrans d'échec/refus avec gabarits §7.2-7.3 |
-| **E5 — Résultat** | ✅ Livré | Document annoté : seuls les paragraphes corrigés + compteur « X non affichés » ; corrections simples (`del` barré + `ins` coloré), blocs multi (`del--multi` italique pointillé + `ins` ordonnés Forme→Style→Technique→Embellissement), suggestions isolées (`mark.sugg` jamais barré) ; tooltips multi-cas au focus (variantes, sections « Embellissement — suggestions » migrées) ; légende interactive à pastilles ; **bouton « Lecture Embellissement »** (visible seulement si la phase 6 a produit des suggestions ; lecture exclusive, retour à l'état précédent au second clic) |
+| **E5 — Résultat (Atelier interactif J2.2)** | ✅ Livré | Document annoté : seuls les paragraphes corrigés + compteur « X masqués » ; Forme (barré conservé + original/corrigé sélectionnable) ; Style (souligné pointillé bleu + bulle contextuelle pour demander alternatives à l'IA) ; Embellissement (pointillé vert + suggestions à la demande) ; Technique (isolé dans la barre latérale droite) ; boutons de workflow de fin de chapitre (« Soumettre une nouvelle version » et « Valider la version actuelle ») |
 | **E6 — Codex** | ⬜ J3 | Fiches par catégorie, alias, éditeur manuel |
 | **E7 — Journaux** | ⬜ J3 | Journaux ecriture/evolution/intrigue, lecture seule |
 | **E8 — Paramètres** | ⬜ J4 | Modèles/températures/garde-fous, test de connexion |
@@ -305,6 +305,7 @@ Navigation clavier : `←`/`→` entre corrections visibles (centrage + `outline
 | J1 — Moteur métier | ✅ | `28f7b62` | Normalisation, réconciliation/déduplication, chaîne N+1, alertes, client LLM + mock — 65 tests |
 | J2 — MVP de relecture | ✅ | `aa1d5f9` | E3/E4/E5, jobs async, phases 3-6 Mistral parallèles, rendu annoté complet, E2E réel — 80 tests |
 | J2.1 — Correctifs retour utilisateur | ✅ | `569c784` | Fix redirection, matrice dérogable, jauge de créativité, analyses récentes, orphelins — 85 tests |
+| J2.2 — Atelier interactif & Word | ✅ | En cours | Texte riche Word-fidèle, Forme (barré), Style/Embellissement (alternatives à la demande), Technique (barre latérale), validation manuelle des chapitres — 89 tests |
 | J3 — Chaîne & codex | ⏳ prochain | — | Voir §9 + critère d'acceptation ci-dessous |
 | J4 — Confort | ⬜ | — | E8, E9, exports, import .docx |
 | J5 — Mise en ligne | ⬜ | — | Docker prod, Caddy TLS, auth simple, Tailscale documenté |

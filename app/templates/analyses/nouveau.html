@@ -10,11 +10,18 @@
 {% if erreur %}<div class="bandeau bandeau--avertissement">{{ erreur }}</div>{% endif %}
 
 {% if projet %}
-<form method="post" action="/analyses" class="formulaire-soumission">
-  <label for="texte">Texte à corriger</label>
-  <textarea id="texte" name="texte" rows="16" required></textarea>
+<form method="post" action="/analyses" class="formulaire-soumission" id="form-soumission">
+  <div class="editeur-barre-outils">
+    <button type="button" class="btn-outil" onclick="document.execCommand('bold', false, null)"><strong>G</strong></button>
+    <button type="button" class="btn-outil" onclick="document.execCommand('italic', false, null)"><em>I</em></button>
+    <button type="button" class="btn-outil" onclick="document.execCommand('underline', false, null)"><u>S</u></button>
+    <span class="info-outil">Collez directement depuis Word : chaque paragraphe et style (gras, italique, souligné) est fidèlement préservé.</span>
+  </div>
+
+  <div id="editeur-word" class="editeur-word" contenteditable="true" role="textbox" aria-multiline="true"></div>
+  <input type="hidden" name="texte" id="texte-json" value="">
+
   <p class="compteur-taille"><span id="compteur">0</span> / {{ max_caracteres }} caractères — au-delà : refus explicite, jamais de troncature.</p>
-  <p class="info-texte">ℹ️ Le texte est analysé en <strong>texte brut</strong> : espaces, indentation et sauts de ligne sont conservés et respectés à l'affichage. L'italique et le gras ne sont pas conservés (import .docx prévu au jalon J4).</p>
 
   <fieldset>
     <legend>Catégorie</legend>
@@ -26,10 +33,10 @@
   <fieldset>
     <legend>Types de correction — pré-cochés selon la catégorie, librement modifiables</legend>
     <input type="hidden" name="phases" id="phases-json" value="">
-    <label><input type="checkbox" id="case-forme"> <strong>Forme</strong> — orthographe, grammaire, typographie</label>
-    <label><input type="checkbox" id="case-style"> <strong>Style</strong> — répétitions, rythme, fluidité</label>
-    <label><input type="checkbox" id="case-technique"> <strong>Technique</strong> — temps, POV, cohérence interne</label>
-    <label><input type="checkbox" id="case-embellissement"> <strong>Embellissement</strong> — suggestions créatives non contraignantes</label>
+    <label><input type="checkbox" id="case-forme"> <strong>Forme</strong> — orthographe, grammaire (barré conservé)</label>
+    <label><input type="checkbox" id="case-style"> <strong>Style</strong> — répétitions, lourdeurs (alternatives à la demande)</label>
+    <label><input type="checkbox" id="case-technique"> <strong>Technique</strong> — temps, POV, cohérence (barre latérale)</label>
+    <label><input type="checkbox" id="case-embellissement"> <strong>Embellissement</strong> — créativité (suggestions à la demande)</label>
     <div class="jauge" id="jauge-embellissement" hidden>
       <label for="creativite">Créativité de l'Embellissement (température) : <strong id="valeur-creativite">{{ temperature_defaut }}</strong></label>
       <input type="range" id="creativite" name="temperature_embellissement"
@@ -39,10 +46,10 @@
   </fieldset>
 
   <fieldset>
-    <legend>Remplacement officiel (équivalent /maj)</legend>
+    <legend>Remplacement officiel</legend>
     <label><input type="checkbox" name="remplacement">
       Considérer ce texte comme le <strong>remplacement du chapitre courant</strong> (N=N) —
-      la correction reste livrée intégralement ; refus si le chapitre courant n'a jamais été soumis.</label>
+      la validation finale mettra à jour le chapitre officiel.</label>
   </fieldset>
 
   <button type="submit">Lancer l'analyse</button>
@@ -50,7 +57,8 @@
 
 <script>
 (() => {
-  const zone = document.getElementById('texte');
+  const editeur = document.getElementById('editeur-word');
+  const texteJson = document.getElementById('texte-json');
   const compteur = document.getElementById('compteur');
   const apercu = document.getElementById('apercu-categorie');
   const cases = {
@@ -74,18 +82,87 @@
     });
   }
 
-  function categorieDemandee() {
+  function serialiserEditeur() {
+    if (!editeur) return "";
+    let childNodes = Array.from(editeur.childNodes);
+    if (childNodes.length === 0) {
+      texteJson.value = "";
+      compteur.textContent = "0";
+      return "";
+    }
+
+    let blocs = [];
+    let blocCourant = [];
+
+    childNodes.forEach(node => {
+      if (node.nodeType === Node.ELEMENT_NODE && (node.tagName === 'P' || node.tagName === 'DIV')) {
+        if (blocCourant.length > 0) {
+          blocs.push(blocCourant);
+          blocCourant = [];
+        }
+        blocs.push([node]);
+      } else if (node.nodeType === Node.ELEMENT_NODE && node.tagName === 'BR') {
+        if (blocCourant.length > 0) {
+          blocs.push(blocCourant);
+          blocCourant = [];
+        }
+      } else {
+        blocCourant.push(node);
+      }
+    });
+    if (blocCourant.length > 0) blocs.push(blocCourant);
+
+    const paragraphes = [];
+    let texteBrutTotal = "";
+    let pIndex = 1;
+
+    blocs.forEach(bloc => {
+      const runs = [];
+      let texteBloc = "";
+
+      function explorerNoeud(noeud, gras, italique, souligne) {
+        if (noeud.nodeType === Node.TEXT_NODE) {
+          const t = noeud.textContent;
+          if (t) {
+            runs.push({ texte: t, gras: gras, italique: italique, souligne: souligne });
+            texteBloc += t;
+          }
+        } else if (noeud.nodeType === Node.ELEMENT_NODE) {
+          const tag = noeud.tagName;
+          const isGras = gras || tag === 'B' || tag === 'STRONG';
+          const isItalique = italique || tag === 'I' || tag === 'EM';
+          const isSouligne = souligne || tag === 'U';
+          Array.from(noeud.childNodes).forEach(enfant => {
+            explorerNoeud(enfant, isGras, isItalique, isSouligne);
+          });
+        }
+      }
+
+      bloc.forEach(node => explorerNoeud(node, false, false, false));
+
+      if (texteBloc.trim().length > 0) {
+        paragraphes.push({ id: `p-${pIndex++}`, runs: runs });
+        texteBrutTotal += texteBloc + "\n";
+      }
+    });
+
+    texteJson.value = JSON.stringify(paragraphes);
+    compteur.textContent = texteBrutTotal.trim().length;
+    return texteBrutTotal;
+  }
+
+  function categorieDemandee(texteBrut) {
     const radio = document.querySelector('input[name="categorie"]:checked');
     if (radio && radio.value !== 'auto') return radio.value;
-    const premiereLigne = zone.value.split('\n', 1)[0];
-    if (/^\s*\d+(?:\.\d+)?\s*:\s*\S/.test(premiereLigne) || premiereLigne.trim() === 'Prologue') return 'chapitre';
-    const blocs = zone.value.split(/\n{2,}/).filter((b) => b.trim() !== '');
+    const premiereLigne = (texteBrut.split('\n')[0] || "").trim();
+    if (/^\s*\d+(?:\.\d+)?\s*:\s*\S/.test(premiereLigne) || premiereLigne === 'Prologue') return 'chapitre';
+    const blocs = texteBrut.split(/\n+/).filter(b => b.trim() !== '');
     return blocs.length >= 3 ? 'passage' : 'extrait';
   }
 
-  // Pré-cochage matrice (v6 §5.4) — dérogable : seules les cases jamais touchées suivent la catégorie
   function ajuster() {
-    const categorie = categorieDemandee();
+    const texteBrut = serialiserEditeur();
+    const categorie = categorieDemandee(texteBrut);
     const defauts = {
       forme: true,
       style: categorie === 'chapitre',
@@ -100,12 +177,23 @@
     ecrirePhases();
   }
 
-  zone.addEventListener('input', () => { compteur.textContent = zone.value.length; ajuster(); });
-  document.querySelectorAll('input[name="categorie"]').forEach((r) => r.addEventListener('change', ajuster));
+  editeur.addEventListener('input', ajuster);
+  editeur.addEventListener('paste', () => setTimeout(ajuster, 20));
+
+  document.querySelectorAll('input[name="categorie"]').forEach(r => r.addEventListener('change', ajuster));
   Object.entries(cases).forEach(([phase, element]) => {
     element.addEventListener('change', () => { touchee[phase] = true; ajuster(); });
   });
   creativite.addEventListener('input', () => { valeurCreativite.textContent = creativite.value; });
+
+  const form = document.getElementById('form-soumission');
+  if (form) {
+    form.addEventListener('submit', () => {
+      serialiserEditeur();
+      ecrirePhases();
+    });
+  }
+
   ajuster();
 })();
 </script>

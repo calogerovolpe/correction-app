@@ -3,80 +3,230 @@
 {% block contenu %}
 <h2>Résultat de l'analyse #{{ analyse.id }}</h2>
 <p>Catégorie : <strong>{{ analyse.categorie }}</strong>
-{%- if analyse.decision == 'conforme' %} — chapitre officiel conforme (écritures du codex au jalon J3)
-{%- elif analyse.decision == 'remplacement_officiel' %} — remplacement officiel
+{%- if analyse.decision == 'conforme' %} — chapitre officiel conforme (écritures à la validation)
+{%- elif analyse.decision == 'remplacement_officiel' %} — remplacement officiel (écritures à la validation)
 {%- elif analyse.decision == 'forcage' %} — catégorie forcée par l'auteur
-{%- endif %} · {{ nb_corrections }} correction(s) fusionnée(s)</p>
+{%- endif %} · {{ nb_corrections }} correction(s) répertoriée(s)</p>
 
 {% if analyse.decision == 'reclassement_extrait' %}
 <div class="bandeau bandeau--information">{{ analyse.message or "Chapitre hors séquence — traité comme Extrait ; le codex n'a pas été modifié." }}</div>
 {% endif %}
 
-<div x-data="{ forme: true, style: true, technique: true, embellissement: true, lecture: false }" class="relecture">
-  <div class="legende" role="toolbar" aria-label="Filtres d'affichage">
-    <button type="button" class="pastille pastille--forme" :class="{ 'pastille--off': !forme }" :aria-pressed="forme" @click="forme = !forme">Forme</button>
-    <button type="button" class="pastille pastille--style" :class="{ 'pastille--off': !style }" :aria-pressed="style" @click="style = !style">Style</button>
-    <button type="button" class="pastille pastille--technique" :class="{ 'pastille--off': !technique }" :aria-pressed="technique" @click="technique = !technique">Technique</button>
-    <button type="button" class="pastille pastille--embellissement" :class="{ 'pastille--off': !embellissement }" :aria-pressed="embellissement" @click="embellissement = !embellissement">Embellissement</button>
-    {% if avec_embellissements %}
-    <button type="button" class="bouton-lecture" :aria-pressed="lecture" :class="{ 'bouton-lecture--on': lecture }" @click="lecture = !lecture">📖 Lecture Embellissement</button>
-    {% endif %}
-    {% if document.nb_masques > 0 %}
-    <span class="compteur-masques">{{ document.nb_masques }} paragraphe(s) sans correction non affichés</span>
-    {% endif %}
+<div x-data="relectureApp()" class="relecture-atelier">
+  <!-- Colonne centrale : Texte annoté avec filtres -->
+  <div class="colonne-texte">
+    <div class="legende" role="toolbar" aria-label="Filtres d'affichage">
+      <button type="button" class="pastille pastille--forme" :class="{ 'pastille--off': !filtres.forme }" :aria-pressed="filtres.forme" @click="filtres.forme = !filtres.forme">Forme</button>
+      <button type="button" class="pastille pastille--style" :class="{ 'pastille--off': !filtres.style }" :aria-pressed="filtres.style" @click="filtres.style = !filtres.style">Style</button>
+      <button type="button" class="pastille pastille--technique" :class="{ 'pastille--off': !filtres.technique }" :aria-pressed="filtres.technique" @click="filtres.technique = !filtres.technique">Technique</button>
+      <button type="button" class="pastille pastille--embellissement" :class="{ 'pastille--off': !filtres.embellissement }" :aria-pressed="filtres.embellissement" @click="filtres.embellissement = !filtres.embellissement">Embellissement</button>
+      {% if document.nb_masques > 0 %}
+      <span class="compteur-masques">{{ document.nb_masques }} paragraphe(s) sans correction masqués</span>
+      {% endif %}
+    </div>
+
+    <div id="document-texte" class="document"
+         :class="{ 'filtre-forme-off': !filtres.forme, 'filtre-style-off': !filtres.style, 'filtre-technique-off': !filtres.technique, 'filtre-embellissement-off': !filtres.embellissement }">
+      {% for par in document.paragraphes %}
+      <p class="paragraphe" data-paragraphe-id="{{ par.id }}">
+        {%- for seg in par.segments -%}
+        {%- if seg.type == 'texte' %}{{ seg.texte }}
+        {%- elif seg.type == 'forme' %}
+        <span class="corr-forme" id="{{ seg.groupe }}" @click="selectionnerCorrection('{{ seg.groupe }}')">
+          <del class="del" x-show="!choix['{{ seg.groupe }}'] || choix['{{ seg.groupe }}'] === 'corrige'">{{ seg.original }}</del>
+          <ins class="ins ins--forme" x-text="choix['{{ seg.groupe }}'] === 'original' ? '{{ seg.original }}' : '{{ seg.correction }}'"></ins>
+        </span>
+        {%- elif seg.type == 'style' %}
+        <span class="corr-style" id="{{ seg.groupe }}"
+              @click="ouvrirBulle($event, '{{ seg.groupe }}', 'style', '{{ seg.original }}', '{{ par.id }}', '{{ seg.info.explication }}')"
+              x-text="choix['{{ seg.groupe }}'] || '{{ seg.original }}'"></span>
+        {%- elif seg.type == 'embellissement' %}
+        <span class="corr-embellissement" id="{{ seg.groupe }}"
+              @click="ouvrirBulle($event, '{{ seg.groupe }}', 'embellissement', '{{ seg.original }}', '{{ par.id }}', '{{ seg.info.explication }}')"
+              x-text="choix['{{ seg.groupe }}'] || '{{ seg.original }}'"></span>
+        {%- elif seg.type == 'multi' %}
+        <span class="corr-multi" id="{{ seg.groupe }}" @click="selectionnerCorrection('{{ seg.groupe }}')">
+          <span class="del--multi" x-text="choix['{{ seg.groupe }}'] || '{{ seg.original }}'"></span>
+        </span>
+        {%- endif %}
+        {%- endfor %}
+      </p>
+      {% endfor %}
+      {% if not document.paragraphes %}
+      <p class="aucune-correction">Aucune correction détectée — le texte est ressorti propre de toutes les phases actives.</p>
+      {% endif %}
+    </div>
+
+    <!-- Actions finales de relecture (Workflow J2.2) -->
+    <div class="actions-fin-chapitre">
+      <form method="post" action="/analyses/{{ analyse.id }}/nouvelle-version" style="display:inline;">
+        <input type="hidden" name="choix_json" :value="JSON.stringify(choix)">
+        <button type="submit" class="btn-action btn-nouvelle-version">🔄 Soumettre une nouvelle version (re-correction)</button>
+      </form>
+      {% if analyse.decision in ('conforme', 'remplacement_officiel') %}
+      <form method="post" action="/analyses/{{ analyse.id }}/valider" style="display:inline;">
+        <input type="hidden" name="choix_json" :value="JSON.stringify(choix)">
+        <button type="submit" class="btn-action btn-valider">✅ Valider la version actuelle (officielle)</button>
+      </form>
+      {% endif %}
+    </div>
   </div>
 
-  <div id="document" class="document"
-       :class="{ 'filtre-forme-off': !forme, 'filtre-style-off': !style, 'filtre-technique-off': !technique, 'filtre-embellissement-off': !embellissement, 'lecture-embellissement': lecture }">
-    {% for par in document.paragraphes %}
-    <p class="paragraphe" data-paragraphe-id="{{ par.id }}">
-      {%- for seg in par.segments -%}
-      {%- if seg.type == 'texte' %}{{ seg.texte }}
-      {%- elif seg.type == 'simple' %}
-      <span class="corr corr--{{ seg.phase }}" data-groupe="{{ seg.groupe }}">
-        <del class="del">{{ seg.original }}</del>
-        <ins class="ins ins--{{ seg.phase }}" tabindex="0" aria-describedby="tip-{{ seg.groupe }}">{{ seg.texte }}</ins>
-        <span class="tooltip" id="tip-{{ seg.groupe }}" role="tooltip" hidden>
-          {% for cas in seg.cas %}{% include "analyses/_cas.html" %}{% endfor %}
-        </span>
-      </span>
-      {%- elif seg.type == 'multi' %}
-      <span class="corr corr--multi" data-groupe="{{ seg.groupe }}">
-        <del class="del del--multi">{{ seg.original }}</del>
-        {%- for i in seg.ins %}<ins class="ins ins--{{ i.phase }}" tabindex="0" aria-describedby="tip-{{ seg.groupe }}">{{ i.texte }}</ins>{% endfor %}
-        <span class="tooltip tooltip--multi" id="tip-{{ seg.groupe }}" role="tooltip" hidden>
-          {% for cas in seg.cas %}{% include "analyses/_cas.html" %}{% endfor %}
-        </span>
-      </span>
-      {%- elif seg.type == 'suggestion' %}
-      <span class="corr-sugg" data-groupe="{{ seg.groupe }}">
-        <mark class="sugg" tabindex="0" aria-describedby="tip-{{ seg.groupe }}">{{ seg.original }}</mark>
-        <span class="tooltip" id="tip-{{ seg.groupe }}" role="tooltip" hidden>
-          <section class="tooltip__cas">
-            <h4 class="tooltip__cas-titre">Embellissement — suggestion non contraignante</h4>
-            <p class="tooltip__explication">{{ seg.explication }}</p>
-            <p class="tooltip__suggestion">Suggestion : {{ seg.suggestion }}</p>
-            {% if seg.variantes %}
-            <ul class="tooltip__variantes">
-              {% for variante in seg.variantes %}<li>{{ variante }}</li>{% endfor %}
-            </ul>
-            {% endif %}
-          </section>
-        </span>
-      </span>
-      {%- endif %}
-      {%- endfor %}
-    </p>
-    {% endfor %}
-    {% if not document.paragraphes %}
-    <p class="aucune-correction">Aucune correction détectée — le texte est ressorti propre de toutes les phases actives (v6 §8.5 : une liste vide est un résultat valide).</p>
-    {% endif %}
+  <!-- Colonne latérale droite : détails des corrections et incohérences techniques -->
+  <aside class="barre-laterale">
+    <div class="barre-section" x-show="correctionActive">
+      <h3>Détails de la correction</h3>
+      <template x-if="correctionActive">
+        <div>
+          <h4 x-text="correctionActive.titre"></h4>
+          <p class="explication" x-text="correctionActive.explication"></p>
+          <template x-if="correctionActive.regle">
+            <p class="regle"><strong>Règle :</strong> <span x-text="correctionActive.regle"></span></p>
+          </template>
+
+          <div class="choix-options" x-show="correctionActive.phase === 'forme'">
+            <label>
+              <input type="radio" :name="'choix-' + correctionActive.groupe" value="corrige"
+                     :checked="!choix[correctionActive.groupe] || choix[correctionActive.groupe] === 'corrige'"
+                     @change="choix[correctionActive.groupe] = 'corrige'">
+              Correction appliquée (<span x-text="correctionActive.correction"></span>)
+            </label>
+            <label>
+              <input type="radio" :name="'choix-' + correctionActive.groupe" value="original"
+                     :checked="choix[correctionActive.groupe] === 'original'"
+                     @change="choix[correctionActive.groupe] = 'original'">
+              Garder l'original (<span x-text="correctionActive.original"></span>)
+            </label>
+          </div>
+        </div>
+      </template>
+    </div>
+
+    <!-- Section Incohérences Techniques -->
+    <div class="barre-section section-technique" x-show="filtres.technique && correctionsTechniques.length > 0">
+      <h3>Incohérences Techniques (<span x-text="correctionsTechniques.length"></span>)</h3>
+      <ul class="liste-techniques">
+        <template x-for="tech in correctionsTechniques" :key="tech.id">
+          <li class="item-technique">
+            <strong x-text="tech.titre"></strong>
+            <p x-text="tech.explication"></p>
+          </li>
+        </template>
+      </ul>
+    </div>
+  </aside>
+
+  <!-- Bulle contextuelle popover (Style & Embellissement) -->
+  <div class="bulle-contexte" id="bulle-contexte" x-show="bulle.ouverte" :style="bulle.style" @click.outside="bulle.ouverte = false" style="display:none;">
+    <div class="bulle-entete">
+      <strong x-text="bulle.phase === 'style' ? 'Problème de Style' : 'Suggestion d\'Embellissement'"></strong>
+      <button type="button" class="btn-fermer" @click="bulle.ouverte = false">&times;</button>
+    </div>
+    <p class="bulle-explication" x-text="bulle.explication"></p>
+
+    <div class="bulle-actions" x-show="!bulle.chargement && bulle.alternatives.length === 0">
+      <button type="button" class="btn-demander-alternatives" @click="demanderAlternatives()">
+        ✨ Demander des alternatives à l'IA
+      </button>
+    </div>
+
+    <div x-show="bulle.chargement" class="bulle-chargement">
+      ⏳ Recherche d'alternatives littéraires...
+    </div>
+
+    <div x-show="bulle.alternatives.length > 0" class="bulle-resultats">
+      <p class="titre-choix">Choisissez une alternative :</p>
+      <ul class="liste-alternatives">
+        <template x-for="alt in bulle.alternatives" :key="alt">
+          <li>
+            <button type="button" class="btn-choix-alt" @click="appliquerAlternative(alt)" x-text="alt"></button>
+          </li>
+        </template>
+        <li>
+          <button type="button" class="btn-choix-alt btn-revenir-original" @click="appliquerAlternative(bulle.original)">
+            ↩️ Garder la version originale
+          </button>
+        </li>
+      </ul>
+    </div>
   </div>
 </div>
 
-<p class="actions-resultat">
-  <a href="/analyses/nouveau">Soumettre un autre texte</a> ·
-  <a href="/">Accueil</a>
-</p>
-<script src="/static/app.js"></script>
+<script>
+function relectureApp() {
+  return {
+    filtres: { forme: true, style: true, technique: true, embellissement: true },
+    choix: {},
+    correctionsBarre: {{ document.corrections_barre | tojson }},
+    correctionsTechniques: {{ document.corrections_techniques | tojson }},
+    correctionActive: null,
+    bulle: {
+      ouverte: false,
+      style: '',
+      groupe: '',
+      phase: '',
+      original: '',
+      paragrapheId: '',
+      explication: '',
+      chargement: false,
+      alternatives: []
+    },
+
+    init() {
+      if (this.correctionsBarre.length > 0) {
+        this.correctionActive = this.correctionsBarre[0];
+      }
+    },
+
+    selectionnerCorrection(groupe) {
+      const c = this.correctionsBarre.find(item => item.groupe === groupe);
+      if (c) {
+        this.correctionActive = c;
+      }
+    },
+
+    ouvrirBulle(event, groupe, phase, original, paragrapheId, explication) {
+      const rect = event.target.getBoundingClientRect();
+      this.bulle.groupe = groupe;
+      this.bulle.phase = phase;
+      this.bulle.original = original;
+      this.bulle.paragrapheId = paragrapheId;
+      this.bulle.explication = explication;
+      this.bulle.alternatives = [];
+      this.bulle.chargement = false;
+      this.bulle.style = `top: ${window.scrollY + rect.bottom + 6}px; left: ${window.scrollX + rect.left}px;`;
+      this.bulle.ouverte = true;
+      this.selectionnerCorrection(groupe);
+    },
+
+    async demanderAlternatives() {
+      this.bulle.chargement = true;
+      try {
+        const parEl = document.querySelector(`[data-paragraphe-id="${this.bulle.paragrapheId}"]`);
+        const rep = await fetch('/api/alternatives', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fragment: this.bulle.original,
+            paragraphe_texte: parEl ? parEl.textContent : this.bulle.original,
+            phase: this.bulle.phase
+          })
+        });
+        const data = await rep.json();
+        this.bulle.alternatives = data.alternatives || [];
+      } catch (err) {
+        alert("Erreur lors de la génération des alternatives : " + err);
+      } finally {
+        this.bulle.chargement = false;
+      }
+    },
+
+    appliquerAlternative(texte) {
+      this.choix[this.bulle.groupe] = texte;
+      this.bulle.ouverte = false;
+    }
+  }
+}
+</script>
+
 {% endblock %}

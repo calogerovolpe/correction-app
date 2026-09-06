@@ -19,7 +19,7 @@ from app.config import settings
 from app.llm.client import ClientLLM
 from app.llm.prompts import CONSIGNES_PHASES, prompt_phase_correction
 from app.models import PannePhase
-from app.services import chaine, reconciliation
+from app.services import chaine, reconciliation, texte_riche
 from app.services.normalisation import (
     decouper_paragraphes,
     detecter_categorie,
@@ -109,9 +109,18 @@ async def _executer_interne(identifiant: int) -> None:
     options = json.loads(analyse["options_json"] or "{}")
 
     await _maj(identifiant, statut="en_cours", etape="normalisation")
-    texte = normaliser(analyse["texte_source"])
+    source = analyse["texte_source"]
+
+    # Support format riche (v2 JSON) ou texte brut (legacy)
+    paragraphes_riches = texte_riche.parser_document_riche(source)
+    if paragraphes_riches:
+        paragraphes = texte_riche.convertir_en_paragraphes_simples(paragraphes_riches)
+        texte = "\n".join(p.texte for p in paragraphes)
+    else:
+        texte = normaliser(source)
+        paragraphes = decouper_paragraphes(texte)
+
     verifier_taille(texte, settings.max_caracteres)
-    paragraphes = decouper_paragraphes(texte)
     titre = extraire_titre_chapitre(texte)
     numero = titre[0] if titre else None
     categorie_naturelle = detecter_categorie(texte)
