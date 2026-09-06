@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block titre %}Soumettre un texte — Correction de manuscrit{% endblock %}
+{% block contenu %}
+<h2>Soumettre un texte</h2>
+
+{% if projet %}
+<p>Projet actif : <strong>{{ projet.titre }}</strong> ({{ projet.projet_id }}) — chaîne : {{ projet.chain_status }}</p>
+{% endif %}
+
+{% if erreur %}<div class="bandeau bandeau--avertissement">{{ erreur }}</div>{% endif %}
+
+{% if projet %}
+<form method="post" action="/analyses" class="formulaire-soumission">
+  <label for="texte">Texte à corriger</label>
+  <textarea id="texte" name="texte" rows="14" required></textarea>
+  <p class="compteur-taille"><span id="compteur">0</span> / {{ max_caracteres }} caractères —
+    au-delà : refus explicite, jamais de troncature silencieuse.</p>
+
+  <fieldset>
+    <legend>Catégorie</legend>
+    <label><input type="radio" name="categorie" value="auto" checked> Détection automatique (Chapitre / Passage / Extrait)</label>
+    <label><input type="radio" name="categorie" value="passage"> Forcer <strong>Passage</strong> — aucune écriture, aucune contrainte de chaîne</label>
+    <label><input type="radio" name="categorie" value="extrait"> Forcer <strong>Extrait</strong> — aucune écriture, aucune contrainte de chaîne</label>
+  </fieldset>
+
+  <fieldset>
+    <legend>Phases d'analyse (matrice v6 §5.4)</legend>
+    <label><input type="checkbox" name="activer_style"> Activer <strong>Style</strong> (déjà actif par défaut sur les Chapitres)</label>
+    <label><input type="checkbox" name="activer_technique"> Activer <strong>Technique</strong> (déjà actif par défaut sur les Chapitres)</label>
+    <label><input type="checkbox" name="activer_embellissement"> Activer <strong>Embellissement</strong> (déjà actif par défaut sur Passages et Extraits)</label>
+  </fieldset>
+
+  <fieldset>
+    <legend>Remplacement officiel (équivalent /maj, v6 §6.6)</legend>
+    <label><input type="checkbox" name="remplacement">
+      Considérer ce texte comme le <strong>remplacement du chapitre courant</strong> (N=N) —
+      la correction reste livrée intégralement. Refus si le chapitre courant n'a jamais été soumis.</label>
+  </fieldset>
+
+  <button type="submit">Lancer l'analyse</button>
+</form>
+
+<script>
+  (() => {
+    const zone = document.getElementById('texte');
+    const compteur = document.getElementById('compteur');
+    zone.addEventListener('input', () => { compteur.textContent = zone.value.length; });
+  })();
+</script>
+{% else %}
+<p><a href="/">Retour à l'accueil pour créer un projet</a></p>
+{% endif %}
+{% endblock %}

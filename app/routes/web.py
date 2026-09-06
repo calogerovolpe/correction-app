@@ -1,17 +1,27 @@
-"""Écrans web — E1 Accueil / Projets (cahier des charges §6, version J0 minimale)."""
+"""Écrans web — E1 Accueil/Projets + E3 Soumission + E4 Suivi + E5 Résultat (cahier des charges §6)."""
 
+import asyncio
+import json
 import secrets
 import string
 from pathlib import Path
 
 from fastapi import APIRouter, Form, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from app import db
+from app.config import settings
+from app.models import CorrectionFusionnee
+from app.services import analyse as service_analyse
+from app.services import rendu as service_rendu
+from app.services.normalisation import decouper_paragraphes, normaliser
 
 TEMPLATES = Jinja2Templates(directory=str(Path(__file__).parent.parent / "templates"))
 router = APIRouter()
+
+# Références fortes des tâches asynchrones (jobs d'analyse — cahier §4.4)
+_TACHES: set[asyncio.Task] = set()
 
 
 def _nouvel_id() -> str:
@@ -50,3 +60,131 @@ async def creer_projet(titre: str = Form(...)):
             "INSERT INTO parametres (cle, valeur) VALUES ('projet_actif', ?)", (projet_id,)
         )
     return RedirectResponse("/", status_code=303)
+
+
+# --- E3 : soumission d'un texte (cahier des charges §6-E3) --------------------
+
+
+async def _projet_actif():
+    actif = await _projet_actif_id()
+    if not actif:
+        return None
+    lignes = await db.interroger("SELECT * FROM projets WHERE projet_id = ?", (actif,))
+    return lignes[0] if lignes else None
+
+
+async def _analyse(identifiant: int):
+    lignes = await db.interroger("SELECT * FROM analyses WHERE id = ?", (identifiant,))
+    return lignes[0] if lignes else None
+
+
+def _contexte_nouveau(projet, erreur=None):
+    return {
+        "projet": projet,
+        "max_caracteres": settings.max_caracteres,
+        "erreur": erreur,
+    }
+
+
+@router.get("/analyses/nouveau")
+async def formulaire_analyse(request: Request):
+    return TEMPLATES.TemplateResponse(
+        request, "analyses/nouveau.html", _contexte_nouveau(await _projet_actif())
+    )
+
+
+@router.post("/analyses")
+async def soumettre_analyse(
+    request: Request,
+    texte: str = Form(...),
+    categorie: str = Form("auto"),
+    activer_style: str = Form(""),
+    activer_technique: str = Form(""),
+    activer_embellissement: str = Form(""),
+    remplacement: str = Form(""),
+):
+    projet = await _projet_actif()
+    erreur = None
+    if projet is None:
+        erreur = "Aucun projet actif : créez d'abord un projet (roman) sur la page d'accueil."
+    elif not texte.strip():
+        erreur = "Le texte soumis est vide."
+    elif len(texte) > settings.max_caracteres:
+        erreur = (
+            f"Texte de {len(texte)} caractères — la limite est de {settings.max_caracteres}. "
+            "Refus explicite : aucune troncature silencieuse du contexte (v6 §2.3)."
+        )
+    if erreur:
+        return TEMPLATES.TemplateResponse(
+            request, "analyses/nouveau.html", _contexte_nouveau(projet, erreur),
+            status_code=400,
+        )
+
+    options = {
+        "categorie": categorie if categorie in ("auto", "passage", "extrait") else "auto",
+        "style": activer_style == "on",
+        "technique": activer_technique == "on",
+        "embellissement": activer_embellissement == "on",
+        "remplacement": remplacement == "on",
+    }
+    _, identifiant = await db.executer(
+        "INSERT INTO analyses (projet_id, texte_source, options_json) VALUES (?, ?, ?)",
+        (projet["projet_id"], texte, json.dumps(options, ensure_ascii=False)),
+    )
+    tache = asyncio.create_task(service_analyse.executer(identifiant))
+    _TACHES.add(tache)
+    tache.add_done_callback(_TACHES.discard)
+    return RedirectResponse(f"/analyses/{identifiant}", status_code=303)
+
+
+# --- E4 : suivi du job / E5 : résultat (cahier des charges §6-E4, E5) ----------
+
+
+@router.get("/analyses/{identifiant}")
+async def page_analyse(request: Request, identifiant: int):
+    analyse = await _analyse(identifiant)
+    if analyse is None:
+        return HTMLResponse("Analyse introuvable.", status_code=404)
+    statut = analyse["statut"]
+    if statut in ("en_attente", "en_cours"):
+        return TEMPLATES.TemplateResponse(request, "analyses/suivi.html", {"analyse": analyse})
+    if statut in ("echec", "rejetee"):
+        return TEMPLATES.TemplateResponse(request, "analyses/erreur.html", {"analyse": analyse})
+
+    # terminee -> E5 : document annoté (v6 §7)
+    lignes = await db.interroger(
+        "SELECT data_json FROM corrections WHERE analyse_id = ? ORDER BY id", (identifiant,)
+    )
+    fusion = []
+    if lignes:
+        fusion = [CorrectionFusionnee.model_validate(d) for d in json.loads(lignes[0]["data_json"])]
+    paragraphes = decouper_paragraphes(normaliser(analyse["texte_source"]))
+    document = service_rendu.preparer_document(fusion, paragraphes)
+    avec_embellissements = any(
+        f.correction.phase == "embellissement" or f.embellissement_migre is not None
+        for f in fusion
+    )
+    return TEMPLATES.TemplateResponse(
+        request,
+        "analyses/resultat.html",
+        {
+            "analyse": analyse,
+            "document": document,
+            "avec_embellissements": avec_embellissements,
+            "nb_corrections": len(fusion),
+        },
+    )
+
+
+@router.get("/analyses/{identifiant}/fragment")
+async def fragment_analyse(request: Request, identifiant: int):
+    """Fragment HTMX de polling (cahier §4.4) : statut en cours, redirection si final."""
+    analyse = await _analyse(identifiant)
+    if analyse is None:
+        return HTMLResponse("", status_code=404)
+    if analyse["statut"] in ("terminee", "echec", "rejetee"):
+        reponse = HTMLResponse("")
+        reponse.headers["HX-Redirect"] = f"/analyses/{identifiant}"
+        return reponse
+    return TEMPLATES.TemplateResponse(request, "analyses/fragment_statut.html",
+                                     {"analyse": analyse})

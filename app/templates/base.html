@@ -9,12 +9,18 @@
 <body>
   <header>
     <h1>Correction de manuscrit</h1>
+    <nav>
+      <a href="/">Projets</a> ·
+      <a href="/analyses/nouveau">Soumettre un texte</a>
+    </nav>
   </header>
   <main>
     {% block contenu %}{% endblock %}
   </main>
   <footer>
-    <p>correction-app — jalon J0 (Socle)</p>
+    <p>correction-app — moteur métier v6</p>
   </footer>
+  <script src="/static/vendor/htmx.min.js" defer></script>
+  <script src="/static/vendor/alpine.min.js" defer></script>
 </body>
 </html>

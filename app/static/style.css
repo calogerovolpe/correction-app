@@ -33,3 +33,112 @@ footer { border-top: 1px solid var(--bordure); color: var(--texte-secondaire); f
 .formulaire-projet input { flex: 1 1 240px; padding: 0.4rem 0.6rem; border: 1px solid var(--bordure); border-radius: 4px; }
 .formulaire-projet button { padding: 0.4rem 1rem; border: 1px solid var(--bordure); border-radius: 4px; background: #f5f5f5; cursor: pointer; }
 .formulaire-projet button:hover { background: #e0e0e0; }
+
+/* ===== Annotations (v6 §7 — palette WCAG AA) ===== */
+:root {
+  --corr-forme: #c62828;           --fond-forme: #fdecea;
+  --corr-style: #1565c0;           --fond-style: #e3f2fd;
+  --corr-technique: #6a1b9a;       --fond-technique: #f3e5f5;
+  --corr-embellissement: #2e7d32; --fond-embellissement: #e8f5e9;
+  --texte-barre: #757575;
+}
+
+.paragraphe { white-space: pre-wrap; padding: 0.4rem 0; }
+.document { max-width: 760px; }
+.aucune-correction { color: var(--texte-secondaire, #757575); font-style: italic; }
+
+.del { text-decoration: line-through; color: var(--texte-barre); }
+.del--multi {
+  text-decoration: none;
+  font-style: italic;
+  font-weight: 700;
+  border-bottom: 2px dotted currentColor;
+  color: var(--texte-barre);
+}
+.ins { font-weight: 600; cursor: pointer; text-decoration: none; border-radius: 3px; padding: 0 2px; }
+.ins--forme           { color: var(--corr-forme); background: var(--fond-forme); }
+.ins--style           { color: var(--corr-style); background: var(--fond-style); }
+.ins--technique       { color: var(--corr-technique); background: var(--fond-technique); }
+.ins--embellissement  { color: var(--corr-embellissement); background: var(--fond-embellissement); }
+.sugg {
+  background: var(--fond-embellissement);
+  border-bottom: 2px dotted var(--corr-embellissement);
+  color: inherit;
+  cursor: pointer;
+}
+.corr, .corr-sugg { position: relative; }
+.ins:focus, .sugg:focus { outline: 2px solid #212121; outline-offset: 2px; }
+
+/* Tooltips (affichés au focus — clic ou Tab) */
+.tooltip {
+  display: none;
+  position: absolute;
+  left: 0;
+  top: 100%;
+  z-index: 10;
+  min-width: 280px;
+  max-width: 420px;
+  padding: 0.6rem 0.8rem;
+  background: #212121;
+  color: #ffffff;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 400;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+.corr:focus-within .tooltip, .corr-sugg:focus-within .tooltip { display: block; }
+.tooltip__cas + .tooltip__cas { margin-top: 0.5rem; border-top: 1px solid #ffffff44; padding-top: 0.5rem; }
+.tooltip__cas-titre { margin: 0 0 0.2rem; font-size: 0.9rem; }
+.tooltip__explication, .tooltip__regle, .tooltip__suggestion, .tooltip__note, .tooltip__cas--embellissement p { margin: 0.2rem 0; }
+.tooltip__variantes { margin: 0.25rem 0 0; padding-left: 1.1rem; }
+.tooltip__cas--embellissement { margin-top: 0.4rem; }
+
+/* ===== Légende interactive (v6 §7.4) ===== */
+.legende { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin: 1rem 0; }
+.pastille {
+  border: 2px solid; border-radius: 999px; padding: 0.15rem 0.9rem;
+  cursor: pointer; background: #ffffff; font-size: 0.9rem;
+}
+.pastille--forme           { color: var(--corr-forme);           border-color: var(--corr-forme); }
+.pastille--style           { color: var(--corr-style);           border-color: var(--corr-style); }
+.pastille--technique       { color: var(--corr-technique);       border-color: var(--corr-technique); }
+.pastille--embellissement  { color: var(--corr-embellissement);  border-color: var(--corr-embellissement); }
+.pastille--off { opacity: 0.35; }
+.bouton-lecture {
+  border: 2px solid #212121; border-radius: 6px; background: #ffffff;
+  padding: 0.15rem 0.8rem; cursor: pointer; font-size: 0.9rem;
+}
+.bouton-lecture--on { background: #212121; color: #ffffff; }
+.compteur-masques { color: #757575; font-size: 0.85rem; margin-left: auto; }
+
+/* Filtres par catégorie : la correction masquée reprend l'apparence du texte neutre (v6 §7.4) */
+.filtre-forme-off .ins--forme,
+.filtre-style-off .ins--style,
+.filtre-technique-off .ins--technique { display: none; }
+.filtre-forme-off .corr--forme > .del { text-decoration: none; color: inherit; }
+.filtre-style-off .corr--style > .del { text-decoration: none; color: inherit; }
+.filtre-technique-off .corr--technique > .del { text-decoration: none; color: inherit; }
+.filtre-embellissement-off .corr-sugg > .sugg { background: none; border-bottom: none; color: inherit; }
+.filtre-embellissement-off .sugg { background: none; border-bottom: none; color: inherit; }
+.filtre-embellissement-off .corr-sugg:focus-within .tooltip { display: none; }
+
+/* Mode « Lecture Embellissement » (v6 §7.4) : suggestions exclusives */
+.lecture-embellissement .ins:not(.ins--embellissement) { display: none; }
+.lecture-embellissement .del { text-decoration: none; color: inherit; font-style: normal; font-weight: normal; border-bottom: none; }
+.lecture-embellissement .corr > .tooltip { display: none !important; }
+
+/* ===== Bandeaux, formulaire E3, suivi E4 ===== */
+.bandeau { padding: 0.6rem 0.9rem; margin: 0.8rem 0; border-radius: 4px; white-space: pre-line; }
+.bandeau--information  { background: var(--fond-style); border-left: 4px solid var(--corr-style); }
+.bandeau--avertissement { background: var(--fond-forme); border-left: 4px solid var(--corr-forme); }
+
+.formulaire-soumission { display: flex; flex-direction: column; gap: 0.4rem; }
+.formulaire-soumission textarea { padding: 0.5rem; border: 1px solid #bdbdbd; border-radius: 4px; font-family: inherit; font-size: 1rem; }
+.compteur-taille { font-size: 0.85rem; color: #757575; margin-top: -0.2rem; }
+.formulaire-soumission fieldset { border: 1px solid #e0e0e0; border-radius: 6px; margin: 0.6rem 0; display: flex; flex-direction: column; gap: 0.3rem; }
+.formulaire-soumission legend { font-weight: 600; padding: 0 0.4rem; }
+.formulaire-soumission button[type="submit"] { align-self: flex-start; padding: 0.5rem 1.4rem; border-radius: 4px; border: 1px solid #bdbdbd; background: #f5f5f5; cursor: pointer; }
+.formulaire-soumission button[type="submit"]:hover { background: #e0e0e0; }
+
+.statut { font-size: 1.05rem; padding: 0.8rem; background: #f5f5f5; border-radius: 6px; }
+.actions-resultat { margin-top: 1.2rem; }

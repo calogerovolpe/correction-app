@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block titre %}Résultat — Correction de manuscrit{% endblock %}
+{% block contenu %}
+<h2>Résultat de l'analyse #{{ analyse.id }}</h2>
+<p>Catégorie : <strong>{{ analyse.categorie }}</strong>
+{%- if analyse.decision == 'conforme' %} — chapitre officiel conforme (écritures du codex au jalon J3)
+{%- elif analyse.decision == 'remplacement_officiel' %} — remplacement officiel
+{%- elif analyse.decision == 'forcage' %} — catégorie forcée par l'auteur
+{%- endif %} · {{ nb_corrections }} correction(s) fusionnée(s)</p>
+
+{% if analyse.decision == 'reclassement_extrait' %}
+<div class="bandeau bandeau--information">{{ analyse.message or "Chapitre hors séquence — traité comme Extrait ; le codex n'a pas été modifié." }}</div>
+{% endif %}
+
+<div x-data="{ forme: true, style: true, technique: true, embellissement: true, lecture: false }" class="relecture">
+  <div class="legende" role="toolbar" aria-label="Filtres d'affichage">
+    <button type="button" class="pastille pastille--forme" :class="{ 'pastille--off': !forme }" :aria-pressed="forme" @click="forme = !forme">Forme</button>
+    <button type="button" class="pastille pastille--style" :class="{ 'pastille--off': !style }" :aria-pressed="style" @click="style = !style">Style</button>
+    <button type="button" class="pastille pastille--technique" :class="{ 'pastille--off': !technique }" :aria-pressed="technique" @click="technique = !technique">Technique</button>
+    <button type="button" class="pastille pastille--embellissement" :class="{ 'pastille--off': !embellissement }" :aria-pressed="embellissement" @click="embellissement = !embellissement">Embellissement</button>
+    {% if avec_embellissements %}
+    <button type="button" class="bouton-lecture" :aria-pressed="lecture" :class="{ 'bouton-lecture--on': lecture }" @click="lecture = !lecture">📖 Lecture Embellissement</button>
+    {% endif %}
+    {% if document.nb_masques > 0 %}
+    <span class="compteur-masques">{{ document.nb_masques }} paragraphe(s) sans correction non affichés</span>
+    {% endif %}
+  </div>
+
+  <div id="document" class="document"
+       :class="{ 'filtre-forme-off': !forme, 'filtre-style-off': !style, 'filtre-technique-off': !technique, 'filtre-embellissement-off': !embellissement, 'lecture-embellissement': lecture }">
+    {% for par in document.paragraphes %}
+    <p class="paragraphe" data-paragraphe-id="{{ par.id }}">
+      {%- for seg in par.segments -%}
+      {%- if seg.type == 'texte' %}{{ seg.texte }}
+      {%- elif seg.type == 'simple' %}
+      <span class="corr corr--{{ seg.phase }}" data-groupe="{{ seg.groupe }}">
+        <del class="del">{{ seg.original }}</del>
+        <ins class="ins ins--{{ seg.phase }}" tabindex="0" aria-describedby="tip-{{ seg.groupe }}">{{ seg.texte }}</ins>
+        <span class="tooltip" id="tip-{{ seg.groupe }}" role="tooltip" hidden>
+          {% for cas in seg.cas %}{% include "analyses/_cas.html" %}{% endfor %}
+        </span>
+      </span>
+      {%- elif seg.type == 'multi' %}
+      <span class="corr corr--multi" data-groupe="{{ seg.groupe }}">
+        <del class="del del--multi">{{ seg.original }}</del>
+        {%- for i in seg.ins %}<ins class="ins ins--{{ i.phase }}" tabindex="0" aria-describedby="tip-{{ seg.groupe }}">{{ i.texte }}</ins>{% endfor %}
+        <span class="tooltip tooltip--multi" id="tip-{{ seg.groupe }}" role="tooltip" hidden>
+          {% for cas in seg.cas %}{% include "analyses/_cas.html" %}{% endfor %}
+        </span>
+      </span>
+      {%- elif seg.type == 'suggestion' %}
+      <span class="corr-sugg" data-groupe="{{ seg.groupe }}">
+        <mark class="sugg" tabindex="0" aria-describedby="tip-{{ seg.groupe }}">{{ seg.original }}</mark>
+        <span class="tooltip" id="tip-{{ seg.groupe }}" role="tooltip" hidden>
+          <section class="tooltip__cas">
+            <h4 class="tooltip__cas-titre">Embellissement — suggestion non contraignante</h4>
+            <p class="tooltip__explication">{{ seg.explication }}</p>
+            <p class="tooltip__suggestion">Suggestion : {{ seg.suggestion }}</p>
+            {% if seg.variantes %}
+            <ul class="tooltip__variantes">
+              {% for variante in seg.variantes %}<li>{{ variante }}</li>{% endfor %}
+            </ul>
+            {% endif %}
+          </section>
+        </span>
+      </span>
+      {%- endif %}
+      {%- endfor %}
+    </p>
+    {% endfor %}
+    {% if not document.paragraphes %}
+    <p class="aucune-correction">Aucune correction détectée — le texte est ressorti propre de toutes les phases actives (v6 §8.5 : une liste vide est un résultat valide).</p>
+    {% endif %}
+  </div>
+</div>
+
+<p class="actions-resultat">
+  <a href="/analyses/nouveau">Soumettre un autre texte</a> ·
+  <a href="/">Accueil</a>
+</p>
+<script src="/static/app.js"></script>
+{% endblock %}

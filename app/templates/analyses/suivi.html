@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block titre %}Analyse en cours — Correction de manuscrit{% endblock %}
+{% block contenu %}
+<h2>Analyse #{{ analyse.id }}</h2>
+<div id="statut" hx-get="/analyses/{{ analyse.id }}/fragment" hx-trigger="every 2s" hx-swap="innerHTML">
+  {% include "analyses/fragment_statut.html" %}
+</div>
+<noscript><p><a href="/analyses/{{ analyse.id }}">Rafraîchir la page</a></p></noscript>
+{% endblock %}

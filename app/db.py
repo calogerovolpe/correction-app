@@ -3,6 +3,7 @@ opérations via asyncio.to_thread (sqlite3 est synchrone), verrou applicatif (mo
 
 import asyncio
 import sqlite3
+import threading
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -10,15 +11,11 @@ from app.config import settings
 
 SCHEMA_PATH = Path(__file__).parent / "schema.sql"
 
-# Verrou mémoire asynchrone (cahier des charges A6 / v6 §15) : un accès SQLite à la fois.
-_verrou: asyncio.Lock | None = None
-
-
-def _obtenir_verrou() -> asyncio.Lock:
-    global _verrou
-    if _verrou is None:
-        _verrou = asyncio.Lock()
-    return _verrou
+# Verrou de sérialisation des accès SQLite (cahier des charges A6 / v6 §15).
+# threading.Lock — agnostique de la boucle d'événements (un asyncio.Lock se lie
+# à sa première boucle, ce qui brise les boucles multiples des tests), suffisant
+# pour un usage mono-utilisateur ; WAL + busy_timeout en filet de sécurité.
+_VERROU = threading.Lock()
 
 
 def _connecter() -> sqlite3.Connection:
@@ -49,31 +46,31 @@ def init_db() -> None:
 
 
 def _executer_sync(sql: str, params: Iterable[Any], many: bool) -> tuple[int, int]:
-    conn = _connecter()
-    try:
-        cur = conn.executemany(sql, params) if many else conn.execute(sql, params)
-        conn.commit()
-        return cur.lastrowid, cur.rowcount
-    finally:
-        conn.close()
+    with _VERROU:
+        conn = _connecter()
+        try:
+            cur = conn.executemany(sql, params) if many else conn.execute(sql, params)
+            conn.commit()
+            return cur.lastrowid, cur.rowcount
+        finally:
+            conn.close()
 
 
 def _interroger_sync(sql: str, params: Iterable[Any]) -> list[dict]:
-    conn = _connecter()
-    try:
-        lignes = conn.execute(sql, params).fetchall()
-        return [dict(ligne) for ligne in lignes]
-    finally:
-        conn.close()
+    with _VERROU:
+        conn = _connecter()
+        try:
+            lignes = conn.execute(sql, params).fetchall()
+            return [dict(ligne) for ligne in lignes]
+        finally:
+            conn.close()
 
 
 async def executer(sql: str, params: Iterable[Any] = ()) -> tuple[int, int]:
     """Exécute une écriture (INSERT/UPDATE/DELETE/DDL). Retourne (lastrowid, rowcount)."""
-    async with _obtenir_verrou():
-        return await asyncio.to_thread(_executer_sync, sql, params, False)
+    return await asyncio.to_thread(_executer_sync, sql, params, False)
 
 
 async def interroger(sql: str, params: Iterable[Any] = ()) -> list[dict]:
     """Exécute une lecture et retourne les lignes en dictionnaires."""
-    async with _obtenir_verrou():
-        return await asyncio.to_thread(_interroger_sync, sql, params)
+    return await asyncio.to_thread(_interroger_sync, sql, params)

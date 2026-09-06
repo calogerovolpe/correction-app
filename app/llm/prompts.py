@@ -23,6 +23,39 @@ def delimiter(titre: str, contenu: str) -> str:
     return f"<{titre}>\n{contenu}\n</{titre}>"
 
 
+# Consignes impératives par phase (v6 §9 à §12)
+CONSIGNES_PHASES = {
+    "forme": (
+        "Corrige l'orthographe, la grammaire et la typographie de façon objective et "
+        "incontestable : coquilles, accords en genre et nombre, accords des participes "
+        "passés, homophones (a/à, ou/où), choix des prépositions, espaces insécables "
+        "devant les ponctuations doubles, guillemets français « », tirets cadratins — "
+        "pour les dialogues. Respecte strictement la variante linguistique demandée. "
+        "Ne modifie JAMAIS le style ni le vocabulaire : uniquement ce qui est objectivement faux."
+    ),
+    "style": (
+        "Améliore la lisibilité, le rythme et l'élégance sans trahir la voix de l'auteur : "
+        "répétitions rapprochées, lourdeurs, pléonasmes, verbes ternes, déséquilibres de "
+        "cadence. Propose OBLIGATOIREMENT 1 correction principale et 2 à 4 variantes "
+        "dans le champ variantes."
+    ),
+    "technique": (
+        "Assure la rigueur structurelle et logique interne au texte soumis : concordance "
+        "des temps des récits littéraires, stabilité du point de vue narratif "
+        "(focalisation, personne grammaticale), cohérence des détails factuels et "
+        "matériels au sein de l'extrait. Ne signale que ce qui est objectivement "
+        "incohérent dans ce texte seul."
+    ),
+    "embellissement": (
+        "Propose des suggestions stylistiques créatives NON contraignantes : enrichissement "
+        "lexical, recherche de sonorités (prosodie, assonances discrètes), figures de style "
+        "subtiles. Propose OBLIGATOIREMENT 2 à 4 variantes ordonnées de la plus sobre à la "
+        "plus audacieuse. N'apporte aucune correction de faute : ce sont des suggestions "
+        "que l'auteur restera libre d'ignorer."
+    ),
+}
+
+
 def prompt_phase_correction(
     phase: str,
     consigne: str,

@@ -86,6 +86,9 @@ CREATE TABLE IF NOT EXISTS analyses (
                CHECK (statut IN ('en_attente', 'en_cours', 'terminee', 'echec', 'rejetee')),
   etape        TEXT,
   categorie    TEXT,
+  options_json TEXT,                            -- options du formulaire E3 (catégorie, phases, remplacement)
+  decision     TEXT,                            -- décision de la machine d'états (conforme, reclassement_extrait…)
+  message      TEXT,                            -- message de bannière éventuel (reclassement)
   resultat_ref TEXT,
   erreur       TEXT,
   cree_a       TEXT NOT NULL DEFAULT (datetime('now')),

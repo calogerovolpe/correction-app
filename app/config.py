@@ -38,6 +38,10 @@ class Settings(BaseSettings):
     backups_max: int = 20
     mode_debug: bool = False
 
+    # Températures par phase (v6 §2.2) : correction 0.0, embellissement 0.8
+    temperature_correction: float = 0.0
+    temperature_embellissement: float = 0.8
+
     # Variante linguistique : france | quebec | belgique
     variante: str = "france"
 

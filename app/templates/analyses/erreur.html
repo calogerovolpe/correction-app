@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block titre %}Analyse {{ analyse.statut }} — Correction de manuscrit{% endblock %}
+{% block contenu %}
+<h2>Analyse #{{ analyse.id }} — {{ 'échouée' if analyse.statut == 'echec' else 'refusée' }}</h2>
+<div class="bandeau bandeau--avertissement">{{ analyse.erreur }}</div>
+<p>
+  <a href="/analyses/nouveau">Soumettre à nouveau</a> ·
+  <a href="/">Accueil</a>
+</p>
+{% endblock %}
