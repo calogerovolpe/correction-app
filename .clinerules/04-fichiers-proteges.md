@@ -22,10 +22,13 @@
 - Modifier le comportement Option B / fail-fast / liste-vide-jamais-panne (garde-fous v6).
 
 ## Fichiers de l'auteur (hors repo, toujours dans le dossier parent)
-- `Architecture fonction correction de texte — v3/v4/v5/v6.md` : historique des arbitrages.
-  La **v6 seule** fait foi. Les v3-v5 sont archivées pour mémoire, ne pas s'y référer
-  pour coder (sauf pour comprendre l'historique d'une décision).
-- `Cahier des charges — Application web de correction de manuscrit.md` : voir 01-contexte-projet.md.
+- **`Architecture application web — v1 (spécification consolidée).md`** : LA source de vérité
+  de l'application. Toute évolution métier/architecturale doit y être répercutée au même
+  jalon que sa réalisation (règle inscrite dans le document lui-même).
+- `Cahier des charges — Application web de correction de manuscrit.md` : historique de
+  conception, remplacé par la spec consolidée (bandeau l'indiquant en tête) — ne pas coder avec.
+- `Architecture fonction correction de texte — v3/v4/v5/v6.md` : archive de la genèse
+  (fonction OpenWebUI jamais développée) — ne pas coder avec.
 
 ## Points sensibles à traiter avec prudence
 - `app/routes/web.py` : le déballage de `db.executer` (bug historique J2.1).

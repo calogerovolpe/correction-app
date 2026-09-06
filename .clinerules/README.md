@@ -5,9 +5,11 @@
 
 **Projet** : correction-app — application web de correction de manuscrit
 **Stack** : Python 3.11+ / FastAPI / Jinja2 + HTMX + Alpine.js / SQLite (WAL) / Mistral API
-**Documents de référence** (source de vérité, hors repo) :
-- Spécification métier : `../../Architecture fonction correction de texte — v6 (spécification complète).md`
-- Cahier des charges applicatif : `../../Cahier des charges — Application web de correction de manuscrit.md`
+**Documents de référence** :
+- **Source de vérité unique** : `../../Architecture application web — v1 (spécification consolidée).md`
+  (métier + applicatif + état réel ; toute évolution y est répercutée au même jalon) ;
+- Historiques (ne pas coder avec) : v3/v4/v5/v6 (fonction OpenWebUI — genèse) et cahier des
+  charges initial (remplacé par la spec consolidée).
 
 ---
 
