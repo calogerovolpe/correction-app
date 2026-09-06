@@ -30,26 +30,43 @@
       {% for par in document.paragraphes %}
       <p class="paragraphe" data-paragraphe-id="{{ par.id }}">
         {%- for seg in par.segments -%}
-        {%- if seg.type == 'texte' %}{{ seg.texte }}
-        {%- elif seg.type == 'forme' %}
-        <span class="corr-forme" id="{{ seg.groupe }}" @click="selectionnerCorrection('{{ seg.groupe }}')">
+        {%- if seg.type == 'texte' -%}
+          {%- if seg.gras %}<strong>{% endif -%}
+          {%- if seg.italique %}<em>{% endif -%}
+          {%- if seg.souligne %}<u>{% endif -%}
+          {{ seg.texte }}
+          {%- if seg.souligne %}</u>{% endif -%}
+          {%- if seg.italique %}</em>{% endif -%}
+          {%- if seg.gras %}</strong>{% endif -%}
+        {%- elif seg.type == 'forme' -%}
+        <span class="corr-forme" id="{{ seg.groupe }}" data-groupe="{{ seg.groupe }}" @click="selectionnerCorrection($el.dataset.groupe)">
           <del class="del" x-show="!choix['{{ seg.groupe }}'] || choix['{{ seg.groupe }}'] === 'corrige'">{{ seg.original }}</del>
           <ins class="ins ins--forme" x-text="choix['{{ seg.groupe }}'] === 'original' ? '{{ seg.original }}' : '{{ seg.correction }}'"></ins>
         </span>
-        {%- elif seg.type == 'style' %}
+        {%- elif seg.type == 'style' -%}
         <span class="corr-style" id="{{ seg.groupe }}"
-              @click="ouvrirBulle($event, '{{ seg.groupe }}', 'style', '{{ seg.original }}', '{{ par.id }}', '{{ seg.info.explication }}')"
+              data-groupe="{{ seg.groupe }}"
+              data-phase="style"
+              data-original="{{ seg.original }}"
+              data-paragraphe-id="{{ par.id }}"
+              data-explication="{{ seg.info.explication }}"
+              @click="ouvrirBulleParElement($event, $el)"
               x-text="choix['{{ seg.groupe }}'] || '{{ seg.original }}'"></span>
-        {%- elif seg.type == 'embellissement' %}
+        {%- elif seg.type == 'embellissement' -%}
         <span class="corr-embellissement" id="{{ seg.groupe }}"
-              @click="ouvrirBulle($event, '{{ seg.groupe }}', 'embellissement', '{{ seg.original }}', '{{ par.id }}', '{{ seg.info.explication }}')"
+              data-groupe="{{ seg.groupe }}"
+              data-phase="embellissement"
+              data-original="{{ seg.original }}"
+              data-paragraphe-id="{{ par.id }}"
+              data-explication="{{ seg.info.explication }}"
+              @click="ouvrirBulleParElement($event, $el)"
               x-text="choix['{{ seg.groupe }}'] || '{{ seg.original }}'"></span>
-        {%- elif seg.type == 'multi' %}
-        <span class="corr-multi" id="{{ seg.groupe }}" @click="selectionnerCorrection('{{ seg.groupe }}')">
+        {%- elif seg.type == 'multi' -%}
+        <span class="corr-multi" id="{{ seg.groupe }}" data-groupe="{{ seg.groupe }}" @click="selectionnerCorrection($el.dataset.groupe)">
           <span class="del--multi" x-text="choix['{{ seg.groupe }}'] || '{{ seg.original }}'"></span>
         </span>
-        {%- endif %}
-        {%- endfor %}
+        {%- endif -%}
+        {%- endfor -%}
       </p>
       {% endfor %}
       {% if not document.paragraphes %}
@@ -185,18 +202,19 @@ function relectureApp() {
       }
     },
 
-    ouvrirBulle(event, groupe, phase, original, paragrapheId, explication) {
-      const rect = event.target.getBoundingClientRect();
-      this.bulle.groupe = groupe;
-      this.bulle.phase = phase;
-      this.bulle.original = original;
-      this.bulle.paragrapheId = paragrapheId;
-      this.bulle.explication = explication;
+    ouvrirBulleParElement(event, el) {
+      const rect = el.getBoundingClientRect();
+      const ds = el.dataset;
+      this.bulle.groupe = ds.groupe;
+      this.bulle.phase = ds.phase;
+      this.bulle.original = ds.original;
+      this.bulle.paragrapheId = ds.paragrapheId;
+      this.bulle.explication = ds.explication;
       this.bulle.alternatives = [];
       this.bulle.chargement = false;
       this.bulle.style = `top: ${window.scrollY + rect.bottom + 6}px; left: ${window.scrollX + rect.left}px;`;
       this.bulle.ouverte = true;
-      this.selectionnerCorrection(groupe);
+      this.selectionnerCorrection(ds.groupe);
     },
 
     async demanderAlternatives() {

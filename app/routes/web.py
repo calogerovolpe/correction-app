@@ -211,8 +211,15 @@ async def page_analyse(request: Request, identifiant: int):
     fusion = []
     if lignes:
         fusion = [CorrectionFusionnee.model_validate(d) for d in json.loads(lignes[0]["data_json"])]
-    paragraphes = decouper_paragraphes(normaliser(analyse["texte_source"]))
-    document = service_rendu.preparer_document(fusion, paragraphes)
+
+    source = analyse["texte_source"]
+    paragraphes_riches = service_texte_riche.parser_document_riche(source)
+    if paragraphes_riches:
+        paragraphes = service_texte_riche.convertir_en_paragraphes_simples(paragraphes_riches)
+    else:
+        paragraphes = decouper_paragraphes(normaliser(source))
+
+    document = service_rendu.preparer_document(fusion, paragraphes, paragraphes_riches)
     avec_embellissements = any(
         f.correction.phase == "embellissement" or f.embellissement_migre is not None
         for f in fusion

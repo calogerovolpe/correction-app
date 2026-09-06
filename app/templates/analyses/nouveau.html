@@ -107,7 +107,11 @@
     if (html) {
       let parser = new DOMParser();
       let doc = parser.parseFromString(html, 'text/html');
-      
+
+      // 1. Supprimer les éléments Word non textuels et métadonnées
+      let nonTextuels = doc.body.querySelectorAll('xml, style, script, meta, link');
+      nonTextuels.forEach(el => el.remove());
+
       let tous = doc.body.querySelectorAll('*');
       tous.forEach(el => {
         if (el.tagName.toLowerCase().includes(':')) el.remove();
@@ -116,16 +120,21 @@
         el.removeAttribute('lang');
       });
 
-      let paragraphs = doc.body.querySelectorAll('p, div, h1, h2, h3, h4');
-      let cleanedElements = [];
+      // 2. Extraire les paragraphes terminaux (feuilles) pour éviter d'imbriquer div + p
+      let candidats = Array.from(doc.body.querySelectorAll('p, h1, h2, h3, h4, div'));
+      let feuilles = candidats.filter(el => {
+        // Est une feuille si aucun de ses descendants directs ou indirects n'est un autre p/h1-4/div
+        return el.querySelector('p, h1, h2, h3, h4, div') === null;
+      });
 
-      if (paragraphs.length > 0) {
-        paragraphs.forEach(p => {
-          let inner = p.innerHTML.replace(/&nbsp;/g, ' ').trim();
+      let cleanedElements = [];
+      if (feuilles.length > 0) {
+        feuilles.forEach(f => {
+          let inner = f.innerHTML.replace(/&nbsp;/g, ' ').trim();
           if (inner && inner !== '<br>') {
-            let div = document.createElement('div');
-            div.innerHTML = p.innerHTML;
-            cleanedElements.push(div);
+            let p = document.createElement('p');
+            p.innerHTML = f.innerHTML;
+            cleanedElements.push(p);
           }
         });
       }
@@ -148,9 +157,9 @@
     lignes.forEach(l => {
       let trimmed = l.trim();
       if (trimmed) {
-        let div = document.createElement('div');
-        div.textContent = trimmed;
-        editeur.appendChild(div);
+        let p = document.createElement('p');
+        p.textContent = trimmed;
+        editeur.appendChild(p);
       }
     });
   }
@@ -164,6 +173,7 @@
       return "";
     }
 
+    // Regrouper par bloc (chaque P/DIV ou série de nœuds en ligne séparée par BR)
     let blocs = [];
     let blocCourant = [];
 
@@ -180,7 +190,12 @@
           blocCourant = [];
         }
       } else {
-        blocCourant.push(node);
+        // Nœud texte ou span en ligne : ignorer si c'est du pur espace entre balises de bloc
+        if (node.nodeType === Node.TEXT_NODE && !node.textContent.trim()) {
+          // Espace entre deux balises blocs -> ignorer pour ne pas créer de paragraphe fantôme
+        } else {
+          blocCourant.push(node);
+        }
       }
     });
     if (blocCourant.length > 0) blocs.push(blocCourant);
@@ -213,9 +228,10 @@
 
       bloc.forEach(node => explorerNoeud(node, false, false, false));
 
+      // Ne retenir que les paragraphes ayant un contenu textuel réel (trim non vide)
       if (texteBloc.trim().length > 0) {
         paragraphes.push({ id: `p-${pIndex++}`, runs: runs });
-        texteBrutTotal += texteBloc + "\n";
+        texteBrutTotal += texteBloc.trim() + "\n";
       }
     });
 

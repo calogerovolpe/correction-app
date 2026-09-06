@@ -20,30 +20,66 @@ def extraire_texte_brut_paragraphe(p_riche: ParagrapheRiche) -> str:
 
 def parser_document_riche(donnees_json_ou_texte: str) -> list[ParagrapheRiche]:
     """Parse une chaîne JSON représentant une liste de ParagrapheRiche,
-    ou convertit un texte brut legacy (une ligne = un paragraphe) en texte riche par défaut."""
+    ou convertit un texte brut legacy (une ligne = un paragraphe) en texte riche par défaut.
+    Applique un nettoyage systématique :
+    - Élimine les paragraphes vides ou composés exclusivement d'espaces/sauts de ligne.
+    - Élimine les runs vides ou de purs sauts de ligne isolés en bordure.
+    - Renumérote les paragraphes de manière séquentielle propre (p-1, p-2...).
+    """
     if not donnees_json_ou_texte.strip():
         return []
+
+    bruts: list[ParagrapheRiche] = []
 
     # Tente de parser en JSON (format v2)
     try:
         obj = json.loads(donnees_json_ou_texte)
         if isinstance(obj, list) and all("id" in p and "runs" in p for p in obj):
-            return [ParagrapheRiche.model_validate(p) for p in obj]
+            bruts = [ParagrapheRiche.model_validate(p) for p in obj]
     except (json.JSONDecodeError, Exception):
         pass
 
-    # Mode legacy ou texte brut Word : chaque ligne non vide = un paragraphe (Word-fidèle)
-    lignes = [l.strip() for l in donnees_json_ou_texte.replace("\r\n", "\n").replace("\r", "\n").split("\n")]
-    # Supprimer les lignes vides consécutives ou isolées superflues tout en gardant chaque paragraphe
-    lignes_propres = [l for l in lignes if l]
-    resultats = []
-    for i, ligne in enumerate(lignes_propres, start=1):
-        resultats.append(
-            ParagrapheRiche(
-                id=f"p-{i}",
-                runs=[RunFormat(texte=ligne, gras=False, italique=False, souligne=False)]
+    if not bruts:
+        # Mode legacy ou texte brut Word : chaque ligne non vide = un paragraphe (Word-fidèle)
+        lignes = [l.strip() for l in donnees_json_ou_texte.replace("\r\n", "\n").replace("\r", "\n").split("\n")]
+        lignes_propres = [l for l in lignes if l]
+        for i, ligne in enumerate(lignes_propres, start=1):
+            bruts.append(
+                ParagrapheRiche(
+                    id=f"p-{i}",
+                    runs=[RunFormat(texte=ligne, gras=False, italique=False, souligne=False)]
+                )
             )
-        )
+
+    # Nettoyage et normalisation défensive
+    resultats: list[ParagrapheRiche] = []
+    p_num = 1
+    for p in bruts:
+        # Nettoyer les runs
+        runs_propres: list[RunFormat] = []
+        for r in p.runs:
+            t = r.texte.replace("\r\n", "\n").replace("\r", "\n")
+            if t:
+                runs_propres.append(
+                    RunFormat(
+                        texte=t,
+                        gras=bool(r.gras),
+                        italique=bool(r.italique),
+                        souligne=bool(r.souligne),
+                    )
+                )
+
+        texte_total = "".join(r.texte for r in runs_propres).strip()
+        # On ne conserve que les paragraphes ayant un contenu textuel réel (pas de purs espaces/newlines)
+        if texte_total:
+            resultats.append(
+                ParagrapheRiche(
+                    id=f"p-{p_num}",
+                    runs=runs_propres,
+                )
+            )
+            p_num += 1
+
     return resultats
 
 

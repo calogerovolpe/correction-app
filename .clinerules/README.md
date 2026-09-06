@@ -22,14 +22,21 @@
 | J2 — MVP de relecture | ✅ Terminé | `aa1d5f9` |
 | J2.1 — Correctifs retour utilisateur | ✅ Terminé | `569c784` |
 | J2.2 — Atelier interactif & Word | ✅ Terminé | `22b7639` |
-| J2.3 — Catégorisation déclarative & Nettoyage Word | ✅ Terminé | En cours |
+| J2.3 — Catégorisation déclarative | ✅ Terminé | `cbc9cd2` |
+| J2.4 — Rendu texte riche & fiabilisation bulle | ✅ Terminé | En cours |
 | J3 — Chaîne & codex | ⏳ Prochain | — |
 | J4 — Confort | ⬜ À faire | — |
 | J5 — Mise en ligne | ⬜ À faire | — |
 
-**État des tests** : 76/76 verts (`pytest`)
+**État des tests** : 77/77 verts (`pytest`)
 
 ---
+
+## J2.4 — Rendu texte riche & fiabilisation bulle d'alternatives ✅
+- **Rendu E5 réparé** : la page de résultat utilise désormais `parser_document_riche` pour ne jamais afficher de code JSON brut.
+- **Préservation des styles Word dans le rendu** : les segments de texte non corrigés restituent fidèlement le formatage d'origine (`<em>`, `<strong>`, `<u>`), notamment les italiques du texte.
+- **Fiabilisation de la bulle d'alternatives** : passage par les attributs `dataset` (`data-*`) côté DOM, éliminant tout blocage dû aux apostrophes ou guillemets dans les fragments et explications.
+- **Nettoyage strict en profondeur du texte riche** : élimination des paragraphes fantômes et des runs vides.
 
 ## J2.3 — Catégorisation déclarative & Nettoyage Word ✅
 - Nettoyage strict au collage Word : suppression des sauts de ligne et balises fantômes (`o:p`, `&nbsp;`, `<br>`).

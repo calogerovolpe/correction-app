@@ -58,5 +58,38 @@ def test_extraire_mots_frequents_antirepetition():
         "Le capitaine regardait la mer. Le capitaine attendait le navire. "
         "Le capitaine pensait à la bataille et le capitaine espérait."
     )
-    frequents = texte_riche.extraire_mots_frequents(texte)
-    assert "capitaine" in frequents
+    mots = texte_riche.extraire_mots_frequents(texte)
+    assert "capitaine" in mots
+
+
+def test_parser_document_riche_nettoie_paragraphes_parasites():
+    # Simulation du collage Word parasité avec des paragraphes de purs espaces et retours
+    parasite_json = json.dumps([
+        {
+            "id": "p-1",
+            "runs": [
+                {"texte": "\n\n", "gras": False, "italique": False, "souligne": False},
+                {"texte": "  \n  ", "gras": False, "italique": False, "souligne": False},
+            ]
+        },
+        {
+            "id": "p-2",
+            "runs": [
+                {"texte": "Prologue", "gras": False, "italique": False, "souligne": False}
+            ]
+        },
+        {
+            "id": "p-3",
+            "runs": [
+                {"texte": "La curiosité d’un enfant…", "gras": False, "italique": True, "souligne": False}
+            ]
+        }
+    ])
+    propres = texte_riche.parser_document_riche(parasite_json)
+    # Le premier paragraphe vide doit être totalement ignoré
+    assert len(propres) == 2
+    assert propres[0].id == "p-1"
+    assert propres[0].runs[0].texte == "Prologue"
+    assert propres[1].id == "p-2"
+    assert propres[1].runs[0].texte == "La curiosité d’un enfant…"
+    assert propres[1].runs[0].italique is True

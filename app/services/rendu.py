@@ -38,10 +38,15 @@ def _info_correction(fusion: CorrectionFusionnee, groupe: str) -> dict:
 
 
 def preparer_document(
-    fusionnees: list[CorrectionFusionnee], paragraphes: list[Paragraphe]
+    fusionnees: list[CorrectionFusionnee],
+    paragraphes: list[Paragraphe],
+    paragraphes_riches: list = None,
 ) -> dict:
     """Construit le document annoté avec les segments pour le texte,
-    et la liste structurée des corrections pour la barre latérale."""
+    et la liste structurée des corrections pour la barre latérale.
+    Si paragraphes_riches est fourni, préserve le formatage (gras, italique, souligné)
+    sur les segments de texte non corrigés.
+    """
     
     # Isoler les corrections techniques (qui vont exclusivement dans la barre latérale)
     corrections_techniques = [
@@ -56,6 +61,9 @@ def preparer_document(
     for fusion in in_text_fusions:
         par_corrections.setdefault(fusion.correction.paragraphe_id, []).append(fusion)
 
+    # Indexation des paragraphes riches par identifiant
+    riches_par_id = {p.id: p for p in (paragraphes_riches or [])}
+
     affiches: list[dict] = []
     toutes_corrections_barre: list[dict] = []
     nb_masques = 0
@@ -67,8 +75,11 @@ def preparer_document(
             nb_masques += 1
             continue
 
+        p_riche = riches_par_id.get(paragraphe.id)
         tries = sorted(items, key=lambda f: (f.correction.debut, f.correction.fin))
-        numero_groupe, segments, corrections_groupe = _construire_segments(tries, paragraphe, numero_groupe)
+        numero_groupe, segments, corrections_groupe = _construire_segments(
+            tries, paragraphe, numero_groupe, p_riche
+        )
         affiches.append({"id": paragraphe.id, "segments": segments})
         toutes_corrections_barre.extend(corrections_groupe)
 
@@ -80,7 +91,28 @@ def preparer_document(
     }
 
 
-def _construire_segments(items, paragraphe, numero_groupe):
+def _generer_segments_texte(debut: int, fin: int, paragraphe: Paragraphe, p_riche) -> list[dict]:
+    """Génère un ou plusieurs segments de texte brut ou enrichis en runs si p_riche est présent."""
+    if debut >= fin:
+        return []
+    if not p_riche:
+        return [{"type": "texte", "texte": paragraphe.texte[debut:fin]}]
+
+    from app.services.texte_riche import decouper_runs_par_intervalle
+    _, runs_intervalle, _ = decouper_runs_par_intervalle(p_riche.runs, debut, fin)
+    segments = []
+    for r in runs_intervalle:
+        segments.append({
+            "type": "texte",
+            "texte": r.texte,
+            "gras": r.gras,
+            "italique": r.italique,
+            "souligne": r.souligne,
+        })
+    return segments
+
+
+def _construire_segments(items, paragraphe, numero_groupe, p_riche=None):
     blocs: list[dict] = []
     for fusion in items:
         correction = fusion.correction
@@ -96,7 +128,7 @@ def _construire_segments(items, paragraphe, numero_groupe):
 
     for bloc in blocs:
         if bloc["debut"] > position:
-            segments.append({"type": "texte", "texte": paragraphe.texte[position:bloc["debut"]]})
+            segments.extend(_generer_segments_texte(position, bloc["debut"], paragraphe, p_riche))
 
         numero_groupe += 1
         groupe_id = f"g-{numero_groupe:04d}"
@@ -106,7 +138,7 @@ def _construire_segments(items, paragraphe, numero_groupe):
         position = bloc["fin"]
 
     if position < len(paragraphe.texte):
-        segments.append({"type": "texte", "texte": paragraphe.texte[position:]})
+        segments.extend(_generer_segments_texte(position, len(paragraphe.texte), paragraphe, p_riche))
 
     return numero_groupe, segments, corrections_creees
 
