@@ -8,17 +8,24 @@ annoté interactif. Un codex narratif persistant (personnages, glossaire…) mé
 roman au fil des chapitres officiels (chaîne N+1 stricte).
 
 ## Documents de référence — source de vérité
-1. **Spécification consolidée de l'application** : `docs/Architecture application web — v1 (spécification consolidée).md`
-   → **LA source de vérité unique pour l'application** (métier + applicatif + état réel du code,
-   jalons J0-J2.1 consolidés, registre des 26 décisions). **Tout doute : elle fait foi.**
-   Elle est versionnée dans le repo : **toute évolution métier/architecturale est committée
-   dans le même commit que le code correspondant.**
-2. Documents historiques (dans `docs/` aussi — ne pas coder avec) :
-   - `docs/Cahier des charges — Application web de correction de manuscrit.md` : conception
-     initiale (remplacé par la spec consolidée, bandeau l'indiquant en tête) ;
-   - **Hors repo, dans le dossier grand-parent** (`..\..\` côté disque, jamais dans le repo) :
-     `Architecture fonction correction de texte — v3/v4/v5/v6.md` — archive de la genèse
-     du métier (fonction OpenWebUI jamais développée).
+1. **État actuel et prochaines étapes** : `.clinerules/00-ou-nous-sommes.md` (synthèse ultra-courte à consulter en premier).
+2. **Journal de bord des jalons** : `.clinerules/README.md` (historique complet des validations et critères).
+3. **Spécification consolidée de l'application** : `docs/Architecture application web — v1 (spécification consolidée).md`
+   → **Source de vérité détaillée** (métier + applicatif + registre des décisions). À consulter de manière ciblée pour des questions d'architecture ou lors de nouveaux jalons.
+4. **Documents historiques** (dans `docs/` aussi) :
+   - `docs/Cahier des charges — Application web de correction de manuscrit.md` : conception initiale (remplacé par la spec consolidée) ;
+   - Hors repo, dans le dossier grand-parent : `Architecture fonction correction de texte — v3/v4/v5/v6.md`.
+
+## Carte de lecture par tâche (Économie de tokens)
+Pour éviter de saturer le contexte avec des lectures inutiles, s'en tenir aux fichiers strictement nécessaires :
+
+| Type d'intervention | Fichiers de règles à consulter | Code à inspecter / modifier |
+|---|---|---|
+| **Bug UI / Affichage** | `02-conventions-code.md` | `app/templates/`, `app/static/style.css`, `app/static/app.js` |
+| **Bug Découpage / Normalisation** | `02-conventions-code.md` | `app/services/texte_riche.py`, `app/services/normalisation.py` |
+| **Bug LLM / Prompts** | `02-conventions-code.md` | `app/llm/prompts.py`, `app/llm/client.py` |
+| **Bug Pipeline / Job** | `02-conventions-code.md` | `app/services/analyse.py`, `app/services/reconciliation.py` |
+| **Nouveau Jalon (ex: J3)** | `00-ou-nous-sommes.md` + section ciblée dans `docs/` | Selon le plan validé en amont |
 
 ## Stack (décisions A1-A9 du cahier des charges — ne pas changer sans arbitrage de l'auteur)
 - **Backend** : Python 3.11+ (3.14 en pratique), FastAPI, Uvicorn, Pydantic v2
@@ -39,12 +46,12 @@ app/
 ├── schema.sql       # Schéma complet (projets, parametres, chapitres, codex, codex_index,
 │                    #  journaux, alertes, analyses, corrections)
 ├── llm/             # client.py (compatible OpenAI), prompts.py (anti-injection), mock.py (tests)
-├── services/        # normalisation.py, reconciliation.py, chaine.py, alertes.py,
+├── services/        # normalisation.py, reconciliation.py, chaine.py, alertes.py, texte_riche.py,
 │                    #  analyse.py (orchestrateur jobs), rendu.py (document annoté)
 ├── routes/web.py    # Écrans E1/E3/E4/E5
 ├── templates/       # base.html, index.html, analyses/*.html
 └── static/          # style.css, app.js, vendor/ (htmx, alpine — NE PAS MODIFIER)
-tests/               # pytest : unit + intégration (mock LLM), 85 tests
+tests/               # pytest : unit + intégration (mock LLM), 77 tests
 scripts/tester_llm.py  # ping fail-fast des 5 modèles (utilise le vrai .env)
 ```
 
@@ -53,3 +60,4 @@ scripts/tester_llm.py  # ping fail-fast des 5 modèles (utilise le vrai .env)
 - Identité de commit : `calogerovolpe <bx.volpe@gmail.com>`
 - **Un commit par jalon ou correctif** (message : `Jn — <contenu> — N tests verts`),
   push systématique après commit
+

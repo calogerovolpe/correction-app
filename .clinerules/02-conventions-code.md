@@ -8,6 +8,12 @@
 - Typage : annotations complètes (`str | None`, `list[dict]`), dataclasses/frozen pour les
   valeurs métier pures, Pydantic pour les contrats LLM.
 
+## Dimensionnement des fichiers et modularité
+- **Cible de taille de fichier** : idéalement **< 300 lignes** de code par fichier.
+- **Seuil d'alerte** : tout fichier approchant ou dépassant **500 lignes** doit faire l'objet d'un fractionnement lors du jalon suivant.
+- **Règle de découpage** : par responsabilité métier / écran (ex: scinder un routeur en `analyses.py`, `resultat.py`, `projets.py`), jamais par découpage arbitraire de lignes.
+- Ne pas sur-fractionner les petits modules : un service concis de 100 à 200 lignes est optimal.
+
 ## Architecture — règles fixes
 1. **Services purs vs orchestration** : `normalisation.py`, `chaine.py`, `reconciliation.py`,
    `rendu.py` sont des fonctions PURES (testables sans DB ni LLM). `analyse.py` orchestre,

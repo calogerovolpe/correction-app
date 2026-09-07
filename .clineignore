@@ -1,0 +1,22 @@
+# Fichiers et dossiers ignorés par Cline pour économiser les tokens
+# et protéger les données sensibles
+
+# Environnements et dépendances
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+correction_app.egg-info/
+
+# Données locales de l'auteur (contient le manuscrit - CONFIDENTIEL)
+data/
+exports/
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm
+
+# Librairies tierces statiques (aucun besoin d'analyse par l'IA)
+app/static/vendor/
+
+# Spécifications volumineuses (à lire manuellement ou à la demande seulement)
+docs/
