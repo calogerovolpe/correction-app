@@ -60,6 +60,17 @@ def extraire_corrections(sortie_llm: str, phase: str) -> list[Correction]:
         if correction.phase != phase:
             # La phase est connue par construction : cohérence forcée (v6 §8.2)
             correction = correction.model_copy(update={"phase": phase})
+        if correction.phase == "forme" and correction.original == correction.correction:
+            # No-op Forme (jalon A, décision 34) : « cous » barré pour réécrire
+            # « cous » (explication « aucune correction nécessaire ») n'est pas
+            # une correction — rejet individuel, sans arrêter le pipeline.
+            # NB : Style/Technique marquent SANS réécrire (original ==
+            # correction est leur mode de marquage légitime — on ne les touche pas).
+            JOURNAL.warning(
+                "Correction %s rejetée (%s) : no-op Forme (original == correction)",
+                correction.id, phase,
+            )
+            continue
         validees.append(correction)
     return validees
 
@@ -91,6 +102,24 @@ def reconcilier(correction: Correction, paragraphe: Paragraphe) -> Correction | 
         correction.id, correction.original, paragraphe.id,
     )
     return None
+
+
+def renumeroter(fusions: list[CorrectionFusionnee]) -> list[CorrectionFusionnee]:
+    """Assigne des ids GLOBAUX uniques et déterministes (jalon A, décision 33).
+
+    Chaque phase LLM émet ses propres ids (ex. `c-0001`) sans coordination :
+    deux corrections de phases différentes peuvent partager le même id. Or
+    `rendu.py` construit ses groupes `g-XXXX` par id — un doublon colle deux
+    corrections (barre latérale désynchronisée, choix Forme partagé).
+    On réassigne donc `c-0001`, `c-0002`, … dans l'ordre de la liste fusionnée,
+    qui est déterministe (phases dans ORDRE_PHASES, ordre d'émission du LLM)."""
+    return [
+        CorrectionFusionnee(
+            correction=f.correction.model_copy(update={"id": f"c-{index:04d}"}),
+            embellissement_migre=f.embellissement_migre,
+        )
+        for index, f in enumerate(fusions, start=1)
+    ]
 
 
 def dedupliquer(corrections: list[Correction]) -> list[CorrectionFusionnee]:

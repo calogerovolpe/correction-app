@@ -7,6 +7,7 @@ import asyncio
 import hashlib
 import json
 import time
+from pathlib import Path
 
 from app.config import settings
 from app.llm.mock import MockLLM
@@ -250,3 +251,25 @@ def test_prefill_dernieres_options_sur_e3(client, monkeypatch):
     assert 'value="chapitre" checked' not in page.text
     assert 'id="case-technique" >' in page.text        # décochée (dernier choix mémorisé)
     assert 'id="case-style" checked' not in page.text
+
+
+# --- Jalon A : menu contextuel fiable (rendu) ---------------------------------
+
+
+def test_menu_contextuel_et_popover_masques_au_chargement(client, monkeypatch):
+    """Jalon A (rendu) : le menu contextuel et le popover de suggestion sont
+    rendus avec l'attribut `hidden` (masqués au chargement), et le CSS contient
+    la garde `[hidden] { display: none !important }` — avant, la règle
+    `.menu-contextuel { display: flex }` neutralisait le `hidden` (menu toujours
+    visible). Position fixed + clientX/clientY, positionnement du popover,
+    fermeture au clic extérieur et à Échap : comportement JS de `app.js`,
+    à vérifier manuellement au navigateur (aucun moteur JS dans pytest)."""
+    identifiant = _chapitre_termine(client, monkeypatch)
+    page = client.get(f"/analyses/{identifiant}")
+    assert '<div id="menu-contextuel" class="menu-contextuel" hidden>' in page.text
+    assert '<div id="popover-action" class="bulle-contexte popover-atelier" hidden></div>' in page.text
+    css = (Path(__file__).resolve().parents[1] / "app" / "static" / "style.css").read_text(
+        encoding="utf-8"
+    )
+    assert "[hidden] { display: none !important; }" in css
+    assert "position: fixed" in css

@@ -3,7 +3,7 @@ refus/restauration, localisation ancrée, splices avec remappage déterministe,
 préservation du formatage, réévaluation d'un paragraphe."""
 
 from app.models import Correction, CorrectionFusionnee
-from app.services import reconstruction
+from app.services import reconciliation, reconstruction
 from app.services.texte_riche import ParagrapheRiche, RunFormat
 
 TEXTE = "Les cavaliers part à l'aube vers la cité."
@@ -175,3 +175,20 @@ def test_second_paragraphe_independant():
     assert _courant(etat, "p-2") == "Le soir tombe sur la mer."
     c2 = next(e for e in etat["corrections"] if e["fusion"].correction.id == "c-2")
     assert c2["fusion"].correction.debut == 4  # non décalée par la splice de p-1
+
+
+# --- Jalon A : choix Forme indépendants après ids uniques ---------------------
+
+
+def test_choix_forme_independants_apres_renumerotation():
+    """Deux corrections émises avec le même id : après réassignation globale
+    (jalon A), le choix Forme (clé = id) ne porte que sur SA correction."""
+    fusions = reconciliation.renumeroter([
+        _fusion("c-0001", "forme", 14, 18, "part", "partent"),
+        _fusion("c-0001", "forme", 36, 40, "cité", "cités"),
+    ])
+    etat = reconstruction.etat_initial(fusions, [_p()])
+    ids = [e["fusion"].correction.id for e in etat["corrections"]]
+    assert len(set(ids)) == 2
+    assert reconstruction.basculer_choix(etat, ids[0], "original") is True
+    assert etat["choix"] == {ids[0]: "original"}  # l'autre Forme reste appliquée

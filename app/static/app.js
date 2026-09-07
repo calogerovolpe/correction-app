@@ -7,6 +7,10 @@
 
   const selection = { paragrapheId: "", fragment: "", contexte: "", texteParagraphe: "" };
 
+  /* Coordonnées viewport du dernier clic droit (jalon A) : le menu et le
+     popover sont en position: fixed, donc positionnés par clientX/clientY. */
+  const curseur = { x: 0, y: 0 };
+
   const zoneAtelier = () => document.getElementById("zone-atelier");
 
   function afficherErreur(message) {
@@ -95,9 +99,13 @@
       return;
     }
     evenement.preventDefault();
-    menu.style.left = evenement.pageX + "px";
-    menu.style.top = evenement.pageY + "px";
+    curseur.x = evenement.clientX;
+    curseur.y = evenement.clientY;
     menu.hidden = false;
+    /* position: fixed (jalon A) : coordonnées viewport, robustes au scroll ;
+       recentrage simple pour ne jamais sortir de l'écran. */
+    menu.style.left = Math.max(8, Math.min(curseur.x, window.innerWidth - (menu.offsetWidth || 240) - 12)) + "px";
+    menu.style.top = Math.max(8, Math.min(curseur.y, window.innerHeight - (menu.offsetHeight || 100) - 12)) + "px";
   });
 
   async function demanderSuggestion(action) {
@@ -174,6 +182,11 @@
       pop.append(titre, liste);
     }
     pop.hidden = false;
+    /* position: fixed (jalon A) : positionné au point du clic droit — avant,
+       `absolute` sans left/top le laissait hors écran (fin du document).
+       Mesuré une fois visible, puis recentré pour rester dans la fenêtre. */
+    pop.style.left = Math.max(8, Math.min(curseur.x, window.innerWidth - (pop.offsetWidth || 340) - 12)) + "px";
+    pop.style.top = Math.max(8, Math.min(curseur.y, window.innerHeight - (pop.offsetHeight || 200) - 12)) + "px";
   }
 
   document.addEventListener("click", async (evenement) => {

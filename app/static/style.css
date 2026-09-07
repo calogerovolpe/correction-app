@@ -8,6 +8,11 @@
 
 * { box-sizing: border-box; }
 
+/* L'attribut `hidden` doit TOUJOURS gagner (jalon A) : la règle UA
+   `[hidden] { display: none }` était surchargée par les règles d'auteur
+   (ex. `.menu-contextuel { display: flex }`) — menu visible malgré `hidden`. */
+[hidden] { display: none !important; }
+
 body {
   margin: 0;
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -333,9 +338,10 @@ footer { border-top: 1px solid var(--bordure); color: var(--texte-secondaire); f
 .obsolete-note { color: #c62828; font-size: 0.85rem; }
 .btn-reevaluer { font-size: 0.8rem; color: #1565c0; margin-left: 0.4rem; }
 
-/* Menu contextuel (clic droit sur sélection) */
+/* Menu contextuel (clic droit sur sélection) — jalon A : position fixed
+   (coordonnées clientX/clientY, robuste au scroll) */
 .menu-contextuel {
-  position: absolute;
+  position: fixed;
   z-index: 300;
   display: flex;
   flex-direction: column;
@@ -357,8 +363,10 @@ footer { border-top: 1px solid var(--bordure); color: var(--texte-secondaire); f
 }
 .item-menu:hover { background: #e3f2fd; }
 
-/* Popover de suggestion (embellissement / alternatives) */
-.popover-atelier { position: absolute; z-index: 250; width: 340px; }
+/* Popover de suggestion (embellissement / alternatives) — jalon A : position
+   fixed + left/top posés par app.js (avant : absolute sans left/top → hors écran ;
+   position fixed prime sur le `absolute` de .bulle-contexte, défini plus haut) */
+.popover-atelier { position: fixed; z-index: 250; width: 340px; }
 .popover-atelier .titre-choix { font-weight: 600; margin: 0 0 0.4rem; }
 .popover-atelier .proposition { background: #e8f5e9; border-radius: 4px; padding: 0.5rem; }
 .popover-atelier .actions-popover { display: flex; flex-direction: column; gap: 0.3rem; margin-top: 0.4rem; }

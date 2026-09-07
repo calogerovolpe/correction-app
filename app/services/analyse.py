@@ -181,6 +181,10 @@ async def _executer_interne(identifiant: int) -> None:
 
     toutes = [correction for resultat in resultats for correction in resultat]
     fusion = reconciliation.dedupliquer(toutes)
+    # IDs globaux uniques et déterministes (jalon A) : chaque phase émet ses
+    # propres ids sans coordination — un doublon casserait les groupes g-XXXX
+    # du rendu (barre latérale désynchronisée, choix Forme partagés).
+    fusion = reconciliation.renumeroter(fusion)
 
     # Écritures — métadonnées uniquement en J2 (narratif au jalon J3)
     await _maj(identifiant, etape="ecriture")

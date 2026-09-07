@@ -3,6 +3,7 @@ Forme refusée, corrections obsolètes, groupes g-XXXX, compteur de masqués."""
 
 from app.models import Correction, CorrectionFusionnee
 from app.services import reconstruction, rendu
+from app.services.reconciliation import renumeroter
 from app.services.texte_riche import ParagrapheRiche, RunFormat
 
 TEXTE = "Les sentinelles veille sur les remparts silencieux."
@@ -121,3 +122,25 @@ def test_compteur_de_paragraphes_masques():
     doc_vide = rendu.preparer_document(etat["paragraphes"], etat["corrections"], etat["choix"])
     assert doc_vide["nb_masques"] == 2
     assert doc_vide["paragraphes"] == []
+
+
+# --- Jalon A : ids de correction uniques entre phases -------------------------
+
+
+def test_ids_dupliques_entre_phases_groupes_et_barre_distincts():
+    """Deux phases émettent le même id « c-0001 » : après réassignation globale
+    (analyse.py appelle renumeroter), le rendu produit 2 groupes distincts et
+    2 entrées de barre latérale distinctes — avant le correctif, le dict
+    `groupes` (clé = id) collait les deux corrections sur un même data-groupe."""
+    forme = _fusion("c-0001", "forme", 16, 22, "veille", "veillent")
+    style = _fusion("c-0001", "style", 16, 22, "veille", "veillaient")
+    fusion = renumeroter([forme, style])
+    assert len({f.correction.id for f in fusion}) == 2  # ids réassignés uniques
+    doc = _doc(fusion)
+    infos = doc["corrections_barre"]
+    assert len(infos) == 2
+    g_forme = next(i["groupe"] for i in infos if i["phase"] == "forme")
+    g_style = next(i["groupe"] for i in infos if i["phase"] == "style")
+    assert g_forme != g_style
+    seg_forme = next(s for s in doc["paragraphes"][0]["segments"] if s["type"] == "forme")
+    assert seg_forme["groupe"] == g_forme  # le clic cible la BONNE correction

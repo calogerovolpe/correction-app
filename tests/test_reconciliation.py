@@ -5,7 +5,7 @@ import json
 
 import pytest
 
-from app.models import Correction, PannePhase
+from app.models import Correction, CorrectionFusionnee, PannePhase
 from app.services import reconciliation as reco
 from app.services.normalisation import Paragraphe
 
@@ -187,3 +187,97 @@ def test_embellissement_isole_sans_style_hote():
     assert len(fusion) == 1
     assert fusion[0].correction.phase == "embellissement"
     assert fusion[0].embellissement_migre is None
+
+# --- Ids globaux uniques (jalon A, décision 33) ------------------------------
+
+
+def test_renumeroter_assigne_des_ids_globaux_uniques_et_deterministes():
+    """Chaque phase LLM émet ses ids sans coordination (ex. c-0001 deux fois) :
+    la réassignation produit une suite unique ET déterministe."""
+    style = _correction(id="c-0007", phase="style", type="repetition")
+    forme = _correction(id="c-0001", phase="forme", type="accord")
+    entrees = [CorrectionFusionnee(correction=style), CorrectionFusionnee(correction=forme)]
+    fusion = reco.renumeroter(entrees)
+    assert [f.correction.id for f in fusion] == ["c-0001", "c-0002"]
+    encore = reco.renumeroter(entrees)  # déterministe : même entrée → mêmes ids
+    assert [f.correction.id for f in encore] == ["c-0001", "c-0002"]
+
+
+def test_renumeroter_conserve_l_embellissement_migre():
+    style = _correction(id="c-0001", phase="style", type="repetition")
+    embellissement = _correction(
+        id="c-0001", phase="embellissement", type="prosodie",
+        correction="s'envolent", variantes=["volent"],
+    )
+    fusion = reco.renumeroter(reco.dedupliquer([style, embellissement]))
+    assert len(fusion) == 1
+    assert fusion[0].correction.id == "c-0001"
+    assert fusion[0].embellissement_migre is not None
+    assert fusion[0].embellissement_migre.suggestion == "s'envolent"
+
+
+# --- Rejet des no-op Forme (jalon A, décision 34) ----------------------------
+
+
+def test_no_op_forme_rejetee_les_autres_conservees():
+    """« cous » barré pour réécrire « cous » (explication « aucune correction
+    nécessaire ») : rejet individuel, sans arrêt, les autres restent."""
+    sortie = json.dumps(
+        {
+            "corrections": [
+                {
+                    "id": "c-0001", "phase": "forme", "type": "accord",
+                    "paragraphe_id": "p-1", "debut": 14, "fin": 18,
+                    "contexte_avant": "Les cavaliers ", "original": "part",
+                    "correction": "partent", "explication": "Accord.",
+                },
+                {
+                    "id": "c-0002", "phase": "forme", "type": "orthographe",
+                    "paragraphe_id": "p-1", "debut": 36, "fin": 40,
+                    "contexte_avant": "vers la ", "original": "cous",
+                    "correction": "cous",
+                    "explication": "aucune correction nécessaire",
+                },
+            ]
+        },
+        ensure_ascii=False,
+    )
+    validees = reco.extraire_corrections(sortie, "forme")
+    assert [c.id for c in validees] == ["c-0001"]
+
+
+def test_no_op_forme_seule_liste_vide_jamais_une_panne():
+    sortie = json.dumps(
+        {
+            "corrections": [
+                {
+                    "id": "c-0001", "phase": "forme", "type": "orthographe",
+                    "paragraphe_id": "p-1", "debut": 36, "fin": 40,
+                    "original": "cous", "correction": "cous",
+                    "explication": "aucune correction nécessaire",
+                }
+            ]
+        },
+        ensure_ascii=False,
+    )
+    assert reco.extraire_corrections(sortie, "forme") == []
+
+
+def test_marquage_style_original_egale_correction_conserve():
+    """Style/Technique marquent SANS réécrire : original == correction est leur
+    mode de marquage légitime — le rejet no-op ne concerne que la phase Forme."""
+    sortie = json.dumps(
+        {
+            "corrections": [
+                {
+                    "id": "c-0001", "phase": "style", "type": "repetition",
+                    "paragraphe_id": "p-1", "debut": 0, "fin": 3,
+                    "original": "Les", "correction": "Les",
+                    "explication": "Répétition.",
+                }
+            ]
+        },
+        ensure_ascii=False,
+    )
+    validees = reco.extraire_corrections(sortie, "style")
+    assert [c.id for c in validees] == ["c-0001"]

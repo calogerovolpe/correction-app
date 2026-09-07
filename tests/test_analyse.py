@@ -289,3 +289,46 @@ def test_jobs_orphelins_recuperes_au_demarrage(dossier_donnees):
             "SELECT statut, erreur FROM analyses WHERE projet_id = 'P-ORPH'"))
     assert lignes[0]["statut"] == "echec"
     assert "redémarrage" in lignes[0]["erreur"]
+
+
+def test_ids_de_corrections_uniques_entre_phases(client, monkeypatch):
+    """Jalon A : chaque phase émet ses ids sans coordination (ici « c-0001 »
+    deux fois) — les ids persistés sont réassignés globalement uniques et
+    déterministes, sinon deux corrections partagent le même `data-groupe`
+    (barre latérale désynchronisée, choix Forme collés)."""
+    _modeles_distincts(monkeypatch)
+    reponse_style = json.dumps(
+        {
+            "corrections": [
+                {
+                    "id": "c-0001", "phase": "style", "type": "repetition",
+                    "paragraphe_id": "p-1", "debut": 14, "fin": 18,
+                    "contexte_avant": "Les cavaliers ", "original": "part",
+                    "correction": "partent", "explication": "Répétition.",
+                    "regle": "", "variantes": [],
+                }
+            ]
+        },
+        ensure_ascii=False,
+    )
+    mock = MockLLM(reponses={"m-forme": REPONSE_FORME, "m-style": reponse_style})
+    monkeypatch.setattr(service_analyse, "_client_llm", lambda: mock)
+    client.post("/projets", data={"titre": "Mon roman"}, follow_redirects=True)
+
+    identifiant = _lancer(client, {"texte": TEXTE, "categorie": "extrait"})
+    assert _attendre(client, identifiant) == "terminee"
+
+    from app import db
+
+    lignes = asyncio.run(db.interroger(
+        "SELECT data_json FROM corrections WHERE analyse_id = ?", (identifiant,)))
+    fusion = json.loads(lignes[0]["data_json"])
+    ids = [f["correction"]["id"] for f in fusion]
+    assert len(ids) == 2
+    assert len(set(ids)) == 2           # plus aucun doublon entre phases
+    assert ids == ["c-0001", "c-0002"]  # réassignation déterministe
+
+    page = client.get(f"/analyses/{identifiant}")
+    assert 'data-groupe="g-0001"' in page.text   # marque cliquable dans le texte
+    assert '"groupe": "g-0001"' in page.text     # JSON de la barre latérale
+    assert '"groupe": "g-0002"' in page.text
