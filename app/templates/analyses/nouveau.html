@@ -26,9 +26,9 @@
   <!-- Choix de catégorie 100% déclaratif (J2.3) -->
   <fieldset>
     <legend>Catégorie du texte</legend>
-    <label><input type="radio" name="categorie" value="chapitre" checked> <strong>Chapitre</strong> (officiel ou brouillon)</label>
-    <label><input type="radio" name="categorie" value="passage"> <strong>Passage</strong> (scène libre, aucune écriture narrative)</label>
-    <label><input type="radio" name="categorie" value="extrait"> <strong>Extrait</strong> (court fragment, aucune écriture narrative)</label>
+    <label><input type="radio" name="categorie" value="chapitre" {% if prefil.categorie == 'chapitre' %}checked{% endif %}> <strong>Chapitre</strong> (officiel ou brouillon)</label>
+    <label><input type="radio" name="categorie" value="passage" {% if prefil.categorie == 'passage' %}checked{% endif %}> <strong>Passage</strong> (scène libre, aucune écriture narrative)</label>
+    <label><input type="radio" name="categorie" value="extrait" {% if prefil.categorie == 'extrait' %}checked{% endif %}> <strong>Extrait</strong> (court fragment, aucune écriture narrative)</label>
   </fieldset>
 
   <!-- Options Chapitre : numéro + case codex -->
@@ -50,20 +50,15 @@
     </div>
   </fieldset>
 
-  <!-- Types de correction (dérogable) -->
+  <!-- Types de correction (dérogable) — 3 phases ; l'Embellissement se demande
+       à la demande par sélection + clic droit sur le résultat (J2.5) -->
   <fieldset>
     <legend>Types de correction</legend>
     <input type="hidden" name="phases" id="phases-json" value="">
-    <label><input type="checkbox" id="case-forme" checked> <strong>Forme</strong> — orthographe, grammaire, typographie (barré conservé)</label>
-    <label><input type="checkbox" id="case-style" checked> <strong>Style</strong> — répétitions, lourdeurs (alternatives à la demande)</label>
-    <label><input type="checkbox" id="case-technique" checked> <strong>Technique</strong> — temps, POV, cohérence (barre latérale)</label>
-    <label><input type="checkbox" id="case-embellissement"> <strong>Embellissement</strong> — créativité & prosodie (suggestions à la demande)</label>
-    <div class="jauge" id="jauge-embellissement" hidden>
-      <label for="creativite">Créativité de l'Embellissement (température) : <strong id="valeur-creativite">{{ temperature_defaut }}</strong></label>
-      <input type="range" id="creativite" name="temperature_embellissement"
-             min="0" max="1.5" step="0.1" value="{{ temperature_defaut }}">
-      <p class="aide-jauge">0 = sobre et prévisible · 1.5 = audacieux et inventif</p>
-    </div>
+    <label><input type="checkbox" id="case-forme" {% if prefil.forme %}checked{% endif %}> <strong>Forme</strong> — orthographe, grammaire, typographie (barré conservé)</label>
+    <label><input type="checkbox" id="case-style" {% if prefil.style %}checked{% endif %}> <strong>Style</strong> — répétitions, lourdeurs (alternatives à la demande)</label>
+    <label><input type="checkbox" id="case-technique" {% if prefil.technique %}checked{% endif %}> <strong>Technique</strong> — temps, POV, cohérence (fond jaune + barre latérale)</label>
+    <p class="info-texte">L'Embellissement se demande à tout moment : sélectionnez un passage dans le résultat, puis clic droit → « Embellir la sélection ».</p>
   </fieldset>
 
   <button type="submit">Lancer l'analyse</button>
@@ -78,22 +73,20 @@
     forme: document.getElementById('case-forme'),
     style: document.getElementById('case-style'),
     technique: document.getElementById('case-technique'),
-    embellissement: document.getElementById('case-embellissement'),
   };
-  const jauge = document.getElementById('jauge-embellissement');
-  const creativite = document.getElementById('creativite');
-  const valeurCreativite = document.getElementById('valeur-creativite');
   const phasesJson = document.getElementById('phases-json');
   const optionsChapitre = document.getElementById('options-chapitre');
   const inputNum = document.getElementById('numero-chapitre');
   const indicateur = document.getElementById('indicateur-attendu');
+  // Pré-remplissage J2.5 : si des configurations précédentes existent, elles
+  // s'affichent telles quelles au chargement (la matrice ne re-précoche pas).
+  const preRempli = {{ 'true' if prefil else 'false' }};
 
   function ecrirePhases() {
     phasesJson.value = JSON.stringify({
       forme: cases.forme.checked,
       style: cases.style.checked,
       technique: cases.technique.checked,
-      embellissement: cases.embellissement.checked,
     });
   }
 
@@ -243,7 +236,7 @@
   function majAffichageCat() {
     const radio = document.querySelector('input[name="categorie"]:checked');
     const cat = radio ? radio.value : 'chapitre';
-    
+
     if (optionsChapitre) {
       optionsChapitre.style.display = (cat === 'chapitre') ? 'block' : 'none';
     }
@@ -252,14 +245,11 @@
       cases.forme.checked = true;
       cases.style.checked = true;
       cases.technique.checked = true;
-      cases.embellissement.checked = false;
     } else {
       cases.forme.checked = true;
-      cases.style.checked = false;
+      cases.style.checked = true;
       cases.technique.checked = false;
-      cases.embellissement.checked = true;
     }
-    jauge.hidden = !cases.embellissement.checked;
     ecrirePhases();
   }
 
@@ -278,11 +268,7 @@
 
   editeur.addEventListener('input', serialiserEditeur);
   document.querySelectorAll('input[name="categorie"]').forEach(r => r.addEventListener('change', majAffichageCat));
-  Object.values(cases).forEach(el => el.addEventListener('change', () => {
-    jauge.hidden = !cases.embellissement.checked;
-    ecrirePhases();
-  }));
-  if (creativite) creativite.addEventListener('input', () => { valeurCreativite.textContent = creativite.value; });
+  Object.values(cases).forEach(el => el.addEventListener('change', ecrirePhases));
   if (inputNum) inputNum.addEventListener('input', verifIndicateur);
 
   const form = document.getElementById('form-soumission');
@@ -293,7 +279,11 @@
     });
   }
 
-  majAffichageCat();
+  if (preRempli) {
+    ecrirePhases();
+  } else {
+    majAffichageCat();
+  }
   verifIndicateur();
 })();
 </script>

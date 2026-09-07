@@ -1,13 +1,15 @@
-"""Orchestration des analyses — cahier des charges §4.4 et §7 (jalon J2).
+"""Orchestration des analyses — cahier des charges §4.4 et §7 (jalons J2-J2.5).
 
 Séquence (adaptation v6 §14.1) :
-  normalisation -> validation du remplacement (refus zéro token)
-  -> chaîne N+1 (catégorie définitive) -> fail-fast (ping des modèles actifs)
-  -> phases 3-6 parallèles (Option B : aucune panne tolérée, aucun résultat partiel)
-  -> validation/réconciliation -> déduplication Style prioritaire -> écritures.
+  normalisation -> chaîne déclarative (catégorie choisie par l'auteur)
+  -> fail-fast (ping des modèles actifs) -> phases parallèles (Forme, Style,
+  Technique) (Option B : aucune panne tolérée, aucun résultat partiel)
+  -> validation/réconciliation -> déduplication -> écritures.
 
-J2 : aucune écriture narrative (codex/journaux/chapitres — jalon J3) ; seules les
-métadonnées `analyses` et `corrections` sont persistées."""
+J2.5 : l'Embellissement n'est plus une phase d'analyse — il est demandé À LA
+DEMANDE sur sélection (app/routes/atelier.py). Aucune écriture narrative ici
+(chapitres/codex/journaux — jalon J3) ; seules les métadonnées `analyses` et
+`corrections` sont persistées."""
 
 import asyncio
 import json
@@ -30,7 +32,7 @@ from app.services.normalisation import (
 
 JOURNAL = logging.getLogger("correction.analyse")
 
-ORDRE_PHASES = ["forme", "style", "technique", "embellissement"]
+ORDRE_PHASES = ["forme", "style", "technique"]
 
 GABARIT_FAIL_FAST = (
     "⛔ Exécution interrompue — la phase {nom} ne répond pas ({cause}).\n"
@@ -47,22 +49,18 @@ _MODELES = {
     "forme": lambda: settings.modele_forme,
     "style": lambda: settings.modele_style,
     "technique": lambda: settings.modele_technique,
-    "embellissement": lambda: settings.modele_embellissement,
 }
 
 
 def phases_actives(categorie: str, choix: dict) -> list[str]:
-    """Pré-sélection par défaut selon la matrice (v6 §5.4), DÉROGEABLE (décision de
-    l'auteur, jalon J2) : l'interface pré-coche les phases selon la catégorie et
-    l'utilisateur les coche/décoche librement — un Chapitre peut ainsi être corrigé
-    pour la seule Forme, ou le seul Embellissement.
-
-    `choix[phase]` : None = pré-sélection matrice ; True/False = choix explicite."""
+    """Pré-sélection par défaut selon la catégorie, DÉROGABLE (décision de
+    l'auteur, J2.1) : Chapitre = Forme + Style + Technique ; Passage/Extrait =
+    Forme + Style. `choix[phase]` : None = pré-sélection ; True/False = choix
+    explicite. L'Embellissement est demandé à la demande (J2.5), jamais ici."""
     defauts = {
         "forme": True,
-        "style": categorie == "chapitre",
+        "style": True,
         "technique": categorie == "chapitre",
-        "embellissement": categorie in ("passage", "extrait"),
     }
     return [
         phase for phase in ORDRE_PHASES
@@ -161,13 +159,12 @@ async def _executer_interne(identifiant: int) -> None:
                    fini_a=_maintenant())
         return
 
-    # Phases 3 à 6 parallèles (v6 §14.1 étape 8) — Option B en cas de panne
+    # Phases parallèles (v6 §14.1 étape 8) — Option B en cas de panne
     await _maj(identifiant, etape="phases")
-    temperature_embellissement = options.get("temperature_embellissement")
     try:
         resultats = await asyncio.gather(
             *(
-                _executer_phase(client, phase, paragraphes, temperature_embellissement)
+                _executer_phase(client, phase, paragraphes)
                 for phase in actives
             )
         )
@@ -194,24 +191,18 @@ async def _executer_interne(identifiant: int) -> None:
     await _maj(identifiant, statut="terminee", etape=None, fini_a=_maintenant())
 
 
-async def _executer_phase(client, phase: str, paragraphes, temperature_embellissement=None) -> list:
+async def _executer_phase(client, phase: str, paragraphes) -> list:
     """Une phase : prompt -> complétion -> extraction (PannePhase possible)
     -> réconciliation par correction (rejets individuels, jamais d'arrêt).
 
-    Jauge de créativité (décision de l'auteur, jalon J2) : la température de
-    l'Embellissement est choisie par l'utilisateur dans E3 (défaut : réglage global)."""
+    Les phases de correction tournent toujours à température 0.0 ; la jauge
+    de créativité ne concerne que l'Embellissement, désormais à la demande (J2.5)."""
     messages = prompt_phase_correction(
         phase, CONSIGNES_PHASES[phase], paragraphes, settings.variante
     )
-    if phase == "embellissement":
-        temperature = (
-            temperature_embellissement
-            if temperature_embellissement is not None
-            else settings.temperature_embellissement
-        )
-    else:
-        temperature = settings.temperature_correction
-    sortie = await client.completer(_MODELES[phase](), messages, temperature=temperature)
+    sortie = await client.completer(
+        _MODELES[phase](), messages, temperature=settings.temperature_correction
+    )
     corrections = reconciliation.extraire_corrections(sortie, phase)
     par_dict = {p.id: p for p in paragraphes}
     validees = []

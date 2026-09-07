@@ -29,22 +29,6 @@ REPONSE_FORME = json.dumps(
 )
 
 
-REPONSE_EMBELLISSEMENT = json.dumps(
-    {
-        "corrections": [
-            {
-                "id": "c-0002", "phase": "embellissement", "type": "prosodie",
-                "paragraphe_id": "p-2", "debut": 36, "fin": 40,
-                "contexte_avant": "vers la ", "original": "cité",
-                "correction": "cité endormie", "explication": "Assonance discrète.",
-                "regle": "", "variantes": ["cité muette", "cité ensevelie"],
-            }
-        ]
-    },
-    ensure_ascii=False,
-)
-
-
 def _modeles_distincts(monkeypatch):
     """Modèles distincts par phase pour scripter le mock indépendamment."""
     for champ, valeur in [
@@ -91,7 +75,7 @@ def _projet_courant(dossier_donnees, courant, statut="ok"):
 
 def test_analyse_complete_extrait(client, monkeypatch):
     _modeles_distincts(monkeypatch)
-    mock = MockLLM(reponses={"m-forme": REPONSE_FORME, "m-embellissement": '{"corrections": []}'})
+    mock = MockLLM(reponses={"m-forme": REPONSE_FORME, "m-style": '{"corrections": []}'})
     monkeypatch.setattr(service_analyse, "_client_llm", lambda: mock)
     client.post("/projets", data={"titre": "Mon roman"}, follow_redirects=True)
 
@@ -103,10 +87,11 @@ def test_analyse_complete_extrait(client, monkeypatch):
     assert "partent" in page.text
     assert 'data-paragraphe-id="p-1"' in page.text
     assert "pastille--forme" in page.text     # légende interactive
-    # Matrice Extrait : embellissement actif par défaut, style/technique non appelés
+    # Matrice Extrait (J2.5) : Forme + Style actifs, PAS de Technique,
+    # et PAS d'Embellissement (demandé à la demande par clic droit)
     appels = [modele for modele, _ in mock.appels]
-    assert "m-forme" in appels and "m-embellissement" in appels
-    assert "m-style" not in appels and "m-technique" not in appels
+    assert "m-forme" in appels and "m-style" in appels
+    assert "m-technique" not in appels and "m-embellissement" not in appels
 
 
 def test_chapitre_declaratif_respecte(client, monkeypatch, dossier_donnees):
@@ -180,7 +165,7 @@ def test_panne_option_b_aucun_resultat_partiel(client, monkeypatch):
 def test_sortie_non_parsable_panne_de_phase(client, monkeypatch):
     _modeles_distincts(monkeypatch)
     mock = MockLLM(reponses={"m-forme": "Je ne peux pas répondre en JSON.",
-                             "m-embellissement": "Panne incompréhensible."})
+                             "m-style": "Panne incompréhensible."})
     monkeypatch.setattr(service_analyse, "_client_llm", lambda: mock)
     client.post("/projets", data={"titre": "Mon roman"}, follow_redirects=True)
 
@@ -230,7 +215,7 @@ def test_redirection_identifiant_incremental(client, monkeypatch):
     pointait systématiquement vers /analyses/1 (déballage inversé : rowcount
     au lieu de lastrowid) — invisible en base vierge, où id=1 était toujours correct."""
     _modeles_distincts(monkeypatch)
-    mock = MockLLM(reponses={"m-forme": REPONSE_FORME, "m-embellissement": '{"corrections": []}'})
+    mock = MockLLM(reponses={"m-forme": REPONSE_FORME, "m-style": '{"corrections": []}'})
     monkeypatch.setattr(service_analyse, "_client_llm", lambda: mock)
     client.post("/projets", data={"titre": "Mon roman"}, follow_redirects=True)
 
@@ -243,21 +228,21 @@ def test_redirection_identifiant_incremental(client, monkeypatch):
 
 
 def test_derogation_matrice_phases_libres(client, monkeypatch, dossier_donnees):
-    """Décision de l'auteur (J2) : la matrice ne fait que pré-cocher — l'utilisateur
-    peut tout décocher sauf ce qu'il veut (ex. un Chapitre corrigé Forme + Embellissement)."""
+    """Décision de l'auteur (J2.1) : la matrice ne fait que pré-cocher —
+    l'utilisateur peut décocher librement (ex. un Passage corrigé Forme seule)."""
     _modeles_distincts(monkeypatch)
     _projet_courant(dossier_donnees, 3)
-    mock = MockLLM(reponses={"m-forme": REPONSE_FORME, "m-embellissement": '{"corrections": []}'})
+    mock = MockLLM(reponses={"m-forme": REPONSE_FORME})
     monkeypatch.setattr(service_analyse, "_client_llm", lambda: mock)
 
     texte = "4 : La nuit tombe\n\nLes cavaliers part à l'aube vers la cité."
     identifiant = _lancer(client, {
-        "texte": texte, "categorie": "auto",
-        "phases": '{"forme": true, "style": false, "technique": false, "embellissement": true}',
+        "texte": texte, "categorie": "passage",
+        "phases": '{"forme": true, "style": false, "technique": false}',
     })
     assert _attendre(client, identifiant) == "terminee"
     appels = [modele for modele, _ in mock.appels]
-    assert "m-forme" in appels and "m-embellissement" in appels   # choisis par l'utilisateur
+    assert "m-forme" in appels                      # choisi par l'utilisateur
     assert "m-style" not in appels and "m-technique" not in appels  # décochés : dérogation matrice
 
 
@@ -269,29 +254,11 @@ def test_aucune_phase_selectionnee_refusee(client, monkeypatch):
 
     page = client.post("/analyses", data={
         "texte": TEXTE, "categorie": "extrait",
-        "phases": '{"forme": false, "style": false, "technique": false, "embellissement": false}',
+        "phases": '{"forme": false, "style": false, "technique": false}',
     })
     assert page.status_code == 400
     assert "au moins un type de correction" in page.text
     assert mock.appels == []  # rien n'a été consommé
-
-
-def test_temperature_choisie_par_l_utilisateur(client, monkeypatch):
-    """Jauge de créativité : la température de l'Embellissement vient du formulaire."""
-    _modeles_distincts(monkeypatch)
-    mock = MockLLM(reponses={"m-forme": '{"corrections": []}', "m-embellissement": '{"corrections": []}'})
-    monkeypatch.setattr(service_analyse, "_client_llm", lambda: mock)
-    client.post("/projets", data={"titre": "Mon roman"}, follow_redirects=True)
-
-    identifiant = _lancer(client, {
-        "texte": TEXTE, "categorie": "extrait",
-        "phases": '{"forme": true, "embellissement": true}',
-        "temperature_embellissement": "1.3",
-    })
-    assert _attendre(client, identifiant) == "terminee"
-    temperatures = {modele: temperature for modele, temperature in mock.appels}
-    assert temperatures["m-embellissement"] == 1.3   # jauge utilisateur
-    assert temperatures["m-forme"] == 0.0            # correction : toujours 0.0
 
 
 def test_texte_sans_projet_refuse(client):

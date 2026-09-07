@@ -47,14 +47,9 @@ CONSIGNES_PHASES = {
         "matériels au sein de l'extrait. Ne signale que ce qui est objectivement "
         "incohérent dans ce texte seul."
     ),
-    "embellissement": (
-        "Repère les passages propices à un enrichissement stylistique créatif ou une élévation poétique "
-        "(recherche de sonorités, prosodie, métaphores subtiles). "
-        "Cible le fragment dans `original`. Dans `explication`, décris l'intention poétique (ex: 'Recherche d'assonance', 'Élévation lexicale'). "
-        "Dans `correction`, laisse le texte original ou une brève suggestion indicative. "
-        "Laisse `variantes` vide : les suggestions concrètes seront générées à la demande par l'auteur."
-    ),
 }
+# NB : l'Embellissement n'est plus une phase d'analyse (J2.5) — il est demandé
+# à la demande sur sélection via `prompt_embellissement_selection`.
 
 
 def prompt_phase_correction(
@@ -164,6 +159,43 @@ def prompt_alternatives_a_la_demande(
         f"Mots fréquents à ÉVITER pour ne pas créer de nouvelle répétition : {eviter_str}.\n\n"
         f"{delimiter('PARAGRAPHE_CONTEXTE', paragraphe_texte)}\n\n"
         f"Fragment à remplacer : « {fragment} »"
+    )
+    return [
+        {"role": "system", "content": systeme},
+        {"role": "user", "content": utilisateur},
+    ]
+
+
+def prompt_embellissement_selection(
+    fragment: str,
+    paragraphe_texte: str,
+    contexte: str = "",
+    variante: str = "france",
+) -> list[dict[str, str]]:
+    """Prompt de l'embellissement À LA DEMANDE (J2.5) : l'auteur sélectionne un
+    passage, clique droit, « Embellir » — l'IA réécrit le passage en tenant
+    compte du contexte du texte (paragraphe courant + paragraphe précédent)."""
+    systeme = (
+        "Tu es un écrivain styliste français d'exception.\n"
+        "L'auteur a sélectionné un passage de son manuscrit et te demande de l'embellir\n"
+        "(élévation poétique ou lexicale, sonorités, rythme, images subtiles).\n"
+        "Règles impératives :\n"
+        "1. Conserve EXACTEMENT le sens du passage et son intégration grammaticale ;\n"
+        "2. Respecte la voix de l'auteur, le ton et le registre du contexte fourni ;\n"
+        "3. Reste d'une longueur proche du fragment d'origine (pas de gonflement) ;\n"
+        "4. Respecte la variante linguistique demandée ;\n"
+        "5. Réponds UNIQUEMENT par un JSON strict :\n"
+        '{"texte": "passage embell", "explication": "brève justification stylistique"}'
+    )
+    bloc_contexte = (
+        f"\n\n{delimiter('CONTEXTE_PRECEDENT', contexte)}" if contexte.strip() else ""
+    )
+    utilisateur = (
+        f"{CONSIGNE_ANTI_INJECTION}\n\n"
+        f"Variante linguistique : {variante}.\n\n"
+        f"{delimiter('PARAGRAPHE_COURANT', paragraphe_texte)}"
+        f"{bloc_contexte}\n\n"
+        f"Passage sélectionné à embellir : « {fragment} »"
     )
     return [
         {"role": "system", "content": systeme},

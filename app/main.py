@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from app import db
-from app.routes import web
+from app.routes import atelier, web
 
 DOSSIER_APP = Path(__file__).parent
 
@@ -31,3 +31,4 @@ async def cycle_de_vie(_: FastAPI):
 app = FastAPI(title="Correction de manuscrit", lifespan=cycle_de_vie)
 app.mount("/static", StaticFiles(directory=DOSSIER_APP / "static"), name="static")
 app.include_router(web.router)
+app.include_router(atelier.router)

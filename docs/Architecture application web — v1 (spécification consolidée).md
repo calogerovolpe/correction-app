@@ -91,6 +91,7 @@ Une soumission crée une ligne `analyses` (statut `en_attente`) puis lance `anal
 | `alertes` | Incohérences détectées (J3) | `numero_projet` stable (UNIQUE, MAX+1 à l'insertion) ; niveaux avertissement/information/confirmation ; statut active/validee ; colonne `cible` (double barrière) |
 | `analyses` | Support des jobs | Statuts CHECK ; `options_json` (catégorie, phases, remplacement, température) ; `decision` + `message` (machine d'états) ; `erreur` ; horodatages |
 | `corrections` | Historique de relecture | Dernier jeu de corrections fusionnées par analyse (`data_json`) |
+| `documents` | État courant de l'atelier E5 (J2.5) | Texte affiché (runs riches), corrections remappées + état actif/obsolète, choix Forme, paragraphes modifiés |
 
 **Trigger `trg_projet_actif_restrict`** : impossible de supprimer le projet actif (équivalent `ON DELETE RESTRICT`). Cascades `ON DELETE CASCADE` sur toutes les tables filles.
 
@@ -162,13 +163,15 @@ Validation Pydantic `extra='forbid'` : tout champ inconnu rejette l'entrée. La 
 * **Dernier validé gagne** : à la validation finale (« Valider la version actuelle »), le numéro validé met à jour `current_chapter_num` et devient la nouvelle référence pour le pré-remplissage du chapitre suivant.
 * **Option Codex/Journaux** : disponible uniquement pour les Chapitres, une case à cocher permet d'activer ou non l'extraction et l'historisation narrative lors de la validation officielle.
 
-### 5.3 Phases d'analyse — pré-sélection dérogable
+### 5.3 Phases d'analyse — pré-sélection dérogable (J2.5 : 3 phases)
 
 La sélection des types de correction est pré-remplie selon la catégorie déclarée, tout en restant librement modifiable :
-* **Chapitre** : Forme, Style, Technique cochées ; Embellissement décochée.
-* **Passage & Extrait** : Forme, Embellissement cochées ; Style, Technique décochées.
+* **Chapitre** : Forme, Style, Technique cochées.
+* **Passage & Extrait** : Forme, Style cochées ; Technique décochée.
 
 Seule contrainte : au moins un type de correction doit être sélectionné avant soumission.
+
+**L'Embellissement n'est plus une phase de soumission (décision de l'auteur, J2.5)** : il se demande À LA DEMANDE depuis l'écran E5 — l'auteur sélectionne un passage, clic droit, « Embellir la sélection » ; l'IA réécrit en tenant compte du contexte (paragraphe courant + précédent, température par défaut 0.8), puis les corrections du paragraphe sont réévaluées avec l'embellissement. La jauge de créativité de E3 est supprimée.
 
 * * *
 
@@ -181,7 +184,7 @@ Seule contrainte : au moins un type de correction doit être sélectionné avant
 | **Forme** | Orthographe, grammaire, typographie objectives (coquilles, accords, homophones, insécables, guillemets « », tirets —) ; respect strict de la variante linguistique ; ne touche jamais au style | 0.0 |
 | **Style** | Lisibilité, rythme, répétitions rapprochées, lourdeurs, pléonasmes. Détection ciblée ; les alternatives ne sont pas pré-générées mais produites à la demande au clic de l'auteur | 0.0 |
 | **Technique** | Cohérence **intra-texte** : concordance des temps, stabilité du POV, détails factuels de l'extrait. Affiché exclusivement dans la barre latérale | 0.0 |
-| **Embellissement** | Repérage de passages propices à élévation poétique/lexicale ; suggestions concrètes générées à la demande au clic de l'auteur | **jauge utilisateur** (défaut 0.8) |
+| **Embellissement** | **À la demande (J2.5)** : sélection + clic droit dans E5 → l'IA réécrit le passage sélectionné (contexte du passage pris en compte) ; les corrections du paragraphe sont réévaluées | jauge utilisateur (défaut 0.8) |
 | **Phase 2** (rôle `modele_phase2`, jalon J3) | Extraction codex, cohérence inter-chapitres contre le codex, relecture-diff du remplacement | 0.0 |
 
 **Jauge de créativité** (décision J2.1) : la température de l'Embellissement est choisie par l'utilisateur à chaque soumission (curseur 0 = sobre → 1.5 = audacieux), transmise dans `options_json.temperature_embellissement` ; défaut : `APP_TEMPERATURE_EMBELLISSEMENT`.
@@ -257,7 +260,7 @@ Navigation clavier : `←`/`→` entre corrections visibles (centrage + `outline
 | **E2 — Timeline de chaîne** | ⬜ J3 | Chapitres officiels (Prologue=0, 1..N), numéro attendu en évidence, reclassés grisés « hors chaîne » |
 | **E3 — Soumission** | ✅ Livré | Éditeur Word-fidèle (contenteditable, gras/italique/souligné) + compteur live `max_caracteres` ; catégorie auto en direct + forçage ; 4 cases de phases pré-cochées décochables (§5.4) + **jauge de créativité** (si Embellissement) ; case remplacement officiel ; refus explicites (400) |
 | **E4 — Suivi de job** | ✅ Livré | Polling HTMX 2 s, étape courante, redirection finale ; écrans d'échec/refus avec gabarits §7.2-7.3 |
-| **E5 — Résultat (Atelier interactif J2.2)** | ✅ Livré | Document annoté : seuls les paragraphes corrigés + compteur « X masqués » ; Forme (barré conservé + original/corrigé sélectionnable) ; Style (souligné pointillé bleu + bulle contextuelle pour demander alternatives à l'IA) ; Embellissement (pointillé vert + suggestions à la demande) ; Technique (isolé dans la barre latérale droite) ; boutons de workflow de fin de chapitre (« Soumettre une nouvelle version » et « Valider la version actuelle ») |
+| **E5 — Résultat (Atelier interactif — refondu J2.5)** | ✅ Livré | Document annoté **en couches superposables** (Forme = rouge barré/inséré, Style = soulignement pointillé bleu, Technique = fond jaune, également dans la barre latérale) ; **état courant matérialisé** (`documents`) : le texte affiché EST la version de travail ; corrections Forme appliquées par défaut, refusables depuis la barre latérale ; **sélection + clic droit** → « Embellir la sélection » (réévaluation du paragraphe) et « Trouver une alternative » (synonyme/champ lexical cohérent avec le contexte) ; boutons de workflow : « Soumettre une nouvelle version », « Valider la version actuelle » (Chapitres, confirmation, **texte affiché** enregistré) ou « Soumettre un autre texte » (Passage/Extrait, E3 pré-cochée avec les dernières configurations) ; navigation clavier |
 | **E6 — Codex** | ⬜ J3 | Fiches par catégorie, alias, éditeur manuel |
 | **E7 — Journaux** | ⬜ J3 | Journaux ecriture/evolution/intrigue, lecture seule |
 | **E8 — Paramètres** | ⬜ J4 | Modèles/températures/garde-fous, test de connexion |
@@ -290,7 +293,10 @@ Navigation clavier : `←`/`→` entre corrections visibles (centrage + `outline
 | J1 — Moteur métier | ✅ | `28f7b62` | Normalisation, réconciliation/déduplication, chaîne N+1, alertes, client LLM + mock — 65 tests |
 | J2 — MVP de relecture | ✅ | `aa1d5f9` | E3/E4/E5, jobs async, phases 3-6 Mistral parallèles, rendu annoté complet, E2E réel — 80 tests |
 | J2.1 — Correctifs retour utilisateur | ✅ | `569c784` | Fix redirection, matrice dérogable, jauge de créativité, analyses récentes, orphelins — 85 tests |
-| J2.2 — Atelier interactif & Word | ✅ | En cours | Texte riche Word-fidèle, Forme (barré), Style/Embellissement (alternatives à la demande), Technique (barre latérale), validation manuelle des chapitres — 89 tests |
+| J2.2 — Atelier interactif & Word | ✅ | `22b7639` | Texte riche Word-fidèle, Forme (barré), Style/Embellissement (alternatives à la demande), Technique (barre latérale), validation manuelle des chapitres — 89 tests |
+| J2.3 — Catégorisation déclarative | ✅ | `cbc9cd2` | Catégorie/numéro déclarés par l'auteur, « dernier validé gagne », collage Word strict, numéro pré-rempli — 85 tests |
+| J2.4 — Rendu texte riche & bulles | ✅ | `0bb9577` | Rendu E5 réparé, styles Word restitués, bulles fiabilisées (dataset) — 77 tests |
+| J2.5 — Atelier v2 (texte courant, couches, clic droit) | ✅ | Voir Git | Validation du TEXTE AFFICHÉ + backup natif, nouvelle version fonctionnelle, couches superposables (Technique en fond jaune dans le texte), Embellissement & alternatives par sélection + clic droit (réévaluation du paragraphe), « Soumettre un autre texte » avec configurations mémorisées — 99 tests + E2E réel Mistral |
 | J3 — Chaîne & codex | ⏳ prochain | — | Voir §9 + critère d'acceptation ci-dessous |
 | J4 — Confort | ⬜ | — | E8, E9, exports, import .docx |
 | J5 — Mise en ligne | ⬜ | — | Docker prod, Caddy TLS, auth simple, Tailscale documenté |
@@ -332,6 +338,15 @@ Navigation clavier : `←`/`→` entre corrections visibles (centrage + `outline
 24. **Refusés par l'auteur** : chunking des textes longs (seul `max_caracteres` demeure), échappement de backticks du manuscrit, toggle d'affichage du texte complet (paragraphes non corrigés masqués avec compteur).
 25. **Stack figée** : FastAPI + Jinja2 + HTMX + Alpine + SQLite (SvelteKit écarté en v1) ; librairies servies localement, aucun CDN.
 26. **Déploiement cible** (J5) : Docker + Caddy (TLS automatique) + auth simple sur le VPS ; option Tailscale documentée comme alternative sans exposition publique.
+
+**Décisions J2.5 (atelier v2, arbitrées par l'auteur)** :
+
+27. **Validation du texte affiché** : « Valider la version actuelle » enregistre EXACTEMENT le texte affiché à l'écran au moment du clic, corrigé ou non, avec fenêtre de confirmation ; réservé aux Chapitres (Passage/Extrait → « Soumettre un autre texte » avec les dernières configurations pré-cochées).
+28. **État courant matérialisé** (`documents`) : le texte de travail EST l'écran ; les corrections Forme sont appliquées par défaut, refusables à tout moment ; toute modification est une splice avec remappage déterministe des corrections (jamais de recherche floue).
+29. **Couches superposables** : les corrections de phases différentes couvrant un même mot s'empilent visuellement (Forme = rouge barré/inséré, Style = soulignement pointillé bleu, Technique = fond jaune) — jamais de bloc fusionné qui avale une correction.
+30. **Embellissement à la demande** : plus une phase de soumission ; sélection + clic droit → l'IA réécrit en tenant compte du contexte, puis les corrections du paragraphe sont réévaluées avec l'embellissement (jauge de créativité de E3 supprimée, température par défaut 0.8).
+31. **Alternatives à la demande** : sélection + clic droit → synonymes/champ lexical cohérents avec le contexte ; le flux de bulles au clic gauche sur un mot corrigé est supprimé.
+32. **Backup natif à la validation** : un backup SQLite (`Connection.backup()`) est créé avant toute écriture dans `chapitres`, avec rotation sur `APP_BACKUPS_MAX`.
 
 **Historique documentaire** : v3 → v4 (forçages /passage-/extrait, fail-fast, Artifacts) → v5 (reclassement Extrait, Option B, priorité Style, sessions/chaînes v5) → v6 (résolution des conflits v5, /maj remplacement officiel, Lecture Embellissement) → **présente spec web v1** (consolidation application). La v6 reste la référence de la fonction OpenWebUI si elle est un jour développée.
 

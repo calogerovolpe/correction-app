@@ -10,3 +10,4 @@ __pycache__/
 # Données locales (base, backups, logs) et exports
 data/
 exports/
+data_e2e/

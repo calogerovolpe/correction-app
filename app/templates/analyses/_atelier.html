@@ -1,0 +1,108 @@
+<div id="zone-atelier" data-analyse-id="{{ analyse.id }}">
+  {% if erreur_atelier %}<div class="bandeau bandeau--avertissement">{{ erreur_atelier }}</div>{% endif %}
+  <script id="donnees-corrections" type="application/json">{{ document.corrections_barre | tojson }}</script>
+
+  <div x-data="relectureApp()" class="relecture-atelier">
+    <div class="colonne-texte">
+      <div class="legende" role="toolbar" aria-label="Filtres d'affichage">
+        <button type="button" class="pastille pastille--forme" :class="{ 'pastille--off': !filtres.forme }" :aria-pressed="filtres.forme" @click="filtres.forme = !filtres.forme">Forme</button>
+        <button type="button" class="pastille pastille--style" :class="{ 'pastille--off': !filtres.style }" :aria-pressed="filtres.style" @click="filtres.style = !filtres.style">Style</button>
+        <button type="button" class="pastille pastille--technique" :class="{ 'pastille--off': !filtres.technique }" :aria-pressed="filtres.technique" @click="filtres.technique = !filtres.technique">Technique</button>
+        {% if document.nb_masques > 0 %}
+        <span class="compteur-masques">{{ document.nb_masques }} paragraphe(s) sans correction masqués</span>
+        {% endif %}
+      </div>
+
+      <p class="info-selection">Sélectionnez un passage puis <strong>clic droit</strong> pour demander un <strong>embellissement</strong> ou une <strong>alternative</strong> (synonyme, champ lexical).</p>
+
+      <div id="document-texte" class="document"
+           :class="{ 'filtre-forme-off': !filtres.forme, 'filtre-style-off': !filtres.style, 'filtre-technique-off': !filtres.technique }">
+        {% for par in document.paragraphes %}
+        <p class="paragraphe" data-paragraphe-id="{{ par.id }}">
+          {%- for seg in par.segments -%}
+          {%- if seg.gras %}<strong>{% endif -%}
+          {%- if seg.italique %}<em>{% endif -%}
+          {%- if seg.souligne %}<u>{% endif -%}
+          {%- if seg.type == 'forme' -%}
+          <del class="del {{ seg.classes }}" data-groupe="{{ seg.groupe }}" @click="selectionnerCorrection('{{ seg.groupe }}')">{{ seg.del }}</del><ins class="ins ins--forme {{ seg.classes }}" id="{{ seg.groupe }}" data-groupe="{{ seg.groupe }}" tabindex="0" @click="selectionnerCorrection('{{ seg.groupe }}')">{{ seg.ins }}</ins>
+          {%- else -%}
+          <span class="seg-texte {{ seg.classes }}"{% if seg.groupe %} id="{{ seg.groupe }}" data-groupe="{{ seg.groupe }}" tabindex="0" @click="selectionnerCorrection('{{ seg.groupe }}')"{% endif %}>{{ seg.texte }}</span>
+          {%- endif -%}
+          {%- if seg.souligne %}</u>{% endif -%}
+          {%- if seg.italique %}</em>{% endif -%}
+          {%- if seg.gras %}</strong>{% endif -%}
+          {%- endfor -%}
+          {%- if par.edite %} <a href="#" class="btn-reevaluer" data-action="reevaluer" data-paragraphe-id="{{ par.id }}">↻ Réévaluer ce paragraphe</a>{% endif %}
+        </p>
+        {% endfor %}
+        {% if not document.paragraphes %}
+        <p class="aucune-correction">Aucune correction détectée — le texte est ressorti propre de toutes les phases actives.</p>
+        {% endif %}
+      </div>
+
+      <div class="actions-fin-chapitre">
+        <form method="post" action="/analyses/{{ analyse.id }}/nouvelle-version">
+          <button type="submit" class="btn-action btn-nouvelle-version">🔄 Soumettre une nouvelle version (re-correction)</button>
+        </form>
+        {% if est_chapitre %}
+        <form method="post" action="/analyses/{{ analyse.id }}/valider"
+              onsubmit="return confirm(&quot;Valider ce chapitre TEL QU'AFFICHÉ à l'écran ? Il deviendra la version officielle.&quot;);">
+          <button type="submit" class="btn-action btn-valider">✅ Valider la version actuelle (officielle)</button>
+        </form>
+        {% else %}
+        <a class="btn-action btn-nouvelle-version" href="/analyses/nouveau">📝 Soumettre un autre texte</a>
+        {% endif %}
+      </div>
+    </div>
+
+    <aside class="barre-laterale">
+      <div class="barre-section" x-show="correctionActive" style="display: none;">
+        <h3>Détails de la correction</h3>
+        <template x-if="correctionActive">
+          <div>
+            <h4 x-text="correctionActive.titre"></h4>
+            <p class="explication" x-text="correctionActive.explication"></p>
+            <template x-if="correctionActive.regle">
+              <p class="regle"><strong>Règle :</strong> <span x-text="correctionActive.regle"></span></p>
+            </template>
+            <template x-if="correctionActive.etat === 'obsolete'">
+              <p class="obsolete-note">⛔ <span x-text="correctionActive.motif || 'Correction obsolète — réévaluez le paragraphe.'"></span></p>
+            </template>
+            <div class="choix-options" x-show="correctionActive.phase === 'forme' && correctionActive.etat === 'active'">
+              <label>
+                <input type="radio" name="choix-forme" value="corrige"
+                       :checked="correctionActive.decision !== 'original'"
+                       @change="posterChoixForme(correctionActive, 'corrige')">
+                Correction appliquée (<span x-text="correctionActive.correction"></span>)
+              </label>
+              <label>
+                <input type="radio" name="choix-forme" value="original"
+                       :checked="correctionActive.decision === 'original'"
+                       @change="posterChoixForme(correctionActive, 'original')">
+                Garder l'original (<span x-text="correctionActive.original"></span>)
+              </label>
+            </div>
+          </div>
+        </template>
+      </div>
+
+      <div class="barre-section section-technique" x-show="filtres.technique && correctionsTechniques.length > 0" style="display: none;">
+        <h3>Incohérences Techniques (<span x-text="correctionsTechniques.length"></span>)</h3>
+        <ul class="liste-techniques">
+          <template x-for="tech in correctionsTechniques" :key="tech.id">
+            <li class="item-technique">
+              <strong x-text="tech.titre"></strong>
+              <p x-text="tech.explication"></p>
+            </li>
+          </template>
+        </ul>
+      </div>
+    </aside>
+  </div>
+
+  <div id="menu-contextuel" class="menu-contextuel" hidden>
+    <button type="button" class="item-menu" data-action="embellir">✨ Embellir la sélection</button>
+    <button type="button" class="item-menu" data-action="alternatives">🔁 Trouver une alternative</button>
+  </div>
+  <div id="popover-action" class="bulle-contexte popover-atelier" hidden></div>
+</div>

@@ -1,9 +1,9 @@
 """Client LLM compatible OpenAI (cahier des charges §4.3 / A4) — `/v1/chat/completions`.
 
-Fonctionne avec Ollama en local (dev, coût nul) comme avec tout provider
-compatible (OpenRouter, endpoints OpenAI-compat des grands providers).
-Le ping fail-fast (v6 §4.2) consomme `max_tokens=5` et retente `retries_ping`
-NOUVELLES tentatives (1 -> 2 pings max par modèle)."""
+Fournisseur unique : **Mistral par clé API** (décision A4) ; le client reste
+compatible OpenAI, un changement de fournisseur resterait possible par
+configuration seule. Le ping fail-fast (v6 §4.2) consomme `max_tokens=5` et
+retente `retries_ping` NOUVELLES tentatives (1 -> 2 pings max par modèle)."""
 
 import asyncio
 import logging

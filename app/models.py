@@ -119,3 +119,10 @@ class ReponseAlternatives(BaseModel):
     alternatives: list[str] = []
     explication: str = ""
 
+
+class ReponseEmbellissement(BaseModel):
+    """Réécriture embellie d'un passage sélectionné (J2.5, à la demande)."""
+    model_config = ConfigDict(extra="forbid")
+    texte: str
+    explication: str = ""
+

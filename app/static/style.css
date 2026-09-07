@@ -305,3 +305,61 @@ footer { border-top: 1px solid var(--bordure); color: var(--texte-secondaire); f
 .btn-valider { background: #2e7d32; color: #ffffff; }
 .btn-valider:hover { background: #1b5e20; }
 
+/* ===== Atelier J2.5 : couches superposables ===== */
+/* Forme = rouge (barré + inséré, existant) · Style = soulignement pointillé bleu
+   · Technique = fond jaune — les couches s'empilent par classes cumulées. */
+:root { --fond-technique-mark: #fff9c4; } /* texte #212121 sur #fff9c4 : contraste AA ≈ 15:1 */
+
+.mark-style {
+  border-bottom: 2px dotted var(--corr-style);
+  padding: 0 1px;
+}
+.mark-technique { background: var(--fond-technique-mark); border-radius: 2px; }
+.refusee {
+  text-decoration: underline dotted #9e9e9e;
+  color: var(--texte-secondaire);
+}
+.seg-texte { cursor: default; }
+#document-texte [data-groupe] { cursor: pointer; }
+#document-texte [data-groupe]:focus { outline: 2px solid #212121; outline-offset: 2px; }
+
+/* Filtres : la catégorie masquée reprend l'apparence neutre (v6 §7.4) */
+.filtre-style-off .mark-style { border-bottom-color: transparent; }
+.filtre-technique-off .mark-technique { background: transparent; }
+.filtre-forme-off .ins--forme { display: none; }
+.filtre-forme-off .del { text-decoration: none; color: inherit; }
+
+.info-selection { font-size: 0.85rem; color: #757575; }
+.obsolete-note { color: #c62828; font-size: 0.85rem; }
+.btn-reevaluer { font-size: 0.8rem; color: #1565c0; margin-left: 0.4rem; }
+
+/* Menu contextuel (clic droit sur sélection) */
+.menu-contextuel {
+  position: absolute;
+  z-index: 300;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  border: 1px solid #bdbdbd;
+  border-radius: 6px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2);
+  min-width: 240px;
+  overflow: hidden;
+}
+.item-menu {
+  text-align: left;
+  padding: 0.5rem 0.9rem;
+  border: none;
+  background: #ffffff;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.9rem;
+}
+.item-menu:hover { background: #e3f2fd; }
+
+/* Popover de suggestion (embellissement / alternatives) */
+.popover-atelier { position: absolute; z-index: 250; width: 340px; }
+.popover-atelier .titre-choix { font-weight: 600; margin: 0 0 0.4rem; }
+.popover-atelier .proposition { background: #e8f5e9; border-radius: 4px; padding: 0.5rem; }
+.popover-atelier .actions-popover { display: flex; flex-direction: column; gap: 0.3rem; margin-top: 0.4rem; }
+

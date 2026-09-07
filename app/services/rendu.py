@@ -1,16 +1,26 @@
-"""Préparation du document annoté et des données pour la barre latérale et les bulles contextuelles (J2.2).
+"""Préparation du document annoté — couches superposables (jalon J2.5).
 
-Modèle interactif J2.2 :
-1. Forme (rouge) : barré conservé (`<del>` original + `<ins>` correction). Affichage détails dans la barre latérale.
-2. Technique (violet) : pas d'altération dans le corps, uniquement listé dans la barre latérale (section Technique).
-3. Style (bleu) : soulignement bleu pointillé sur le fragment original (non barré). Clic -> bulle contextuelle + bouton "Demander des alternatives".
-4. Embellissement (vert) : surlignage/soulignage discret vert pointillé. Clic -> bulle contextuelle + bouton "Demander des suggestions".
+Chaque phase garde SA couche visuelle, même en cas de chevauchement (décision
+de l'auteur, J2.5) :
+- Forme : original barré + correction insérée en rouge ;
+- Style : soulignement pointillé bleu (mark-style) ;
+- Technique : fond jaune (mark-technique), ET section dédiée de la barre latérale ;
+- une correction Forme refusée (« Garder l'original ») : texte neutre marqué
+  `refusee` (repérable, non appliqué).
+Les corrections de phases différentes couvrant un même mot s'empilent par
+classes CSS cumulées — jamais avalées par un bloc fusionné.
+
+Entrées : l'état courant de `reconstruction` (texte courant + corrections en
+coordonnées courantes + choix). Le compteur de paragraphes masqués ne compte
+que les paragraphes sans correction active ET sans modification manuelle.
 """
 
-from app.models import CorrectionFusionnee
-from app.services.normalisation import Paragraphe
+from app.services.texte_riche import (
+    ParagrapheRiche,
+    RunFormat,
+    extraire_texte_brut_paragraphe,
+)
 
-ORDRE_PHASES = ["forme", "style", "technique", "embellissement"]
 LIBELLES = {
     "forme": "Forme",
     "style": "Style",
@@ -18,9 +28,11 @@ LIBELLES = {
     "embellissement": "Embellissement",
 }
 
+_CLASSE_MARQUE = {"style": "mark-style", "technique": "mark-technique"}
 
-def _info_correction(fusion: CorrectionFusionnee, groupe: str) -> dict:
-    c = fusion.correction
+
+def _info(entree: dict, groupe: str) -> dict:
+    c = entree["fusion"].correction
     return {
         "id": c.id,
         "groupe": groupe,
@@ -34,163 +46,142 @@ def _info_correction(fusion: CorrectionFusionnee, groupe: str) -> dict:
         "explication": c.explication,
         "regle": c.regle,
         "titre": f"{LIBELLES.get(c.phase, c.phase.capitalize())} — {c.type.replace('_', ' ')}",
+        "etat": entree["etat"],
+        "motif": entree["motif"],
     }
 
 
 def preparer_document(
-    fusionnees: list[CorrectionFusionnee],
-    paragraphes: list[Paragraphe],
-    paragraphes_riches: list = None,
+    paragraphes: list[ParagrapheRiche],
+    entrees: list[dict],
+    choix: dict,
+    modifies: list[str] | None = None,
 ) -> dict:
-    """Construit le document annoté avec les segments pour le texte,
-    et la liste structurée des corrections pour la barre latérale.
-    Si paragraphes_riches est fourni, préserve le formatage (gras, italique, souligné)
-    sur les segments de texte non corrigés.
-    """
-    
-    # Isoler les corrections techniques (qui vont exclusivement dans la barre latérale)
-    corrections_techniques = [
-        _info_correction(f, f"tech-{i+1:04d}")
-        for i, f in enumerate(f for f in fusionnees if f.correction.phase == "technique")
-    ]
-
-    # Corrections in-text : Forme, Style, Embellissement
-    in_text_fusions = [f for f in fusionnees if f.correction.phase != "technique"]
-
-    par_corrections: dict[str, list[CorrectionFusionnee]] = {}
-    for fusion in in_text_fusions:
-        par_corrections.setdefault(fusion.correction.paragraphe_id, []).append(fusion)
-
-    # Indexation des paragraphes riches par identifiant
-    riches_par_id = {p.id: p for p in (paragraphes_riches or [])}
+    """Construit le document annoté (couches) + la liste pour la barre latérale."""
+    groupes = {e["fusion"].correction.id: f"g-{i + 1:04d}" for i, e in enumerate(entrees)}
+    infos_barre = [_info(e, groupes[e["fusion"].correction.id]) for e in entrees]
+    for info in infos_barre:
+        if info["phase"] == "forme":
+            info["decision"] = "original" if choix.get(info["id"]) == "original" else "corrige"
 
     affiches: list[dict] = []
-    toutes_corrections_barre: list[dict] = []
     nb_masques = 0
-    numero_groupe = 0
-
-    for paragraphe in paragraphes:
-        items = par_corrections.get(paragraphe.id)
-        if not items:
+    modifies_set = set(modifies or [])
+    for p in paragraphes:
+        entrees_pid = [
+            e for e in entrees if e["fusion"].correction.paragraphe_id == p.id
+        ]
+        actives = [e for e in entrees_pid if e["etat"] == "active"]
+        if not actives and p.id not in modifies_set:
             nb_masques += 1
             continue
-
-        p_riche = riches_par_id.get(paragraphe.id)
-        tries = sorted(items, key=lambda f: (f.correction.debut, f.correction.fin))
-        numero_groupe, segments, corrections_groupe = _construire_segments(
-            tries, paragraphe, numero_groupe, p_riche
-        )
-        affiches.append({"id": paragraphe.id, "segments": segments})
-        toutes_corrections_barre.extend(corrections_groupe)
-
+        affiches.append({
+            "id": p.id,
+            "segments": _segments(p, actives, choix, groupes),
+            "edite": p.id in modifies_set,
+        })
     return {
         "paragraphes": affiches,
         "nb_masques": nb_masques,
-        "corrections_barre": toutes_corrections_barre,
-        "corrections_techniques": corrections_techniques,
+        "corrections_barre": infos_barre,
     }
 
 
-def _generer_segments_texte(debut: int, fin: int, paragraphe: Paragraphe, p_riche) -> list[dict]:
-    """Génère un ou plusieurs segments de texte brut ou enrichis en runs si p_riche est présent."""
-    if debut >= fin:
-        return []
-    if not p_riche:
-        return [{"type": "texte", "texte": paragraphe.texte[debut:fin]}]
+def _classe_marque(entree: dict) -> str:
+    phase = entree["fusion"].correction.phase
+    if phase in _CLASSE_MARQUE:
+        return _CLASSE_MARQUE[phase]
+    return "refusee"  # correction Forme refusée : texte original restauré
 
-    from app.services.texte_riche import decouper_runs_par_intervalle
-    _, runs_intervalle, _ = decouper_runs_par_intervalle(p_riche.runs, debut, fin)
-    segments = []
-    for r in runs_intervalle:
-        segments.append({
-            "type": "texte",
-            "texte": r.texte,
-            "gras": r.gras,
-            "italique": r.italique,
-            "souligne": r.souligne,
-        })
+
+def _couvrants(marques: list[dict], a: int, b: int) -> list[dict]:
+    return [
+        e for e in marques
+        if e["fusion"].correction.debut < b and e["fusion"].correction.fin > a
+    ]
+
+
+def _segments(p: ParagrapheRiche, actives: list[dict], choix: dict, groupes: dict) -> list[dict]:
+    texte = extraire_texte_brut_paragraphe(p)
+    formes = sorted(
+        (
+            e for e in actives
+            if e["fusion"].correction.phase == "forme"
+            and choix.get(e["fusion"].correction.id) != "original"
+        ),
+        key=lambda e: e["fusion"].correction.debut,
+    )
+    marques = [
+        e for e in actives
+        if e["fusion"].correction.phase != "forme"
+        or choix.get(e["fusion"].correction.id) == "original"
+    ]
+    segments: list[dict] = []
+    position = 0
+    for entree in formes:
+        c = entree["fusion"].correction
+        if c.debut > position:
+            segments.extend(_segments_texte(p, position, c.debut, marques, groupes))
+        segments.append(_segment_forme(entree, p, c, marques, groupes))
+        position = c.fin
+    if position < len(texte):
+        segments.extend(_segments_texte(p, position, len(texte), marques, groupes))
     return segments
 
 
-def _construire_segments(items, paragraphe, numero_groupe, p_riche=None):
-    blocs: list[dict] = []
-    for fusion in items:
-        correction = fusion.correction
-        if blocs and correction.debut < blocs[-1]["fin"]:
-            blocs[-1]["items"].append(fusion)
-            blocs[-1]["fin"] = max(blocs[-1]["fin"], correction.fin)
-        else:
-            blocs.append({"items": [fusion], "debut": correction.debut, "fin": correction.fin})
-
-    segments: list[dict] = []
-    corrections_creees: list[dict] = []
+def _runs_intervalle(runs: list[RunFormat], a: int, b: int) -> list[RunFormat]:
+    """Runs (tronqués aux bornes) couvrant [a, b)."""
+    morceaux: list[RunFormat] = []
     position = 0
-
-    for bloc in blocs:
-        if bloc["debut"] > position:
-            segments.extend(_generer_segments_texte(position, bloc["debut"], paragraphe, p_riche))
-
-        numero_groupe += 1
-        groupe_id = f"g-{numero_groupe:04d}"
-        segment, infos = _segment_du_bloc(bloc, paragraphe, groupe_id)
-        segments.append(segment)
-        corrections_creees.extend(infos)
-        position = bloc["fin"]
-
-    if position < len(paragraphe.texte):
-        segments.extend(_generer_segments_texte(position, len(paragraphe.texte), paragraphe, p_riche))
-
-    return numero_groupe, segments, corrections_creees
+    for run in runs:
+        d, f = position, position + len(run.texte)
+        position = f
+        if f <= a or d >= b:
+            continue
+        morceaux.append(RunFormat(
+            texte=run.texte[max(d, a) - d:min(f, b) - d],
+            gras=run.gras, italique=run.italique, souligne=run.souligne,
+        ))
+    return morceaux
 
 
-def _segment_du_bloc(bloc, paragraphe, groupe: str) -> tuple[dict, list[dict]]:
-    original = paragraphe.texte[bloc["debut"]:bloc["fin"]]
-    items = bloc["items"]
+def _segments_texte(
+    p: ParagrapheRiche, a: int, b: int, marques: list[dict], groupes: dict
+) -> list[dict]:
+    items: list[dict] = []
+    position = a
+    for run in _runs_intervalle(p.runs, a, b):
+        couvrants = _couvrants(marques, position, position + len(run.texte))
+        position += len(run.texte)
+        classes = " ".join(sorted({_classe_marque(e) for e in couvrants}))
+        groupe = groupes[couvrants[0]["fusion"].correction.id] if couvrants else None
+        items.append({
+            "type": "texte",
+            "texte": run.texte,
+            "gras": run.gras,
+            "italique": run.italique,
+            "souligne": run.souligne,
+            "classes": classes,
+            "groupe": groupe,
+        })
+    return items
 
-    infos_corrections = [_info_correction(f, groupe) for f in items]
 
-    if len(items) == 1:
-        fusion = items[0]
-        c = fusion.correction
-        info = infos_corrections[0]
-
-        if c.phase == "style":
-            # Répétitions / Style : soulignement pointillé bleu, original non altéré par défaut
-            return {
-                "type": "style",
-                "groupe": groupe,
-                "original": original,
-                "paragraphe_id": c.paragraphe_id,
-                "info": info,
-            }, infos_corrections
-
-        elif c.phase == "embellissement":
-            # Embellissement : discret pointillé vert, original non altéré par défaut
-            return {
-                "type": "embellissement",
-                "groupe": groupe,
-                "original": original,
-                "paragraphe_id": c.paragraphe_id,
-                "info": info,
-            }, infos_corrections
-
-        else:
-            # Forme : barré + ins rouge
-            return {
-                "type": "forme",
-                "groupe": groupe,
-                "original": original,
-                "correction": c.correction,
-                "paragraphe_id": c.paragraphe_id,
-                "info": info,
-            }, infos_corrections
-
-    # Bloc multi (ex: Forme + Style)
+def _segment_forme(
+    entree: dict, p: ParagrapheRiche, c, marques: list[dict], groupes: dict
+) -> dict:
+    couvrants = _couvrants(marques, c.debut, c.fin)
+    classes = " ".join(sorted({_classe_marque(e) for e in couvrants}))
+    runs_zone = _runs_intervalle(p.runs, c.debut, c.fin)
+    premier = runs_zone[0] if runs_zone else RunFormat(texte="")
     return {
-        "type": "multi",
-        "groupe": groupe,
-        "original": original,
-        "paragraphe_id": items[0].correction.paragraphe_id,
-        "infos": infos_corrections,
-    }, infos_corrections
+        "type": "forme",
+        "groupe": groupes[c.id],
+        "del": c.original,
+        "ins": "".join(run.texte for run in runs_zone),
+        "gras": premier.gras,
+        "italique": premier.italique,
+        "souligne": premier.souligne,
+        "classes": classes,
+    }
 

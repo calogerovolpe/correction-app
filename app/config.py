@@ -19,8 +19,8 @@ class Settings(BaseSettings):
     # Chemins
     data_dir: Path = Path("data")
 
-    # Couche LLM (compatible OpenAI) — Ollama local par défaut (dev, coût nul)
-    llm_base_url: str = "http://localhost:11434/v1"
+    # Couche LLM (compatible OpenAI) — Mistral par clé API uniquement (décision A4)
+    llm_base_url: str = "https://api.mistral.ai/v1"
     llm_api_key: str = ""
 
     # Modèles par phase (2 à 6) — vide = non configuré

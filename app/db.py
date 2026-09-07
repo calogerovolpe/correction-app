@@ -71,6 +71,38 @@ async def executer(sql: str, params: Iterable[Any] = ()) -> tuple[int, int]:
     return await asyncio.to_thread(_executer_sync, sql, params, False)
 
 
+def _sauvegarder_sync(destination: Path) -> None:
+    with _VERROU:
+        conn = _connecter()
+        try:
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            copie = sqlite3.connect(destination)
+            try:
+                conn.backup(copie)  # backup natif SQLite (spec §9)
+            finally:
+                copie.close()
+        finally:
+            conn.close()
+
+
+async def sauvegarder(destination: Path) -> None:
+    """Backup natif SQLite (`Connection.backup`) — requis avant toute écriture
+    narrative (spec §1.5, §9) : un accident de validation reste réversible."""
+    await asyncio.to_thread(_sauvegarder_sync, destination)
+
+
+async def purger_backups(maximum: int) -> None:
+    """Rotation : ne conserve que les `maximum` backups les plus récents."""
+    dossier = settings.data_dir / "backups"
+    fichiers = sorted(
+        dossier.glob("backup-*.sqlite3"),
+        key=lambda f: f.stat().st_mtime,
+        reverse=True,
+    )
+    for vieux in fichiers[maximum:]:
+        vieux.unlink(missing_ok=True)
+
+
 async def interroger(sql: str, params: Iterable[Any] = ()) -> list[dict]:
     """Exécute une lecture et retourne les lignes en dictionnaires."""
     return await asyncio.to_thread(_interroger_sync, sql, params)

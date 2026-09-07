@@ -102,3 +102,9 @@ CREATE TABLE IF NOT EXISTS corrections (
   data_json  TEXT NOT NULL,
   cree_a     TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+-- État courant de l'atelier E5 (texte affiché, choix, corrections à jour) — J2.5
+CREATE TABLE IF NOT EXISTS documents (
+  analyse_id    INTEGER PRIMARY KEY REFERENCES analyses(id) ON DELETE CASCADE,
+  document_json TEXT NOT NULL
+);
