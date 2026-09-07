@@ -4,7 +4,7 @@
 
 Au début de CHAQUE session, lire OBLIGATOIREMENT **tous** les fichiers de `memory-bank/` AVANT de modifier du code ou d'exécuter des commandes :
 
-`memory-bank/projectbrief.md` · `productContext.md` · `activeContext.md` · `systemPatterns.md` · `techContext.md` · `progress.md`
+`memory-bank/projectbrief.md` · `productContext.md` · `activeContext.md` · `plan-correctifs-atelier-ux.md` · `systemPatterns.md` · `techContext.md` · `progress.md`
 
 ## 2. Mise à jour après chaque jalon
 

@@ -1,10 +1,11 @@
 # Contexte actif — où nous en sommes MAINTENANT
 
-> Fichier le plus souvent mis à jour. Dernière mise à jour : 2026-09-07 (jalon J2.5 livré).
+> Fichier le plus souvent mis à jour. Dernière mise à jour : 2026-09-09 (série de correctifs UX engagée — J3 en attente).
 
 ## Focus du moment
 
-**Préparation du jalon J3 — Chaîne séquentielle & Codex narratif** (l'atelier v2, jalon correctif J2.5, est livré).
+**Série de correctifs atelier E5 & confort UX (multi-sessions) — AVANT J3.**
+La roadmap détaillée, jalon par jalon, est dans **`plan-correctifs-atelier-ux.md`** (même dossier) : la RELIRE EN DÉBUT DE SESSION. Jalons A → E, un commit par jalon ; le suivi (statut/commit) est tenu à jour dans ce fichier.
 
 ## État global
 
@@ -22,17 +23,15 @@
 - **Atelier v2** : état courant matérialisé (nouvelle table `documents`, nouveau service pur `reconstruction.py`) ; rendu en **couches superposables** (`rendu.py` réécrit — Technique désormais aussi dans le corps du texte, fond jaune) ; **sélection + clic droit** → « Embellir la sélection » (réévaluation du paragraphe via LLM) et « Trouver une alternative » (synonyme/champ lexical) ; bouton « ↻ Réévaluer » sur les paragraphes modifiés ; validation = texte affiché + **backup natif SQLite** + rotation ; « Soumettre un autre texte » avec E3 pré-cochée (mémoire des configurations dans `parametres`) ; corrections Forme appliquées par défaut, refusables ; branches mortes (`decision == 'conforme'…`, bandeau `reclassement_extrait`, tooltips `_cas.html`) supprimées ; navigation clavier réellement branchée (`app.js` réécrit, était mort) ; matrice E3 ramenée à 3 phases (jauge supprimée) ; fractionnement de fait : `web.py` (E1/E3/E4, ~230 lignes) + `atelier.py` (E5 + workflow, ~400 lignes).
 - **Divers** : config/docstrings alignées sur « Mistral uniquement » ; README transformé en pointeur Memory Bank ; `Ouvrir Correction.bat` committé ; spec §5.3/§6.1/§8.2/§10/§11 (décisions 27-32) mise à jour dans le même commit.
 
-## Prochaines étapes (ordre) — J3
+## Prochaines étapes (ordre)
 
-1. **Écritures narratives complètes** : backup (déjà en place à la validation) + transaction : `codex` (fiches par catégorie), `journaux` (écriture/évolution) ; case opt-in `avec_codex` désormais câblée.
-2. **Phase 2 LLM** : extraction codex, analyse de cohérence (alertes, double barrière prête dans `alertes.py`), relecture-diff du remplacement (`DeltaRelecture` prête).
-3. **Écrans** : E2 timeline, E5 bandeau d'alertes + « Choix d'auteur », E6 codex éditable, E7 journaux (lecture seule).
-4. **RAG alias** : extraction lexicale, `codex_index`, collisions → fiches candidates au prompt.
-5. **Critère d'acceptation J3** : scénario complet Prologue → ch.1 → ch.2 → resoumission N=N sans remplacement → remplacement officiel (relecture-diff) → alerte → « Choix d'auteur » → non re-détectée.
+1. **Correctifs atelier & confort UX** (jalons A → E, multi-sessions) : voir `plan-correctifs-atelier-ux.md` — fiabilité du cœur (ids de correction uniques : bug barre latérale ; rejet des no-op « cous »→« cous » ; menu contextuel fiable), menu contextuel riche (clic droit sur marque, choix Forme dans le menu), UI/UX (toggle « masquer », layout élargi, pastilles), navigation/projets (activation — bug du « 2 » bloqué, navbar, suppression de projet avec confirmation), édition directe sans IA temps réel.
+2. **J3 — Chaîne & codex** (EN ATTENTE) : écritures narratives (transaction, `avec_codex` câblé, codex/journaux), phase 2 LLM (extraction codex, cohérence, relecture-diff), écrans E2/E6/E7 + bandeau d'alertes, RAG alias. Critère d'acceptation : Prologue → ch.1 → ch.2 → resoumission N=N sans remplacement → remplacement officiel (relecture-diff) → alerte → « Choix d'auteur » → non re-détectée.
 
 ## Décisions en cours / à arbitrer
 
-- Aucune décision métier en attente. Décisions figées : `projectbrief.md` (+ spec §11 décisions 27-32) ; historique : `progress.md`.
+- Nouvelles décisions arbitrées (2026-09-09) : spec §11 **décisions 33-38** (ids de correction uniques, rejet des no-op, toggle « masquer » — **RÉVISE la décision 24**, menu contextuel riche, suppression de projet, édition sans IA temps réel) — voir `plan-correctifs-atelier-ux.md`.
+- Décisions antérieures figées : `projectbrief.md` (+ spec §11 décisions 1-32) ; historique : `progress.md`.
 
 ## Dettes / anomalies connues (documentation)
 

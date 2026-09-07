@@ -1,6 +1,6 @@
 # Brief projet — correction-app
 
-> Source de vérité du scope. Dernière mise à jour : 2026-09-07 (jalon J2.5).
+> Source de vérité du scope. Dernière mise à jour : 2026-09-09 (correctifs UX arbitrés — J3 en attente).
 
 ## Identité
 
@@ -39,7 +39,12 @@
   - **Couches superposables** : Forme = rouge barré/inséré, Style = soulignement pointillé bleu, Technique = fond jaune — les chevauchements s'affichent tous ;
   - **Backup natif SQLite** avant toute écriture dans `chapitres` (rotation `APP_BACKUPS_MAX`).
 - **Matrice de phases = pré-sélection dérogable** (J2.1) : cases pré-cochées selon la catégorie, l'utilisateur décoche/coche librement.
-- **Refusés** : chunking des textes, échappement backticks du manuscrit, toggle d'affichage du texte complet (paragraphes non corrigés masqués avec compteur).
+- **Correctifs UX (2026-09-09, arbitrés par l'auteur — révise J2.5)** :
+  - **Toggle « Masquer les paragraphes sans correction »** dans E5 (défaut : texte entier) — **révise le refus du toggle** (décision 24) ;
+  - **Suppression d'un projet** avec confirmation : suppression TOTALE en cascade (chapitres, codex, journaux, alertes, analyses…) ; projet actif protégé (trigger) ;
+  - **Édition directe sans IA temps réel** : texte éditable + « ↻ Re-corriger » explicite ;
+  - IDs de correction uniques, rejet des corrections no-op, menu contextuel riche — détail : `memory-bank/plan-correctifs-atelier-ux.md` et spec §11 (décisions 33-38).
+- **Refusés** : chunking des textes, échappement backticks du manuscrit.
 - **Chaîne** : rupture → reclassement automatique en Extrait (jamais de blocage) ; N=N sans remplacement → Extrait ; remplacement officiel explicite (case à cocher).
 - **Option B** : panne de phase en cours d'analyse → arrêt global, aucun résultat partiel, aucune écriture narrative.
 - **Déploiement final** : local d'abord ; J5 = Docker + Caddy (TLS) + auth simple sur le VPS, option Tailscale documentée.

@@ -335,7 +335,7 @@ Navigation clavier : `←`/`→` entre corrections visibles (centrage + `outline
 21. **Analyses récentes** sur l'accueil (10 dernières, cliquables) — traçabilité des soumissions.
 22. **Aucun mini-langage de commandes** : tout ce qui était `/maj`, `/nopb`, `/passage`… est un élément d'interface (case, bouton, radio).
 23. **Aucune contrainte d'Artifact** : plus de triple saut de ligne, de bloc ```html, d'IIFE obligatoire, de garde-fou backticks ; l'autoescape Jinja2 suffit.
-24. **Refusés par l'auteur** : chunking des textes longs (seul `max_caracteres` demeure), échappement de backticks du manuscrit, toggle d'affichage du texte complet (paragraphes non corrigés masqués avec compteur).
+24. **Refusés par l'auteur** : chunking des textes longs (seul `max_caracteres` demeure), échappement de backticks du manuscrit, toggle d'affichage du texte complet (paragraphes non corrigés masqués avec compteur). **(Révisé le 2026-09-09 : le toggle est désormais souhaité — décision 35.)**
 25. **Stack figée** : FastAPI + Jinja2 + HTMX + Alpine + SQLite (SvelteKit écarté en v1) ; librairies servies localement, aucun CDN.
 26. **Déploiement cible** (J5) : Docker + Caddy (TLS automatique) + auth simple sur le VPS ; option Tailscale documentée comme alternative sans exposition publique.
 
@@ -347,6 +347,15 @@ Navigation clavier : `←`/`→` entre corrections visibles (centrage + `outline
 30. **Embellissement à la demande** : plus une phase de soumission ; sélection + clic droit → l'IA réécrit en tenant compte du contexte, puis les corrections du paragraphe sont réévaluées avec l'embellissement (jauge de créativité de E3 supprimée, température par défaut 0.8).
 31. **Alternatives à la demande** : sélection + clic droit → synonymes/champ lexical cohérents avec le contexte ; le flux de bulles au clic gauche sur un mot corrigé est supprimé.
 32. **Backup natif à la validation** : un backup SQLite (`Connection.backup()`) est créé avant toute écriture dans `chapitres`, avec rotation sur `APP_BACKUPS_MAX`.
+
+**Décisions correctifs UX (2026-09-09, arbitrées par l'auteur — roadmap : `memory-bank/plan-correctifs-atelier-ux.md`)** :
+
+33. **IDs de correction uniques** : les `id` sont réassignés par Python après déduplication (uniques entre phases) — les identifiants émis par les LLM ne sont pas fiables entre phases parallèles.
+34. **Corrections no-op rejetées** : toute entrée où `original == correction` est rejetée individuellement (jamais d'arrêt du pipeline).
+35. **Toggle « Masquer les paragraphes sans correction »** (E5) : texte entier par défaut, masquage au choix de l'utilisateur — **révise la décision 24**.
+36. **Menu contextuel riche** : ouvert au clic droit sur une marque OU une sélection ; « Appliquer / Garder l'original » (Forme) dans le menu ; barre latérale en lecture seule.
+37. **Suppression d'un projet** : confirmation obligatoire ; suppression totale en cascade ; le projet actif reste protégé (trigger `trg_projet_actif_restrict`).
+38. **Édition directe sans IA temps réel** : texte éditable dans l'atelier + « ↻ Re-corriger » explicite ; correction hors-ligne locale = candidat J4.
 
 **Historique documentaire** : v3 → v4 (forçages /passage-/extrait, fail-fast, Artifacts) → v5 (reclassement Extrait, Option B, priorité Style, sessions/chaînes v5) → v6 (résolution des conflits v5, /maj remplacement officiel, Lecture Embellissement) → **présente spec web v1** (consolidation application). La v6 reste la référence de la fonction OpenWebUI si elle est un jour développée.
 

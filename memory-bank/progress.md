@@ -1,6 +1,6 @@
 # Progression — jalons, état, décisions
 
-> Dernière mise à jour : 2026-09-07 (jalon J2.5 livré).
+> Dernière mise à jour : 2026-09-09 (série de correctifs UX engagée — J3 en attente).
 
 ## État des jalons
 
@@ -15,7 +15,8 @@
 | J2.4 — Rendu texte riche & fiabilisation bulle | ✅ Terminé | `0bb9577` |
 | Memory Bank — source de vérité unique | ✅ Terminé | `cce00cc` |
 | **J2.5 — Atelier v2 (texte courant, couches, clic droit)** | ✅ **Terminé (E2E réel Mistral)** | `05bcbda` |
-| J3 — Chaîne séquentielle & Codex narratif | ⏳ **Prochain** | — |
+| **Correctifs atelier & confort UX (A→E, multi-sessions)** | ⏳ **En cours (avant J3)** | — |
+| J3 — Chaîne séquentielle & Codex narratif | ⬜ En attente (après correctifs) | — |
 | J4 — Confort | ⬜ À faire | — |
 | J5 — Mise en ligne | ⬜ À faire | — |
 
@@ -45,13 +46,15 @@
 
 ## Reste à faire (priorisé)
 
-1. **J3 — Chaîne & codex** (détail dans `activeContext.md`) : écritures narratives (transaction, `avec_codex` câblé, codex/journaux), phase 2 LLM (extraction codex, cohérence, relecture-diff), écrans E2/E6/E7 + bandeau d'alertes, RAG alias.
-2. **J4 — Confort** : E9 (backups liste/restauration/purge, exports md/docx, statistiques, logs debug), E8 (paramètres + test de connexion), import .docx (italique/gras).
-3. **J5 — Mise en ligne** : durcissement (auth simple), Caddy (TLS), compose production + volumes, sauvegardes programmées, doc de déploiement VPS, option Tailscale documentée.
+1. **Correctifs atelier & confort UX** (jalons A → E, multi-sessions — roadmap : `plan-correctifs-atelier-ux.md`) : fiabilité du cœur (ids uniques, no-op, menu contextuel), menu contextuel riche, UI/UX atelier (toggle masqué, layout, pastilles), navigation/projets (activation, navbar, suppression de projet), édition directe sans IA temps réel.
+2. **J3 — Chaîne & codex** (EN ATTENTE, détail dans `activeContext.md`) : écritures narratives (transaction, `avec_codex` câblé, codex/journaux), phase 2 LLM (extraction codex, cohérence, relecture-diff), écrans E2/E6/E7 + bandeau d'alertes, RAG alias.
+3. **J4 — Confort** : E9 (backups liste/restauration/purge, exports md/docx, statistiques, logs debug), E8 (paramètres + test de connexion), import .docx (italique/gras).
+4. **J5 — Mise en ligne** : durcissement (auth simple), Caddy (TLS), compose production + volumes, sauvegardes programmées, doc de déploiement VPS, option Tailscale documentée.
 
 ## Problèmes connus
 
-- Aucun bug applicatif ouvert. 99/99 tests verts. E2E réel Mistral OK.
+- 99/99 tests verts ; E2E réel Mistral OK.
+- **Bugs constatés par l'auteur (correctifs en cours — roadmap `plan-correctifs-atelier-ux.md`)** : barre latérale désynchronisée (ids de correction non uniques entre phases) ; corrections no-op (« cous » → « cous ») ; menu contextuel non fiable (`hidden` neutralisé par le CSS, popover hors écran) ; pas de menu contextuel sur une marque ; numéro attendu erroné pour un nouveau projet (projet non activable).
 - Dette : `atelier.py` ~400 lignes — fractionnement fin planifié pendant J3 si croissance (règle 300 lignes).
 
 ## Historique des décisions clés
@@ -63,3 +66,4 @@
 - **J2.5 (arbitrages de l'auteur, révisent J2.1/J2.2)** : validation du texte AFFICHÉ (chapitres, confirmation) ; Embellissement à la demande (fin de la jauge à la soumission) ; alternatives par sélection + clic droit (fin des bulles au clic gauche) ; couches superposables (Technique fond jaune dans le texte) ; « Soumettre un autre texte » avec configurations mémorisées ; backup natif à la validation. Détail : spec §11 décisions 27-32.
 - **Refusés par l'auteur** (ne pas réouvrir) : chunking, échappement backticks, toggle d'affichage du texte complet.
 - **2026-09-07** : Memory Bank source de vérité unique ; **J2.5** atelier v2.
+- **2026-09-09** : série de correctifs atelier & confort UX arbitrée (roadmap `plan-correctifs-atelier-ux.md` ; spec §11 décisions 33-38 ; révise la décision 24) ; J3 mis en attente.
