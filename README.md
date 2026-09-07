@@ -1,11 +1,15 @@
 # correction-app — Application web de correction de manuscrit
 
-Implémentation de l'application décrite par **`docs/Architecture application web — v1 (spécification consolidée).md`** — LA source de vérité du projet (métier + applicatif), versionnée avec le code.
-Historique de conception : `docs/Cahier des charges — Application web de correction de manuscrit.md` (remplacé par la spec consolidée).
-
-**Jalon courant : J2 — MVP de relecture** : écran E3 (soumission, catégorisation auto, matrice de phases, forçage Passage/Extrait, remplacement officiel, garde-fou taille), jobs asynchrones suivis par HTMX (E4), phases 3-6 parallèles via l'API Mistral (fail-fast, Option B), document annoté E5 (couleurs WCAG AA, tooltips, pastilles filtres, bouton « Lecture Embellissement », navigation clavier, compteur de paragraphes masqués). **Validé de bout en bout avec Mistral Small sur un vrai chapitre.** Jalons J0 (socle) et J1 (moteur métier) validés.
+> **Pointeur** : la source de vérité de l'**état du projet** (jalons, contexte actif,
+> décisions, méthode de travail) est la **Memory Bank** (`memory-bank/`) — lire
+> d'abord `memory-bank/activeContext.md`. La source de vérité de la
+> **spécification** est `docs/Architecture application web — v1 (spécification
+> consolidée).md` (versionnée avec le code).
 
 ## Lancement local
+
+Double-cliquez `Ouvrir Correction.bat` (démarre le serveur et ouvre le navigateur),
+ou manuellement :
 
 ```powershell
 python -m venv .venv
@@ -18,13 +22,11 @@ uvicorn app.main:app --reload
 
 ## Configuration LLM (Mistral — clé API uniquement)
 
-L'application fonctionne **uniquement par clé API Mistral** (décision de l'auteur — aucun LLM local) :
-
 1. Copiez `.env.example` vers `.env` ;
 2. Renseignez `APP_LLM_API_KEY` avec votre clé Mistral ;
-3. Les cinq phases utilisent `mistral-small-latest` par défaut.
+3. Les phases utilisent `mistral-small-latest` par défaut.
 
-Vérification de la connexion (ping fail-fast, `max_tokens=5`, coût négligeable) :
+Vérification de la connexion (ping fail-fast, coût négligeable) :
 
 ```powershell
 python scripts/tester_llm.py
@@ -36,13 +38,15 @@ python scripts/tester_llm.py
 pytest
 ```
 
+E2E réel Mistral (environnement de données isolé `data_e2e/`, jamais votre manuscrit) :
+
+```powershell
+python scripts/e2e_j25.py
+```
+
 ## Docker (parité dev/prod)
 
 ```powershell
 Copy-Item .env.example .env
 docker compose up --build
 ```
-
-## Structure
-
-Voir la spec consolidée §2.2 (`docs/`). Résumé : `app/` (FastAPI, services, routes, templates), `tests/` (pytest), `data/` (SQLite + backups + logs, ignoré par git), `exports/`, `docs/` (spécification versionnée).

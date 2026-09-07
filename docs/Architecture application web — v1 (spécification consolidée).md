@@ -296,7 +296,7 @@ Navigation clavier : `←`/`→` entre corrections visibles (centrage + `outline
 | J2.2 — Atelier interactif & Word | ✅ | `22b7639` | Texte riche Word-fidèle, Forme (barré), Style/Embellissement (alternatives à la demande), Technique (barre latérale), validation manuelle des chapitres — 89 tests |
 | J2.3 — Catégorisation déclarative | ✅ | `cbc9cd2` | Catégorie/numéro déclarés par l'auteur, « dernier validé gagne », collage Word strict, numéro pré-rempli — 85 tests |
 | J2.4 — Rendu texte riche & bulles | ✅ | `0bb9577` | Rendu E5 réparé, styles Word restitués, bulles fiabilisées (dataset) — 77 tests |
-| J2.5 — Atelier v2 (texte courant, couches, clic droit) | ✅ | Voir Git | Validation du TEXTE AFFICHÉ + backup natif, nouvelle version fonctionnelle, couches superposables (Technique en fond jaune dans le texte), Embellissement & alternatives par sélection + clic droit (réévaluation du paragraphe), « Soumettre un autre texte » avec configurations mémorisées — 99 tests + E2E réel Mistral |
+| J2.5 — Atelier v2 (texte courant, couches, clic droit) | ✅ | `05bcbda` | Validation du TEXTE AFFICHÉ + backup natif, nouvelle version fonctionnelle, couches superposables (Technique en fond jaune dans le texte), Embellissement & alternatives par sélection + clic droit (réévaluation du paragraphe), « Soumettre un autre texte » avec configurations mémorisées — 99 tests + E2E réel Mistral |
 | J3 — Chaîne & codex | ⏳ prochain | — | Voir §9 + critère d'acceptation ci-dessous |
 | J4 — Confort | ⬜ | — | E8, E9, exports, import .docx |
 | J5 — Mise en ligne | ⬜ | — | Docker prod, Caddy TLS, auth simple, Tailscale documenté |

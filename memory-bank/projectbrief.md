@@ -1,6 +1,6 @@
 # Brief projet — correction-app
 
-> Source de vérité du scope. Dernière mise à jour : 2026-09-07.
+> Source de vérité du scope. Dernière mise à jour : 2026-09-07 (jalon J2.5).
 
 ## Identité
 
@@ -11,11 +11,12 @@
 ## Exigences fondateurs
 
 1. **Bibliothèque de manuscrit** : chapitres officiels, textes soumis et historiques d'analyses stockés en base — plus de copier-coller à chaque usage.
-2. **Correction multi-phase** : Forme, Style, Technique, Embellissement — exécution parallèle, déduplication Style prioritaire.
-3. **Codex vivant (J3)** : fiches, alias et journaux narratifs persistants, consultables **et éditables** dans l'UI.
-4. **Chaîne N+1 visible** : timeline des chapitres officiels ; rupture → reclassement automatique en Extrait, jamais de blocage.
-5. **UI de relecture sur mesure** : annotations colorées WCAG AA, panneau latéral, filtres, lecture Embellissement, navigation clavier, fidélité Word (gras/italique/souligné).
-6. **Local-first** : tout tourne en local ; mise en ligne seulement au jalon J5.
+2. **Correction multi-phase** : Forme, Style, Technique — exécution parallèle, déduplication Style prioritaire.
+3. **Atelier interactif (J2.5)** : le texte affiché à l'écran EST la version de travail (état courant matérialisé) ; corrections Forme appliquées par défaut et refusables ; corrections superposables en couches (Forme rouge, Style bleu, Technique fond jaune) ; Embellissement et alternatives à la demande par **sélection + clic droit** ; « Valider la version actuelle » enregistre le texte affiché.
+4. **Codex vivant (J3)** : fiches, alias et journaux narratifs persistants, consultables **et éditables** dans l'UI.
+5. **Chaîne N+1 visible** : timeline des chapitres officiels ; rupture → reclassement automatique en Extrait, jamais de blocage.
+6. **UI de relecture sur mesure** : annotations colorées WCAG AA, panneau latéral, filtres, navigation clavier, fidélité Word (gras/italique/souligné).
+7. **Local-first** : tout tourne en local ; mise en ligne seulement au jalon J5.
 
 ## Catégories de texte (métier)
 
@@ -30,9 +31,14 @@
 
 ## Décisions arbitérées par l'auteur (NE PAS RÉOUVRIR)
 
-- **A4 — Fournisseur Mistral uniquement** par clé API (`mistral-small-latest` pour les 5 phases) — aucun LLM local.
+- **A4 — Fournisseur Mistral uniquement** par clé API (`mistral-small-latest` pour les phases) — aucun LLM local.
+- **J2.5 — Atelier v2** (voir `progress.md` et spec §11, décisions 27-32) :
+  - **Validation du texte affiché** : « Valider la version actuelle » (Chapitres, avec confirmation) enregistre EXACTEMENT le texte à l'écran, corrigé ou non ; Passage/Extrait → « Soumettre un autre texte » avec les dernières configurations pré-cochées ;
+  - **Embellissement à la demande** : plus une phase de soumission (jauge de E3 supprimée) ; sélection + clic droit → réécriture contextualisée puis réévaluation des corrections du paragraphe ;
+  - **Alternatives à la demande** : sélection + clic droit (synonyme, champ lexical cohérent avec le contexte) — fin des bulles au clic gauche ;
+  - **Couches superposables** : Forme = rouge barré/inséré, Style = soulignement pointillé bleu, Technique = fond jaune — les chevauchements s'affichent tous ;
+  - **Backup natif SQLite** avant toute écriture dans `chapitres` (rotation `APP_BACKUPS_MAX`).
 - **Matrice de phases = pré-sélection dérogable** (J2.1) : cases pré-cochées selon la catégorie, l'utilisateur décoche/coche librement.
-- **Jauge de créativité** : température Embellissement choisie par analyse (0 → 1.5).
 - **Refusés** : chunking des textes, échappement backticks du manuscrit, toggle d'affichage du texte complet (paragraphes non corrigés masqués avec compteur).
 - **Chaîne** : rupture → reclassement automatique en Extrait (jamais de blocage) ; N=N sans remplacement → Extrait ; remplacement officiel explicite (case à cocher).
 - **Option B** : panne de phase en cours d'analyse → arrêt global, aucun résultat partiel, aucune écriture narrative.
