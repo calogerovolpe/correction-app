@@ -35,7 +35,8 @@ Navigateur (Jinja2 + HTMX polling + Alpine.js — vendor local ; fetch pour l'at
 - **Atelier v2 (J2.5)** : l'état courant du texte est matérialisé (table `documents`, service pur `reconstruction.py`) — le texte AFFICHÉ est la version validée/soumise ; corrections Forme appliquées par défaut, refusables ; toute modification = splice de runs avec remappage DÉTERMINISTE des corrections (après → décalées, intersectantes → couvrent le remplacement / deviennent obsolètes pour Forme, avant → inchangées) ; localisation des fragments par ancre (`contexte_avant + fragment`, sinon occurrence unique) ; embellissement → réévaluation LLM du SEUL paragraphe.
 - **Couches superposables (J2.5)** : rendu par classes CSS cumulées (`mark-style`, `mark-technique`, `refusee`) — jamais de bloc fusionné qui avale une correction ; Technique visible dans le texte ET en barre latérale.
 - **Chaîne N+1** : déclarative (catégorie/numéro choisis par l'auteur, J2.3) ; « dernier validé gagne » ; jamais de blocage.
-- **Réconciliation d'offsets** : ancre `contexte_avant`, rejets individuels, validation Pydantic, fences nettoyées.
+- **Réconciliation d'offsets** : ancre `contexte_avant`, rejets individuels, validation Pydantic, fences nettoyées ; **no-op Forme rejeté** (jalon A : `original == correction` en phase forme = rejet individuel — Style/Technique marquent SANS réécrire, donc `original == correction` y est légitime).
+- **IDs de correction globaux uniques** (jalon A) : les ids `c-XXXX` émis par chaque phase LLM ne sont JAMAIS utilisés tels quels — `reconciliation.renumeroter()` réassigne une suite unique et déterministe après `dedupliquer()` (appelé par `analyse.py`), sinon `rendu.py` colle deux corrections sur le même `data-groupe` (barre latérale désynchronisée, choix Forme partagés).
 - **Alertes** : numérotation MAX+1 stable, choix d'auteur, double barrière (`alertes.py`, prête pour J3).
 
 ## Pièges connus (leçons de bugs réels — NE PAS REFAIRE)

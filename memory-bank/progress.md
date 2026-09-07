@@ -1,6 +1,6 @@
 # Progression — jalons, état, décisions
 
-> Dernière mise à jour : 2026-09-09 (série de correctifs UX engagée — J3 en attente).
+> Dernière mise à jour : 2026-09-09 (jalon A livré — série de correctifs en cours, J3 en attente).
 
 ## État des jalons
 
@@ -15,12 +15,13 @@
 | J2.4 — Rendu texte riche & fiabilisation bulle | ✅ Terminé | `0bb9577` |
 | Memory Bank — source de vérité unique | ✅ Terminé | `cce00cc` |
 | **J2.5 — Atelier v2 (texte courant, couches, clic droit)** | ✅ **Terminé (E2E réel Mistral)** | `05bcbda` |
-| **Correctifs atelier & confort UX (A→E, multi-sessions)** | ⏳ **En cours (avant J3)** | — |
+| **A — Fiabilité du cœur (ids uniques, no-op, menu fiable)** | ✅ **Terminé** | `b5545f0` |
+| **Correctifs atelier & confort UX (B→E restants)** | ⏳ **En cours (avant J3)** | — |
 | J3 — Chaîne séquentielle & Codex narratif | ⬜ En attente (après correctifs) | — |
 | J4 — Confort | ⬜ À faire | — |
 | J5 — Mise en ligne | ⬜ À faire | — |
 
-**Tests : 99/99 verts** (`pytest`). E2E réel : `scripts/e2e_j25.py` (isolé dans `data_e2e/`).
+**Tests : 108/108 verts** (`pytest`). E2E réel : `scripts/e2e_j25.py` (isolé dans `data_e2e/`).
 
 ## Ce qui marche (validé de bout en bout)
 
@@ -43,10 +44,15 @@
   - **Embellissement & alternatives par sélection + clic droit** : plus une phase de soumission (jauge E3 supprimée) ; embellissement → réévaluation LLM du paragraphe ; bouton « ↻ Réévaluer » ; fin des bulles au clic gauche ;
   - **validation du texte affiché** (Chapitres, confirmation JS) + **backup natif SQLite** + rotation ; « Soumettre un autre texte » (Passage/Extrait) avec E3 pré-cochée ;
   - navigation clavier branchée (`app.js` réécrit), branches mortes supprimées, config/docstrings alignées Mistral, README pointeur, `.bat` committé — 99 tests verts + E2E réel Mistral.
+- **A — Fiabilité du cœur** (correctifs UX, décision 33-34, commit `b5545f0`) :
+  - **ids de correction uniques** : nouveau service pur `reconciliation.renumeroter()` — réassignation globale déterministe `c-0001…` après `dedupliquer()` (les ids émis par chaque phase LLM pouvaient se doubler → même `data-groupe`, barre latérale désynchronisée, choix Forme collés) ;
+  - **no-op Forme rejetés** : `extraire_corrections` écarte individuellement toute entrée Forme où `original == correction` (« cous » → « cous ») ; Style/Technique NON concernés (marquage sans réécriture légitime) ;
+  - **menu contextuel fiable** : CSS `[hidden] { display: none !important }` (la règle `.menu-contextuel { display: flex }` neutralisait le `hidden`), menu + popover en `position: fixed` avec `clientX/clientY` (robuste au scroll, recentrage), popover positionné à l'écran, fermeture clic extérieur / Échap effective ;
+  - 9 tests de régression — 108 tests verts.
 
 ## Reste à faire (priorisé)
 
-1. **Correctifs atelier & confort UX** (jalons A → E, multi-sessions — roadmap : `plan-correctifs-atelier-ux.md`) : fiabilité du cœur (ids uniques, no-op, menu contextuel), menu contextuel riche, UI/UX atelier (toggle masqué, layout, pastilles), navigation/projets (activation, navbar, suppression de projet), édition directe sans IA temps réel.
+1. **Correctifs atelier & confort UX** (jalons B → E restants, multi-sessions — A ✅ livré ; roadmap : `plan-correctifs-atelier-ux.md`) : menu contextuel riche (clic droit sur marque, choix Forme dans le menu), UI/UX atelier (toggle masqué, layout, pastilles), navigation/projets (activation, navbar, suppression de projet), édition directe sans IA temps réel.
 2. **J3 — Chaîne & codex** (EN ATTENTE, détail dans `activeContext.md`) : écritures narratives (transaction, `avec_codex` câblé, codex/journaux), phase 2 LLM (extraction codex, cohérence, relecture-diff), écrans E2/E6/E7 + bandeau d'alertes, RAG alias.
 3. **J4 — Confort** : E9 (backups liste/restauration/purge, exports md/docx, statistiques, logs debug), E8 (paramètres + test de connexion), import .docx (italique/gras).
 4. **J5 — Mise en ligne** : durcissement (auth simple), Caddy (TLS), compose production + volumes, sauvegardes programmées, doc de déploiement VPS, option Tailscale documentée.
@@ -54,7 +60,8 @@
 ## Problèmes connus
 
 - 99/99 tests verts ; E2E réel Mistral OK.
-- **Bugs constatés par l'auteur (correctifs en cours — roadmap `plan-correctifs-atelier-ux.md`)** : barre latérale désynchronisée (ids de correction non uniques entre phases) ; corrections no-op (« cous » → « cous ») ; menu contextuel non fiable (`hidden` neutralisé par le CSS, popover hors écran) ; pas de menu contextuel sur une marque ; numéro attendu erroné pour un nouveau projet (projet non activable).
+- **Bugs constatés par l'auteur (correctifs — roadmap `plan-correctifs-atelier-ux.md`)** : ~~barre latérale désynchronisée (ids non uniques entre phases)~~ ✅ jalon A ; ~~corrections no-op (« cous » → « cous »)~~ ✅ jalon A ; ~~menu contextuel non fiable (`hidden` neutralisé, popover hors écran)~~ ✅ jalon A ; pas de menu contextuel sur une marque (jalon B) ; numéro attendu erroné pour un nouveau projet (jalon D).
+- **Limite connue** : `_reevaluer_corrections` régénère des ids `c-r0001…` avec compteur remis à zéro par appel — deux réévaluations de paragraphes différents dans une même session peuvent théoriquement entrer en collision (même classe de bug que le jalon A, cas rare non constaté ; piste : séquence `c-r` continue à l'échelle du document).
 - Dette : `atelier.py` ~400 lignes — fractionnement fin planifié pendant J3 si croissance (règle 300 lignes).
 
 ## Historique des décisions clés

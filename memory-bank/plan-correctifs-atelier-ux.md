@@ -12,7 +12,7 @@ Le jalon suivant repart de l'état committé (donc réalisable sur plusieurs con
 
 ## État de départ
 
-- 99/99 tests verts (`pytest`).
+- 108/108 tests verts (`pytest`) — 99 à l'origine de la série + 9 tests de régression du jalon A.
 - J3 (chaîne séquentielle & codex narratif) est MIS EN ATTENTE jusqu'à la fin des jalons A → E.
 
 ## Règles invariables
@@ -26,7 +26,7 @@ Le jalon suivant repart de l'état committé (donc réalisable sur plusieurs con
 
 | Jalon | Contenu | Statut | Commit |
 |---|---|---|---|
-| A | Fiabilité du cœur : ids de correction uniques, no-op rejetés, menu contextuel fiable | ⬜ | — |
+| A | Fiabilité du cœur : ids de correction uniques, no-op rejetés, menu contextuel fiable | ✅ | `b5545f0` |
 | B | Menu contextuel riche (clic droit sur marque, choix Forme dans le menu) | ⬜ | — |
 | C | UI/UX atelier : toggle « masqué », layout élargi, pastilles retravaillées | ⬜ | — |
 | D | Navigation, projets : activation, navbar, suppression de projet | ⬜ | — |
