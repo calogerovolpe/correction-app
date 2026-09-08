@@ -11,3 +11,8 @@ __pycache__/
 data/
 exports/
 data_e2e/
+
+# Frontend Svelte (jalon F0) : dépendances, build et SPA compilé jamais commités.
+frontend/node_modules/
+frontend/dist/
+app/static/spa/

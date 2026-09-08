@@ -1,0 +1,42 @@
+/* frontend/src/lib/styles/tokens.css
+   DESIGN TOKENS du frontend Svelte (jalon F0).
+   Source de vérité des couches de correction : app/static/style.css
+   (couleurs RÉELLEMENT affichées) ; thème et typographies : plan-refonte-frontend.md. */
+
+:root {
+  /* ---- Thème (identité visuelle introduite en F0) ---- */
+  --fond-page: #f6f1e9;
+  --fond-surface: #fffdf8;
+  --encre: #2a2622;
+  --encre-douce: #6e665e;
+  --accent: #8a3b2c;
+  --accent-fonce: #6e2d21;
+  --accent-doux: #f3e0d8;
+  --bordure: #e4dcd0;
+  --succes: #3e6b4f;
+  --erreur: #b3402a;
+  --attention: #a36b1e;
+
+  /* ---- Couches de correction (couleurs affichées aujourd'hui) ---- */
+  --corr-forme-texte: #c62828;
+  --corr-forme-fond: #fdecea;
+  --corr-style-texte: #1565c0;
+  --corr-style-fond: #e3f2fd;
+  /* Technique : fond jaune du marquage (ne jamais changer) + texte sombre
+     (contraste AA ≈ 15:1). L'ancien accent violet --corr-technique: #6a1b9a
+     est OBSOLÈTE — remplacé par un accent accessible au jalon F3. */
+  --corr-technique-fond: #fff9c4;
+  --corr-technique-texte: #212121;
+  --corr-embellissement-texte: #2e7d32;
+  --corr-embellissement-fond: #e8f5e9;
+
+  /* ---- Typographie (système, locale, accessible) ---- */
+  --police-interface: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --police-manuscrit: Georgia, "Times New Roman", serif;
+
+  /* ---- Mesures ---- */
+  --taille-base: 16px;
+  --interligne: 1.6;
+  --rayon: 6px;
+  --largeur-contenu: 1200px;
+}
