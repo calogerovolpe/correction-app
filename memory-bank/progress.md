@@ -1,6 +1,6 @@
 # Progression — jalons, état, décisions
 
-> Dernière mise à jour : 2026-09-09 (jalon A livré — série de correctifs en cours, J3 en attente).
+> Dernière mise à jour : 2026-09-09 (jalon A livré — plan RÉORGANISÉ : R1/R2 refonte rendu/état + UX1→UX4, J3 en attente).
 
 ## État des jalons
 
@@ -16,8 +16,13 @@
 | Memory Bank — source de vérité unique | ✅ Terminé | `cce00cc` |
 | **J2.5 — Atelier v2 (texte courant, couches, clic droit)** | ✅ **Terminé (E2E réel Mistral)** | `05bcbda` |
 | **A — Fiabilité du cœur (ids uniques, no-op, menu fiable)** | ✅ **Terminé** | `b5545f0` |
-| **Correctifs atelier & confort UX (B→E restants)** | ⏳ **En cours (avant J3)** | — |
-| J3 — Chaîne séquentielle & Codex narratif | ⬜ En attente (après correctifs) | — |
+| **R1 — Onglets hybrides + stockage par phase + déduplication affichage** | ⬜ **Prochain jalon** | — |
+| UX1 — Menu contextuel riche (ex-B) | ⬜ À faire (après R1) | — |
+| UX2 — Confort d'affichage : toggle, layout, style onglets (ex-C) | ⬜ À faire (après R1) | — |
+| UX3 — Navigation, projets : activation, navbar, suppression (ex-D, indépendant) | ⬜ À faire (intercalable) | — |
+| R2 — Base immuable + annotations (refonte `reconstruction.py`) | ⬜ À faire (avant UX4 et J3) | — |
+| UX4 — Édition directe sans IA temps réel (ex-E) | ⬜ À faire (après R2) | — |
+| J3 — Chaîne séquentielle & Codex narratif | ⬜ En attente (après UX4/R2) | — |
 | J4 — Confort | ⬜ À faire | — |
 | J5 — Mise en ligne | ⬜ À faire | — |
 
@@ -52,10 +57,18 @@
 
 ## Reste à faire (priorisé)
 
-1. **Correctifs atelier & confort UX** (jalons B → E restants, multi-sessions — A ✅ livré ; roadmap : `plan-correctifs-atelier-ux.md`) : menu contextuel riche (clic droit sur marque, choix Forme dans le menu), UI/UX atelier (toggle masqué, layout, pastilles), navigation/projets (activation, navbar, suppression de projet), édition directe sans IA temps réel.
-2. **J3 — Chaîne & codex** (EN ATTENTE, détail dans `activeContext.md`) : écritures narratives (transaction, `avec_codex` câblé, codex/journaux), phase 2 LLM (extraction codex, cohérence, relecture-diff), écrans E2/E6/E7 + bandeau d'alertes, RAG alias.
-3. **J4 — Confort** : E9 (backups liste/restauration/purge, exports md/docx, statistiques, logs debug), E8 (paramètres + test de connexion), import .docx (italique/gras).
-4. **J5 — Mise en ligne** : durcissement (auth simple), Caddy (TLS), compose production + volumes, sauvegardes programmées, doc de déploiement VPS, option Tailscale documentée.
+> Ordre détaillé, dépendances et architecture cible : **`plan-correctifs-atelier-ux.md`** (roadmap maîtresse, réorganisée le 2026-09-09).
+
+1. **R1 — Onglets hybrides + stockage par phase + déduplication d'affichage** : projection par phase (`rendu.py`), stockage des corrections par phase, `dedupliquer()` ne mute plus les données, barre d'onglets `Tout | Forme | Style | Technique | (Embellissement)` ; zéro token LLM en plus ; spec consolidée mise à jour dans le même commit.
+2. **UX1 — Menu contextuel riche** (ex-B) : clic droit sur marque, choix Forme dans le menu, barre latérale lecture seule.
+3. **UX2 — Confort d'affichage** (ex-C) : toggle « masquer les paragraphes sans correction », layout ~1200 px, style des onglets (les pastilles sont remplacées par les onglets de R1).
+4. **UX3 — Navigation, projets** (ex-D, indépendant/intercalable) : activation, navbar, suppression de projet.
+5. **R2 — Base immuable + annotations (patches)** : refonte de `reconstruction.py` (fin du remappage d'offsets) ; E2E requis.
+6. **UX4 — Édition directe sans IA temps réel** (ex-E, après R2) : texte éditable + « ↻ Re-corriger ».
+7. **J3 — Chaîne & codex** (EN ATTENTE, après R2/UX4) : écritures narratives (transaction, `avec_codex` câblé, codex/journaux), phase 2 LLM (extraction codex, cohérence, relecture-diff), écrans E2/E6/E7 + bandeau d'alertes, RAG alias.
+8. **J4 — Confort** : E9 (backups liste/restauration/purge, exports md/docx, statistiques, logs debug), E8 (paramètres + test de connexion), import .docx (italique/gras), correction hors-ligne locale (candidat).
+9. **J5 — Mise en ligne** : durcissement (auth simple), Caddy (TLS), compose production + volumes, sauvegardes programmées, doc de déploiement VPS, option Tailscale documentée.
+10. **R3 — Extension des catégories** (futur) : une phase = une config + un onglet + une projection, zéro changement au cœur.
 
 ## Problèmes connus
 
@@ -74,3 +87,4 @@
 - **Refusés par l'auteur** (ne pas réouvrir) : chunking, échappement backticks, toggle d'affichage du texte complet.
 - **2026-09-07** : Memory Bank source de vérité unique ; **J2.5** atelier v2.
 - **2026-09-09** : série de correctifs atelier & confort UX arbitrée (roadmap `plan-correctifs-atelier-ux.md` ; spec §11 décisions 33-38 ; révise la décision 24) ; J3 mis en attente.
+- **2026-09-09 (réorganisation)** : après arbitrage « refonte rendu/état » avec l'auteur, la roadmap est RÉORGANISÉE — ex-B/C/D/E deviennent UX1/UX2/UX3/UX4 et s'intercalent avec deux refontes : **R1** (onglets hybrides + stockage des corrections par phase + déduplication devenue règle d'affichage — révisant la décision 29 « couches superposables ») et **R2** (base immuable + annotations/patches : fin du remappage d'offsets dans `reconstruction.py`). Ordre imposé : R1 → UX1 → UX2 → UX3 → R2 → UX4 → J3 → J4 → J5 (UX3 intercalable). Rationale : chaque phase LLM produit déjà SA collection de corrections indépendante — c'est le RENDU qui fusionnait ; les onglets n'ajoutent aucun appel LLM (zéro token). Cible : « base immuable + annotations + projections ». Détail : `plan-correctifs-atelier-ux.md` (« Architecture cible ») et `activeContext.md` (décisions).
