@@ -1,7 +1,18 @@
 <script lang="ts">
   import NavBar from './lib/composants/NavBar.svelte';
   import Accueil from './routes/Accueil.svelte';
+  import Soumission from './routes/Soumission.svelte';
+  import Suivi from './routes/Suivi.svelte';
   import { routeCourante } from './lib/router';
+
+  /** Extraît l'identifiant de suivi d'une route hash `#/analyses/{id}`. */
+  function idSuivi(chemin: string): number | null {
+    const prefixe = '/analyses/';
+    if (!chemin.startsWith(prefixe)) return null;
+    const reste = chemin.slice(prefixe.length);
+    if (!/^\d+$/.test(reste)) return null;
+    return Number(reste);
+  }
 </script>
 
 <div class="enveloppe">
@@ -9,6 +20,10 @@
   <main>
     {#if $routeCourante === '/'}
       <Accueil />
+    {:else if $routeCourante === '/soumission'}
+      <Soumission />
+    {:else if idSuivi($routeCourante) !== null}
+      <Suivi analyseId={idSuivi($routeCourante)!} />
     {:else}
       <section class="introuvable" aria-labelledby="titre-404">
         <h1 id="titre-404">Page introuvable</h1>

@@ -34,7 +34,7 @@
 |---|---|
 | Backend | Python 3.11+ (3.14 en pratique), FastAPI, Uvicorn, Pydantic v2 |
 | Frontend (actuel) | Jinja2 (autoescape activé) + HTMX (polling) + Alpine.js (état d'affichage) — conservés jusqu'à la bascule (F5) |
-| Frontend (refonte F0→F5) | **Svelte 5 + TypeScript + Vite** — `frontend/` versionné, compilé vers `app/static/spa/` (gitignoré) ; **l'accueil E1 est servi par le SPA depuis F1**, alimenté par l'API JSON `/api/v1/` (`app/routes/api.py`) |
+| Frontend (refonte F0→F5) | **Svelte 5 + TypeScript + Vite** — `frontend/` versionné, compilé vers `app/static/spa/` (gitignoré) ; **l'accueil E1 est servi par le SPA depuis F1**, **E3 (soumission) et E4 (suivi) depuis F2**, alimentés par l'API JSON `/api/v1/` (`app/routes/api.py`) : `GET/POST /api/v1/projets`, `POST /api/v1/projets/{id}/activer`, `DELETE /api/v1/projets/{id}`, `GET /api/v1/analyses` (récentes), `GET /api/v1/soumission` (préparation E3), `POST /api/v1/analyses`, `GET /api/v1/analyses/{id}` (suivi) |
 | Base de données | SQLite : WAL, `busy_timeout=15000`, accès via `asyncio.to_thread`, verrou `threading.Lock` |
 | LLM | Client maison compatible OpenAI (`app/llm/client.py`) → API Mistral `/v1/chat/completions` |
 | Configuration | `pydantic-settings`, préfixe `APP_`, fichier `.env` (clé API, modèles, timeouts, garde-fous) |
@@ -63,7 +63,8 @@ app/
 │   ├── analyse.py        # Orchestrateur des jobs (§7), fabrique _client_llm injectable
 │   └── rendu.py          # Pur : fusion des chevauchements, blocs g-XXXX, segments annotés
 ├── routes/web.py    # Écrans E1, E3, E4, E5 + polling HTMX
-│   ├── routes/api.py# API JSON /api/v1 (F1) : projets E1 + analyses récentes
+│   ├── routes/api.py# API JSON /api/v1 (F1-F2) : projets E1, analyses récentes,
+│   │                #  soumission E3 + suivi E4 (/api/v1/soumission, /analyses)
 ├── templates/       # base.html, index.html, analyses/{nouveau,suivi,fragment_statut,
 │                    #  erreur,resultat,_cas}.html
 └── static/          # style.css (palette WCAG AA), app.js (navigation clavier),
@@ -76,7 +77,7 @@ scripts/tester_llm.py   # Ping fail-fast des 5 rôles (utilise le vrai .env)
 
 ### 2.3 Jobs asynchrones
 
-Une soumission crée une ligne `analyses` (statut `en_attente`) puis lance `analyse.executer(id)` en `asyncio.create_task` (référencé dans un ensemble de tâches). Statuts : `en_attente` → `en_cours` (étape courante : normalisation, chaine, fail_fast, phases, ecriture) → `terminee` | `echec` (Option B) | `rejetee` (fail-fast ou refus de préconditions). La page de suivi (E4) rafraîchit par polling HTMX (2 s) et redirige vers le résultat à l'état final.
+Une soumission crée une ligne `analyses` (statut `en_attente`) puis lance `analyse.executer(id)` en `asyncio.create_task` (référencé dans un ensemble de tâches). Statuts : `en_attente` → `en_cours` (étape courante : normalisation, chaine, fail_fast, phases, ecriture) → `terminee` | `echec` (Option B) | `rejetee` (fail-fast ou refus de préconditions). La page de suivi (E4) rafraîchit par polling HTMX (2 s) et redirige vers le résultat à l'état final. **Depuis F2, E4 existe aussi dans le SPA Svelte** : il pollique `GET /api/v1/analyses/{id}` (équivalent JSON du fragment HTMX — même contrat de statuts, étape et erreur ; l'écran Svelte n'est pas redirigé mais affiche l'état final : synthèse `resultat` pour `terminee`, gabarits fail-fast/Option B verbatim pour `rejetee`/`echec`, jamais de statut fantôme). La lecture de l'état final (`resultat` : nombre de corrections par phase depuis `corrections.data_json`) est allégée au F2 ; le payload complet de l'atelier arrivera au jalon F3.
 
 * * *
 
@@ -262,8 +263,8 @@ Navigation clavier : `←`/`→` entre corrections visibles (centrage + `outline
 |---|---|---|
 | **E1 — Accueil/Projets** | ✅ Livré (écran Svelte depuis F1) | Projets (statut de chaîne, chapitre courant), création, **activation**, projet actif, **suppression avec confirmation** (projet actif protégé, suppression totale en cascade), **analyses récentes** (10 dernières : statut coloré, catégorie, extrait, lien) — écran Svelte servi à `/` (repli Jinja2 si build absent) ; données via `GET/POST /api/v1/projets`, `POST /api/v1/projets/{id}/activer`, `DELETE /api/v1/projets/{id}`, `GET /api/v1/analyses` (`app/routes/api.py`, jalon F1) |
 | **E2 — Timeline de chaîne** | ⬜ J3 | Chapitres officiels (Prologue=0, 1..N), numéro attendu en évidence, reclassés grisés « hors chaîne » |
-| **E3 — Soumission** | ✅ Livré | Éditeur Word-fidèle (contenteditable, gras/italique/souligné) + compteur live `max_caracteres` ; catégorie auto en direct + forçage ; 4 cases de phases pré-cochées décochables (§5.4) + **jauge de créativité** (si Embellissement) ; case remplacement officiel ; refus explicites (400) |
-| **E4 — Suivi de job** | ✅ Livré | Polling HTMX 2 s, étape courante, redirection finale ; écrans d'échec/refus avec gabarits §7.2-7.3 |
+| **E3 — Soumission** | ✅ Livré (Jinja2 + écran Svelte depuis F2) | Éditeur Word-fidèle (gras/italique/souligné + nettoyage strict au collage), compteur live `max_caracteres` (30 000, source unique `GET /api/v1/soumission`) ; catégorie Chapitre/Passage/Extrait + numéro **N+1 pré-rempli** (indicateur « attendu par la suite ») ; matrice des 3 phases pré-cochées **dérogable** (Chapitre = F+S+T, Passage/Extrait = F+S ; mémoire « dernières options » J2.5) ; **refus explicites (400)** — texte vide, dépassement (aucune troncature silencieuse), aucun projet actif, aucune phase cochée ; la soumission passe par `POST /api/v1/analyses` (JSON, même moteur de jobs que le POST Jinja2, spec §2.3) |
+| **E4 — Suivi de job** | ✅ Livré (Jinja2 + écran Svelte depuis F2) | Polling toutes les 2 s, étape courante ; **depuis F2 dans le SPA Svelte** : `GET /api/v1/analyses/{id}` (statuts explicites `en_attente → en_cours → terminee | echec | rejetee` en badges colorés), fail-fast visible (gabarits §7.2/§7.3 verbatim dans `erreur`), **jamais de statut fantôme** (statut inconnu = erreur, pas de spinner infini, arrêt du polling à l'état final) ; `terminee` → synthèse `resultat` (nb de corrections par phase) + lien « Ouvrir le résultat » vers l'atelier E5 |
 | **E5 — Résultat (Atelier interactif — refondu J2.5, onglets R1-a)** | ✅ Livré | Document annoté **en couches superposables** (Forme = rouge barré/inséré, Style = soulignement pointillé bleu, Technique = fond jaune, également dans la barre latérale), affiché via une barre d'**onglets hybrides** `Tout | Forme | Style | Technique` (+ `Embellissement` si des corrections existent — « Tout » = superposition, un onglet = projection de la phase, zéro appel LLM en plus) ; **état courant matérialisé** (`documents`, refondu R2) : **base immuable + annotations** — le texte affiché EST la version de travail, calculée par projection (base + Forme acceptées + patches manuels) ; corrections Forme appliquées par défaut, refusables depuis la barre latérale (un simple filtre, aucun remappage d'offsets) ; **sélection + clic droit** → « Embellir la sélection » (réévaluation du paragraphe) et « Trouver une alternative » (synonyme/champ lexical cohérent avec le contexte) ; boutons de workflow : « Soumettre une nouvelle version », « Valider la version actuelle » (Chapitres, confirmation, **texte affiché** enregistré) ou « Soumettre un autre texte » (Passage/Extrait, E3 pré-cochée avec les dernières configurations) ; navigation clavier |
 | **E6 — Codex** | ⬜ J3 | Fiches par catégorie, alias, éditeur manuel |
 | **E7 — Journaux** | ⬜ J3 | Journaux ecriture/evolution/intrigue, lecture seule |

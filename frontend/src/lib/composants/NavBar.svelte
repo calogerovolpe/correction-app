@@ -7,7 +7,13 @@
     children?: Snippet;
   }
 
-  let { liens = [{ chemin: '/', libelle: 'Accueil' }], children }: Props = $props();
+  let {
+    liens = [
+      { chemin: '/', libelle: 'Accueil' },
+      { chemin: '/soumission', libelle: 'Soumettre un texte' },
+    ],
+    children,
+  }: Props = $props();
 </script>
 
 <header class="navbar">
