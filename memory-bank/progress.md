@@ -17,6 +17,7 @@
 | **J2.5 — Atelier v2 (texte courant, couches, clic droit)** | ✅ **Terminé (E2E réel Mistral)** | `05bcbda` |
 | **A — Fiabilité du cœur (ids uniques, no-op, menu fiable)** | ✅ **Terminé** | `b5545f0` |
 | Memory Bank — réorganisation du plan (R1/R2 refonte rendu-état + UX1→UX4) | ✅ Terminé | `fac3463` |
+| Memory Bank — découpage R1 en R1-a/R1-b (deux conversations, handoff) | ✅ Terminé | `a4dfe98` |
 | **R1-a — Onglets UI + projection par phase (rendu seul)** | ⬜ **Prochain jalon** | — |
 | R1-b — Stockage par phase + déduplication affichage (fin `CorrectionFusionnee`) | ⬜ À faire (après R1-a, autre conversation) | — |
 | UX1 — Menu contextuel riche (ex-B) | ⬜ À faire (après R1) | — |

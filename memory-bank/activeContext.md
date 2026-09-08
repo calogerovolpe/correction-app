@@ -7,7 +7,7 @@
 **Série R1-a/R1-b → UX4 (refonte rendu/état + correctifs UX) — AVANT J3.**
 La roadmap détaillée est dans **`plan-correctifs-atelier-ux.md`** (même dossier) : la RELIRE EN DÉBUT DE SESSION — elle contient l'ordre des jalons, leurs dépendances et l'architecture cible. Un commit par jalon ; le suivi (statut/commit) est tenu à jour dans ce plan ET dans `progress.md`.
 
-- **Où on en est** : jalon A ✅ (`b5545f0`) ; réorganisation du plan ✅ (`fac3463`) ; **prochain jalon = R1-a — Onglets UI + projection par phase** (rendu SEUL, stockage inchangé).
+- **Où on en est** : jalon A ✅ (`b5545f0`) ; réorganisation du plan ✅ (`fac3463`) ; découpage R1-a/R1-b ✅ (`a4dfe98`) ; **prochain jalon = R1-a — Onglets UI + projection par phase** (rendu SEUL, stockage inchangé).
 - **R1 est DÉCOUPÉ en DEUX conversations** : R1-a (UI + rendu) puis R1-b (stockage par phase + fin de `CorrectionFusionnee`) — détail et handoff : `plan-correctifs-atelier-ux.md` (« État du code À LA FIN de R1-a »).
 - **Ordre imposé** : R1-a → R1-b → UX1 → UX2 → UX3 → R2 → UX4 → J3 → J4 → J5 (UX3 indépendant, intercalable).
 - Rien n'est encore codé de la refonte (R1-a/R1-b/R2) au moment de cette mise à jour : seule la memory-bank a été réorganisée.
