@@ -1,16 +1,16 @@
 # Contexte actif — où nous en sommes MAINTENANT
 
-> Fichier le plus souvent mis à jour. Dernière mise à jour : 2026-09-09 (jalon A livré — plan RÉORGANISÉ : refonte rendu/état R1/R2 + correctifs UX réordonnés, J3 en attente).
+> Fichier le plus souvent mis à jour. Dernière mise à jour : 2026-09-09 (jalon R1-a livré — onglets hybrides + projection par phase ; stockage inchangé ; prochain jalon = R1-b, AUTRE conversation).
 
 ## Focus du moment
 
 **Série R1-a/R1-b → UX4 (refonte rendu/état + correctifs UX) — AVANT J3.**
 La roadmap détaillée est dans **`plan-correctifs-atelier-ux.md`** (même dossier) : la RELIRE EN DÉBUT DE SESSION — elle contient l'ordre des jalons, leurs dépendances et l'architecture cible. Un commit par jalon ; le suivi (statut/commit) est tenu à jour dans ce plan ET dans `progress.md`.
 
-- **Où on en est** : jalon A ✅ (`b5545f0`) ; réorganisation du plan ✅ (`fac3463`) ; découpage R1-a/R1-b ✅ (`a4dfe98`) ; **prochain jalon = R1-a — Onglets UI + projection par phase** (rendu SEUL, stockage inchangé).
-- **R1 est DÉCOUPÉ en DEUX conversations** : R1-a (UI + rendu) puis R1-b (stockage par phase + fin de `CorrectionFusionnee`) — détail et handoff : `plan-correctifs-atelier-ux.md` (« État du code À LA FIN de R1-a »).
+- **Où on en est** : jalon A ✅ (`b5545f0`) ; réorganisation du plan ✅ (`fac3463`) ; découpage R1-a/R1-b ✅ (`a4dfe98`) ; **R1-a ✅ (`245071b`) — Onglets UI + projection par phase (rendu SEUL, stockage inchangé)** ; **prochain jalon = R1-b — Stockage par phase + fin de `CorrectionFusionnee` (À FAIRE DANS UNE AUTRE CONVERSATION)**.
+- **R1 est DÉCOUPÉ en DEUX conversations** : R1-a (UI + rendu) ✅ puis R1-b (stockage par phase + fin de `CorrectionFusionnee`) — détail et handoff : `plan-correctifs-atelier-ux.md` (« État du code À LA FIN de R1-a » — **À LIRE IMPÉRATIVEMENT avant R1-b**, l'état intermédiaire est VOLONTAIRE).
 - **Ordre imposé** : R1-a → R1-b → UX1 → UX2 → UX3 → R2 → UX4 → J3 → J4 → J5 (UX3 indépendant, intercalable).
-- Rien n'est encore codé de la refonte (R1-a/R1-b/R2) au moment de cette mise à jour : seule la memory-bank a été réorganisée.
+- R1-a est CODÉ (rendu/UI uniquement) ; R1-b et R2 restent à coder : le stockage (`CorrectionFusionnee` en JSON unique) et `dedupliquer()` sont volontairement intacts.
 
 ## État global
 
@@ -18,6 +18,17 @@ La roadmap détaillée est dans **`plan-correctifs-atelier-ux.md`** (même dossi
 - Tests : **108/108 verts** (`pytest`).
 - **E2E réel Mistral OK** de bout en bout (`scripts/e2e_j25.py`, environnement isolé `data_e2e/`) : analyse 3 phases → nouvelle version (texte courant repris) → validation (chapitre officiel corrigé, hash, chaîne N+1, backup natif créé).
 - Application validée de bout en bout avec Mistral Small.
+
+## Changements récents (R1-a — Onglets hybrides + projection par phase, commit `245071b`)
+
+- **Projection par phase** — `rendu.py` : nouvelle fonction pure `preparer_document_par_phase(paragraphes, entrees, phase, choix, modifies=None)` : filtre les `entrees` sur `e["fusion"].correction.phase == phase` puis appelle la `preparer_document()` existante (AUCUNE duplication de la logique de segments). `preparer_document()` reste la projection « Tout ».
+- **Routage de l'onglet** — `atelier.py` : `_contexte_resultat(..., onglet="tout")` choisit la projection ; `_onglet_valide()` retombe sur « tout » si la valeur est inconnue ; GET `page_analyse` lit `?onglet=` ; les POST `choix-forme`/`reevaluer`/`appliquer-alternative`/`appliquer-embellissement` reçoivent `onglet: str = Form("tout")` → on reste sur l'onglet après l'action ; NOUVELLE route POST `/analyses/{id}/onglet` (re-rend `_atelier.html`, AUCUN état modifié) ; `a_embellissement` calculé sur l'état COMPLET (sinon la projection ferait disparaître l'onglet).
+- **UI onglets** — `_atelier.html` : la légende de pastilles-filtres devient une barre d'onglets `role="tablist"` `Tout | Forme | Style | Technique` (+ `Embellissement` seulement si une correction de cette phase existe) ; boutons `data-action="onglet" data-onglet="..."`, état actif `aria-selected` ; `#zone-atelier[data-onglet]` porte l'onglet actif ; champ caché `onglet` dans les formulaires « nouvelle-version » et « valider » ; section « Techniques » de la barre latérale : `x-show="correctionsTechniques.length > 0"` (les filtres Alpine n'existent plus).
+- **JS** — `app.js` : clic onglet → `poster('/analyses/{id}/onglet', {onglet})` ; `ongletActif()` (lu sur `#zone-atelier`) est transmis aux POST `choix-forme`/`reevaluer`/`appliquer-*` ; logique Alpine `filtres` retirée.
+- **CSS** — `style.css` : styles d'onglets (palette WCAG AA, actif = fond de la couleur de phase, texte blanc) ; suppression des règles orphelines `.legende`/`.pastille*`/`.bouton-lecture*`/`.filtre-*-off`/`.lecture-embellissement`.
+- **Tests** : +8 (3 projections rendu, 5 intégration : barre rendue/`aria-selected`, `?onglet=` projection, onglet inconnu → Tout, POST onglet sans mutation d'état, choix Forme conserve l'onglet) ; 1 test adapté (`pastille--forme` → `onglet--forme`). **116/116 verts.**
+- **Spec** : §8.2 (E5), §8.3 (comportement des onglets), §11 décision 29 révisée (« Couches superposables » → « Onglets hybrides ») — même commit.
+- **NON TOUCHÉ (volontaire, c'est R1-b)** : stockage `corrections.data_json` (liste plate de `CorrectionFusionnee`), `_charger_fusion`, `dedupliquer()`/`embellissement_migre`, `CorrectionFusionnee`/`EmbellissementMigre`, pipeline LLM (3 passes parallèles inchangées — zéro token en plus).
 
 ## Changements récents (A — Fiabilité du cœur, commit `b5545f0`)
 
@@ -37,15 +48,14 @@ La roadmap détaillée est dans **`plan-correctifs-atelier-ux.md`** (même dossi
 
 ## Prochaines étapes (ordre)
 
-1. **R1-a — Onglets UI + projection par phase** (détail : `plan-correctifs-atelier-ux.md`, § jalon R1-a) : `preparer_document_par_phase` dans `rendu.py` (filtrage des `entrees` + appel de `preparer_document`), routage `onglet` (GET query + champ caché des POST), barre d'onglets `Tout | Forme | Style | Technique` (+ Embellissement conditionnel), nouvelle route POST `/analyses/{id}/onglet`, retrait des pastilles/`.filtre-*-off` ; zéro token LLM en plus ; spec consolidée mise à jour dans le même commit. **Stockage et `dedupliquer()` INTACTS.**
-2. **R1-b — Stockage par phase + déduplication d'affichage** (après R1-a, dans une AUTRE conversation) : `corrections.data_json` en dict par phase `{"forme":…, "style":…, "technique":…}`, suppression de `CorrectionFusionnee`/`embellissement_migre`/`EmbellissementMigre` (code mort), `renumeroter()` sur `list[Correction]`, renommage complet `entree["fusion"]` → `entree["correction"]` dans `reconstruction`/`rendu`/`atelier` ; spec §3/§8.4/§11 dans le même commit.
-3. **UX1 — Menu contextuel riche** (ex-B) : clic droit sur marque SANS sélection, choix Forme déplacé dans le menu, barre latérale lecture seule.
-4. **UX2 — Confort d'affichage** (ex-C) : toggle « masquer » (révise la décision 24), layout élargi ~1200 px, style des onglets (les pastilles ont disparu avec R1-a).
-5. **UX3 — Navigation, projets** (ex-D) : activation — bug du « 2 » bloqué, navbar, suppression de projet avec confirmation + protection du projet actif. *Indépendant, intercalable à tout moment.*
-6. **R2 — Base immuable + annotations (patches)** : refonte de `reconstruction.py`, fin du remappage d'offsets ; E2E requis (l'état est touché).
-7. **UX4 — Édition directe sans IA temps réel** (ex-E) : texte éditable + « ↻ Re-corriger » ; dépend de R2.
-8. **J3 — Chaîne & codex** (EN ATTENTE) : écritures narratives (transaction, `avec_codex` câblé, codex/journaux), phase 2 LLM (extraction codex, cohérence, relecture-diff), écrans E2/E6/E7 + bandeau d'alertes, RAG alias. Ne démarre qu'APRÈS R2 (la validation officielle lit l'état courant). Critère d'acceptation : Prologue → ch.1 → ch.2 → resoumission N=N sans remplacement → remplacement officiel (relecture-diff) → alerte → « Choix d'auteur » → non re-détectée.
-9. **J4 — Confort** puis **J5 — Mise en ligne** (inchangés) ; **R3 — extension des catégories** (futur : une phase = une config + un onglet + une projection, zéro changement au cœur).
+1. **R1-b — Stockage par phase + déduplication d'affichage** (prochain jalon — **dans une AUTRE conversation**, après lecture du handoff « État du code À LA FIN de R1-a » dans `plan-correctifs-atelier-ux.md`) : `corrections.data_json` en dict par phase `{"forme":…, "style":…, "technique":…}`, suppression de `CorrectionFusionnee`/`embellissement_migre`/`EmbellissementMigre` (code mort), `renumeroter()` sur `list[Correction]`, renommage complet `entree["fusion"]` → `entree["correction"]` dans `reconstruction`/`rendu`/`atelier` ; spec §3/§8.4/§11 dans le même commit. **NE PAS toucher l'UI (les onglets R1-a restent).**
+2. **UX1 — Menu contextuel riche** (ex-B) : clic droit sur marque SANS sélection, choix Forme déplacé dans le menu, barre latérale lecture seule.
+3. **UX2 — Confort d'affichage** (ex-C) : toggle « masquer » (révise la décision 24), layout élargi ~1200 px, style des onglets (les pastilles ont disparu avec R1-a).
+4. **UX3 — Navigation, projets** (ex-D) : activation — bug du « 2 » bloqué, navbar, suppression de projet avec confirmation + protection du projet actif. *Indépendant, intercalable à tout moment.*
+5. **R2 — Base immuable + annotations (patches)** : refonte de `reconstruction.py`, fin du remappage d'offsets ; E2E requis (l'état est touché).
+6. **UX4 — Édition directe sans IA temps réel** (ex-E) : texte éditable + « ↻ Re-corriger » ; dépend de R2.
+7. **J3 — Chaîne & codex** (EN ATTENTE) : écritures narratives (transaction, `avec_codex` câblé, codex/journaux), phase 2 LLM (extraction codex, cohérence, relecture-diff), écrans E2/E6/E7 + bandeau d'alertes, RAG alias. Ne démarre qu'APRÈS R2 (la validation officielle lit l'état courant). Critère d'acceptation : Prologue → ch.1 → ch.2 → resoumission N=N sans remplacement → remplacement officiel (relecture-diff) → alerte → « Choix d'auteur » → non re-détectée.
+8. **J4 — Confort** puis **J5 — Mise en ligne** (inchangés) ; **R3 — extension des catégories** (futur : une phase = une config + un onglet + une projection, zéro changement au cœur).
 
 ## Décisions en cours / à arbitrer
 

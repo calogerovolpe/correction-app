@@ -58,7 +58,7 @@ Ordre imposé : **R1-a → R1-b avant UX1/UX2** (l'UI se construit sur les ongle
 | Ordre | Jalon | Contenu | Statut | Commit |
 |---|---|---|---|---|
 | ✅ | A | Fiabilité du cœur : ids uniques, no-op rejetés, menu contextuel fiable | ✅ | `b5545f0` |
-| 1 | **R1-a** | Onglets UI + projection par phase (rendu SEUL — stockage et `dedupliquer` inchangés) | ⬜ | — |
+| 1 | **R1-a** | Onglets UI + projection par phase (rendu SEUL — stockage et `dedupliquer` inchangés) | ✅ | `245071b` |
 | 2 | **R1-b** | Stockage PAR PHASE + déduplication devenue règle d'affichage + fin de `CorrectionFusionnee` | ⬜ | — |
 | 3 | **UX1** | Menu contextuel riche (clic droit sur marque, choix Forme dans le menu) | ⬜ | — |
 | 4 | **UX2** | Toggle « masquer les paragraphes sans correction », layout ~1200 px, style des onglets (WCAG AA) | ⬜ | — |

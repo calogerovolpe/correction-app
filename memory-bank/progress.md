@@ -1,6 +1,6 @@
 # Progression — jalons, état, décisions
 
-> Dernière mise à jour : 2026-09-09 (jalon A livré — plan RÉORGANISÉ : R1/R2 refonte rendu/état + UX1→UX4, J3 en attente).
+> Dernière mise à jour : 2026-09-09 (jalon R1-a livré — onglets hybrides + projection par phase ; stockage inchangé ; prochain jalon = R1-b, AUTRE conversation).
 
 ## État des jalons
 
@@ -18,8 +18,8 @@
 | **A — Fiabilité du cœur (ids uniques, no-op, menu fiable)** | ✅ **Terminé** | `b5545f0` |
 | Memory Bank — réorganisation du plan (R1/R2 refonte rendu-état + UX1→UX4) | ✅ Terminé | `fac3463` |
 | Memory Bank — découpage R1 en R1-a/R1-b (deux conversations, handoff) | ✅ Terminé | `a4dfe98` |
-| **R1-a — Onglets UI + projection par phase (rendu seul)** | ⬜ **Prochain jalon** | — |
-| R1-b — Stockage par phase + déduplication affichage (fin `CorrectionFusionnee`) | ⬜ À faire (après R1-a, autre conversation) | — |
+| **R1-a — Onglets UI + projection par phase (rendu seul)** | ✅ **Terminé** | `245071b` |
+| **R1-b — Stockage par phase + déduplication affichage (fin `CorrectionFusionnee`)** | ⬜ **Prochain jalon (AUTRE conversation)** | — |
 | UX1 — Menu contextuel riche (ex-B) | ⬜ À faire (après R1) | — |
 | UX2 — Confort d'affichage : toggle, layout, style onglets (ex-C) | ⬜ À faire (après R1) | — |
 | UX3 — Navigation, projets : activation, navbar, suppression (ex-D, indépendant) | ⬜ À faire (intercalable) | — |
@@ -29,7 +29,7 @@
 | J4 — Confort | ⬜ À faire | — |
 | J5 — Mise en ligne | ⬜ À faire | — |
 
-**Tests : 108/108 verts** (`pytest`). E2E réel : `scripts/e2e_j25.py` (isolé dans `data_e2e/`).
+**Tests : 116/116 verts** (`pytest`). E2E réel : `scripts/e2e_j25.py` (isolé dans `data_e2e/`).
 
 ## Ce qui marche (validé de bout en bout)
 
@@ -76,7 +76,7 @@
 
 ## Problèmes connus
 
-- 99/99 tests verts ; E2E réel Mistral OK.
+- 116/116 tests verts ; E2E réel Mistral OK.
 - **Bugs constatés par l'auteur (correctifs — roadmap `plan-correctifs-atelier-ux.md`)** : ~~barre latérale désynchronisée (ids non uniques entre phases)~~ ✅ jalon A ; ~~corrections no-op (« cous » → « cous »)~~ ✅ jalon A ; ~~menu contextuel non fiable (`hidden` neutralisé, popover hors écran)~~ ✅ jalon A ; pas de menu contextuel sur une marque (jalon B) ; numéro attendu erroné pour un nouveau projet (jalon D).
 - **Limite connue** : `_reevaluer_corrections` régénère des ids `c-r0001…` avec compteur remis à zéro par appel — deux réévaluations de paragraphes différents dans une même session peuvent théoriquement entrer en collision (même classe de bug que le jalon A, cas rare non constaté ; piste : séquence `c-r` continue à l'échelle du document).
 - Dette : `atelier.py` ~400 lignes — fractionnement fin planifié pendant J3 si croissance (règle 300 lignes).
@@ -92,3 +92,4 @@
 - **2026-09-07** : Memory Bank source de vérité unique ; **J2.5** atelier v2.
 - **2026-09-09** : série de correctifs atelier & confort UX arbitrée (roadmap `plan-correctifs-atelier-ux.md` ; spec §11 décisions 33-38 ; révise la décision 24) ; J3 mis en attente.
 - **2026-09-09 (réorganisation)** : après arbitrage « refonte rendu/état » avec l'auteur, la roadmap est RÉORGANISÉE — ex-B/C/D/E deviennent UX1/UX2/UX3/UX4 et s'intercalent avec deux refontes : **R1** (onglets hybrides + stockage des corrections par phase + déduplication devenue règle d'affichage — révisant la décision 29 « couches superposables ») et **R2** (base immuable + annotations/patches : fin du remappage d'offsets dans `reconstruction.py`). Ordre imposé : R1-a → R1-b → UX1 → UX2 → UX3 → R2 → UX4 → J3 → J4 → J5 (UX3 intercalable). Rationale : chaque phase LLM produit déjà SA collection de corrections indépendante — c'est le RENDU qui fusionnait ; les onglets n'ajoutent aucun appel LLM (zéro token). Cible : « base immuable + annotations + projections ». Détail : `plan-correctifs-atelier-ux.md` (« Architecture cible ») et `activeContext.md` (décisions).
+- **2026-09-09 (R1-a)** : **onglets hybrides + projection par phase LIVRÉS** (`245071b`, 116 tests verts) — `preparer_document_par_phase` (rendu), routage `onglet` (GET query + POST Form + route `/analyses/{id}/onglet`), barre d'onglets `Tout | Forme | Style | Technique` (+ `Embellissement` conditionnel), retrait des pastilles/`.filtre-*-off` ; spec §8.2/§8.3/§11 décision 29 révisée dans le même commit. **Stockage et `dedupliquer()` intacts (état intermédiaire volontaire — handoff « À LA FIN de R1-a » dans le plan) ; prochain jalon = R1-b, AUTRE conversation.**
