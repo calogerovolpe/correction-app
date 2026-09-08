@@ -59,7 +59,7 @@ Ordre imposé : **R1-a → R1-b avant UX1/UX2** (l'UI se construit sur les ongle
 |---|---|---|---|---|
 | ✅ | A | Fiabilité du cœur : ids uniques, no-op rejetés, menu contextuel fiable | ✅ | `b5545f0` |
 | 1 | **R1-a** | Onglets UI + projection par phase (rendu SEUL — stockage et `dedupliquer` inchangés) | ✅ | `245071b` |
-| 2 | **R1-b** | Stockage PAR PHASE + déduplication devenue règle d'affichage + fin de `CorrectionFusionnee` | ⬜ | — |
+| 2 | **R1-b** | Stockage PAR PHASE + déduplication devenue règle d'affichage + fin de `CorrectionFusionnee` | ✅ | `c911547` |
 | 3 | **UX1** | Menu contextuel riche (clic droit sur marque, choix Forme dans le menu) | ⬜ | — |
 | 4 | **UX2** | Toggle « masquer les paragraphes sans correction », layout ~1200 px, style des onglets (WCAG AA) | ⬜ | — |
 | 5 | **UX3** | Navigation, projets : activation, navbar, suppression (indépendant, intercalable) | ⬜ | — |
@@ -118,6 +118,8 @@ Historique complet : voir `progress.md`. Contenu : ids de correction uniques
    par phase — N tests verts` → push → MAJ `activeContext.md`/`progress.md`.
 
 ### ⚠️ État du code À LA FIN de R1-a (handoff OBLIGATOIRE pour R1-b)
+
+> ✅ **CONSOMMÉ** — R1-b est livré (`c911547`, voir « Suivi des jalons ») ; section conservée pour l'historique.
 
 - Stockage TOUJOURS : liste plate de `CorrectionFusionnee` dans
   `corrections.data_json` (un JSON par analyse) — RIEN n'a changé côté stockage.

@@ -1,6 +1,6 @@
 # Progression — jalons, état, décisions
 
-> Dernière mise à jour : 2026-09-09 (jalon R1-a livré — onglets hybrides + projection par phase ; stockage inchangé ; prochain jalon = R1-b, AUTRE conversation).
+> Dernière mise à jour : 2026-09-09 (jalon R1-b livré — stockage par phase + fin de `CorrectionFusionnee` + déduplication devenue règle d'affichage ; prochain jalon = UX1).
 
 ## État des jalons
 
@@ -19,8 +19,8 @@
 | Memory Bank — réorganisation du plan (R1/R2 refonte rendu-état + UX1→UX4) | ✅ Terminé | `fac3463` |
 | Memory Bank — découpage R1 en R1-a/R1-b (deux conversations, handoff) | ✅ Terminé | `a4dfe98` |
 | **R1-a — Onglets UI + projection par phase (rendu seul)** | ✅ **Terminé** | `245071b` |
-| **R1-b — Stockage par phase + déduplication affichage (fin `CorrectionFusionnee`)** | ⬜ **Prochain jalon (AUTRE conversation)** | — |
-| UX1 — Menu contextuel riche (ex-B) | ⬜ À faire (après R1) | — |
+| **R1-b — Stockage par phase + déduplication affichage (fin `CorrectionFusionnee`)** | ✅ **Terminé (E2E réel Mistral)** | `c911547` |
+| UX1 — Menu contextuel riche (ex-B) | ⬜ **Prochain jalon** | — |
 | UX2 — Confort d'affichage : toggle, layout, style onglets (ex-C) | ⬜ À faire (après R1) | — |
 | UX3 — Navigation, projets : activation, navbar, suppression (ex-D, indépendant) | ⬜ À faire (intercalable) | — |
 | R2 — Base immuable + annotations (refonte `reconstruction.py`) | ⬜ À faire (avant UX4 et J3) | — |
@@ -29,7 +29,7 @@
 | J4 — Confort | ⬜ À faire | — |
 | J5 — Mise en ligne | ⬜ À faire | — |
 
-**Tests : 116/116 verts** (`pytest`). E2E réel : `scripts/e2e_j25.py` (isolé dans `data_e2e/`).
+**Tests : 114/114 verts** (`pytest`). E2E réel rejoué au jalon R1-b : `scripts/e2e_j25.py` (isolé dans `data_e2e/`).
 
 ## Ce qui marche (validé de bout en bout)
 
@@ -57,26 +57,26 @@
   - **no-op Forme rejetés** : `extraire_corrections` écarte individuellement toute entrée Forme où `original == correction` (« cous » → « cous ») ; Style/Technique NON concernés (marquage sans réécriture légitime) ;
   - **menu contextuel fiable** : CSS `[hidden] { display: none !important }` (la règle `.menu-contextuel { display: flex }` neutralisait le `hidden`), menu + popover en `position: fixed` avec `clientX/clientY` (robuste au scroll, recentrage), popover positionné à l'écran, fermeture clic extérieur / Échap effective ;
   - 9 tests de régression — 108 tests verts.
+- **R1-a — Onglets hybrides + projection par phase** (commit `245071b`) : `preparer_document_par_phase` (filtre les `entrees` puis réutilise `preparer_document`), routage `onglet` (GET query + champ caché des POST + route `/analyses/{id}/onglet` sans mutation d'état), barre d'onglets `Tout | Forme | Style | Technique` (+ Embellissement conditionnel), retrait des pastilles/`.filtre-*-off` ; zéro token LLM en plus — 116 tests verts.
+- **R1-b — Stockage par phase + déduplication d'affichage** (commit `c911547`) : fin de `CorrectionFusionnee`/`EmbellissementMigre` (code mort), `dedupliquer()` SUPPRIMÉE — en recouvrement (exact ou partiel), Style et Embellissement coexistent (déduplication = règle d'affichage) ; `renumeroter()` sur `list[Correction]` ; `corrections.data_json` en dict par phase ; renommage complet `entree["fusion"]` → `entree["correction"]` — 114 tests verts + E2E réel Mistral rejoué.
 
 ## Reste à faire (priorisé)
 
 > Ordre détaillé, dépendances et architecture cible : **`plan-correctifs-atelier-ux.md`** (roadmap maîtresse, réorganisée le 2026-09-09).
 
-1. **R1-a — Onglets UI + projection par phase** (rendu SEUL — stockage et `dedupliquer` intacts) : `preparer_document_par_phase` (filtrage des `entrees` + `preparer_document`), routage `onglet` (GET query + champ caché des POST + route POST `/analyses/{id}/onglet`), barre d'onglets `Tout | Forme | Style | Technique` (+ Embellissement conditionnel), retrait des pastilles/`.filtre-*-off` ; zéro token LLM en plus ; spec consolidée mise à jour dans le même commit.
-2. **R1-b — Stockage par phase + déduplication d'affichage** (AUTRE conversation, après R1-a) : `corrections.data_json` en dict par phase, suppression de `CorrectionFusionnee`/`embellissement_migre`/`EmbellissementMigre` (code mort), `renumeroter()` sur `list[Correction]`, renommage complet `entree["fusion"]` → `entree["correction"]` ; spec §3/§8.4/§11 dans le même commit.
-3. **UX1 — Menu contextuel riche** (ex-B) : clic droit sur marque, choix Forme dans le menu, barre latérale lecture seule.
-4. **UX2 — Confort d'affichage** (ex-C) : toggle « masquer les paragraphes sans correction », layout ~1200 px, style des onglets (les pastilles sont remplacées par les onglets de R1-a).
-5. **UX3 — Navigation, projets** (ex-D, indépendant/intercalable) : activation, navbar, suppression de projet.
-6. **R2 — Base immuable + annotations (patches)** : refonte de `reconstruction.py` (fin du remappage d'offsets) ; E2E requis.
-7. **UX4 — Édition directe sans IA temps réel** (ex-E, après R2) : texte éditable + « ↻ Re-corriger ».
-8. **J3 — Chaîne & codex** (EN ATTENTE, après R2/UX4) : écritures narratives (transaction, `avec_codex` câblé, codex/journaux), phase 2 LLM (extraction codex, cohérence, relecture-diff), écrans E2/E6/E7 + bandeau d'alertes, RAG alias.
-9. **J4 — Confort** : E9 (backups liste/restauration/purge, exports md/docx, statistiques, logs debug), E8 (paramètres + test de connexion), import .docx (italique/gras), correction hors-ligne locale (candidat).
-10. **J5 — Mise en ligne** : durcissement (auth simple), Caddy (TLS), compose production + volumes, sauvegardes programmées, doc de déploiement VPS, option Tailscale documentée.
-11. **R3 — Extension des catégories** (futur) : une phase = une config + un onglet + une projection, zéro changement au cœur.
+1. **UX1 — Menu contextuel riche** (ex-B) : clic droit sur marque, choix Forme dans le menu, barre latérale lecture seule. **PROCHAIN JALON.**
+2. **UX2 — Confort d'affichage** (ex-C) : toggle « masquer les paragraphes sans correction », layout ~1200 px, style des onglets (les pastilles sont remplacées par les onglets de R1-a).
+3. **UX3 — Navigation, projets** (ex-D, indépendant/intercalable) : activation, navbar, suppression de projet.
+4. **R2 — Base immuable + annotations (patches)** : refonte de `reconstruction.py` (fin du remappage d'offsets) ; E2E requis.
+5. **UX4 — Édition directe sans IA temps réel** (ex-E, après R2) : texte éditable + « ↻ Re-corriger ».
+6. **J3 — Chaîne & codex** (EN ATTENTE, après R2/UX4) : écritures narratives (transaction, `avec_codex` câblé, codex/journaux), phase 2 LLM (extraction codex, cohérence, relecture-diff), écrans E2/E6/E7 + bandeau d'alertes, RAG alias.
+7. **J4 — Confort** : E9 (backups liste/restauration/purge, exports md/docx, statistiques, logs debug), E8 (paramètres + test de connexion), import .docx (italique/gras), correction hors-ligne locale (candidat).
+8. **J5 — Mise en ligne** : durcissement (auth simple), Caddy (TLS), compose production + volumes, sauvegardes programmées, doc de déploiement VPS, option Tailscale documentée.
+9. **R3 — Extension des catégories** (futur) : une phase = une config + un onglet + une projection, zéro changement au cœur.
 
 ## Problèmes connus
 
-- 116/116 tests verts ; E2E réel Mistral OK.
+- 114/114 tests verts ; E2E réel Mistral OK (rejoué au jalon R1-b sur le nouveau format de stockage).
 - **Bugs constatés par l'auteur (correctifs — roadmap `plan-correctifs-atelier-ux.md`)** : ~~barre latérale désynchronisée (ids non uniques entre phases)~~ ✅ jalon A ; ~~corrections no-op (« cous » → « cous »)~~ ✅ jalon A ; ~~menu contextuel non fiable (`hidden` neutralisé, popover hors écran)~~ ✅ jalon A ; pas de menu contextuel sur une marque (jalon B) ; numéro attendu erroné pour un nouveau projet (jalon D).
 - **Limite connue** : `_reevaluer_corrections` régénère des ids `c-r0001…` avec compteur remis à zéro par appel — deux réévaluations de paragraphes différents dans une même session peuvent théoriquement entrer en collision (même classe de bug que le jalon A, cas rare non constaté ; piste : séquence `c-r` continue à l'échelle du document).
 - Dette : `atelier.py` ~400 lignes — fractionnement fin planifié pendant J3 si croissance (règle 300 lignes).
@@ -93,3 +93,4 @@
 - **2026-09-09** : série de correctifs atelier & confort UX arbitrée (roadmap `plan-correctifs-atelier-ux.md` ; spec §11 décisions 33-38 ; révise la décision 24) ; J3 mis en attente.
 - **2026-09-09 (réorganisation)** : après arbitrage « refonte rendu/état » avec l'auteur, la roadmap est RÉORGANISÉE — ex-B/C/D/E deviennent UX1/UX2/UX3/UX4 et s'intercalent avec deux refontes : **R1** (onglets hybrides + stockage des corrections par phase + déduplication devenue règle d'affichage — révisant la décision 29 « couches superposables ») et **R2** (base immuable + annotations/patches : fin du remappage d'offsets dans `reconstruction.py`). Ordre imposé : R1-a → R1-b → UX1 → UX2 → UX3 → R2 → UX4 → J3 → J4 → J5 (UX3 intercalable). Rationale : chaque phase LLM produit déjà SA collection de corrections indépendante — c'est le RENDU qui fusionnait ; les onglets n'ajoutent aucun appel LLM (zéro token). Cible : « base immuable + annotations + projections ». Détail : `plan-correctifs-atelier-ux.md` (« Architecture cible ») et `activeContext.md` (décisions).
 - **2026-09-09 (R1-a)** : **onglets hybrides + projection par phase LIVRÉS** (`245071b`, 116 tests verts) — `preparer_document_par_phase` (rendu), routage `onglet` (GET query + POST Form + route `/analyses/{id}/onglet`), barre d'onglets `Tout | Forme | Style | Technique` (+ `Embellissement` conditionnel), retrait des pastilles/`.filtre-*-off` ; spec §8.2/§8.3/§11 décision 29 révisée dans le même commit. **Stockage et `dedupliquer()` intacts (état intermédiaire volontaire — handoff « À LA FIN de R1-a » dans le plan) ; prochain jalon = R1-b, AUTRE conversation.**
+- **2026-09-09 (R1-b)** : **stockage par phase + déduplication d'affichage LIVRÉS** (`c911547`, 114 tests verts + E2E réel Mistral rejoué) — fin de `CorrectionFusionnee`/`EmbellissementMigre` (code mort), `dedupliquer()` supprimée (recouvrement exact Style/Embellissement → les DEUX coexistent), `renumeroter()` sur `list[Correction]`, `corrections.data_json` en dict par phase, renommage complet `entree["fusion"]` → `entree["correction"]` ; spec §3/§4.4/§7.1/§11 décision 29 dans le même commit. **Le handoff R1-a est CONSOMMÉ ; prochain jalon = UX1.**
