@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mount, unmount } from 'svelte';
 import type { Component } from 'svelte';
 
@@ -16,10 +16,29 @@ function rendre(composant: Component, props: Record<string, unknown> = {}): HTML
   return conteneur;
 }
 
+const attendre = () => new Promise((resoudre) => setTimeout(resoudre, 0));
+
+const reponseJson = (corps: unknown) =>
+  new Response(JSON.stringify(corps), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  });
+
 beforeEach(() => {
   conteneur = document.createElement('div');
   document.body.appendChild(conteneur);
   instances = [];
+  // Depuis F1, l'accueil charge ses données via /api/v1 : on mime une base
+  // vierge pour que les tests restent herméétiques (aucun réseau réel).
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (url: RequestInfo | URL) => {
+      const chemin = String(url);
+      if (chemin.includes('/api/v1/analyses')) return reponseJson({ analyses: [] });
+      if (chemin.includes('/api/v1/projets')) return reponseJson({ projets: [] });
+      return reponseJson({ detail: 'introuvable' });
+    }),
+  );
 });
 
 afterEach(() => {
@@ -28,29 +47,32 @@ afterEach(() => {
   }
   instances = [];
   conteneur.remove();
+  vi.unstubAllGlobals();
 });
 
-describe('Coquille d’application (F0)', () => {
+describe("Coquille d'application (F0)", () => {
   it('affiche la marque et le pied de page', () => {
     rendre(App);
     expect(conteneur.textContent).toContain('Correction de manuscrit');
     expect(conteneur.textContent).toContain('vos textes restent sur votre machine');
   });
 
-  it('affiche l’écran d’accueil par défaut', () => {
+  it("affiche l'écran d'accueil par défaut", () => {
     rendre(App);
     expect(conteneur.textContent).toContain('Bienvenue dans votre atelier de correction');
   });
 });
 
-describe('Accueil (coquille F0)', () => {
-  it('affiche un titre d’accueil accueillant', () => {
+describe('Accueil (F1)', () => {
+  it("affiche le titre d'accueil", () => {
     rendre(Accueil);
     expect(conteneur.textContent).toContain('Bienvenue dans votre atelier de correction');
   });
 
-  it('affiche l’état vide des manuscrits', () => {
+  it("affiche l'état vide après chargement", async () => {
     rendre(Accueil);
+    await attendre();
     expect(conteneur.textContent).toContain('Aucun manuscrit pour le moment');
+    expect(conteneur.textContent).toContain('Aucune analyse récente');
   });
 });

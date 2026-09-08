@@ -33,7 +33,8 @@
 | Couche | Choix |
 |---|---|
 | Backend | Python 3.11+ (3.14 en pratique), FastAPI, Uvicorn, Pydantic v2 |
-| Frontend | Jinja2 (autoescape activé) + HTMX (polling) + Alpine.js (état d'affichage) — aucun build Node |
+| Frontend (actuel) | Jinja2 (autoescape activé) + HTMX (polling) + Alpine.js (état d'affichage) — conservés jusqu'à la bascule (F5) |
+| Frontend (refonte F0→F5) | **Svelte 5 + TypeScript + Vite** — `frontend/` versionné, compilé vers `app/static/spa/` (gitignoré) ; **l'accueil E1 est servi par le SPA depuis F1**, alimenté par l'API JSON `/api/v1/` (`app/routes/api.py`) |
 | Base de données | SQLite : WAL, `busy_timeout=15000`, accès via `asyncio.to_thread`, verrou `threading.Lock` |
 | LLM | Client maison compatible OpenAI (`app/llm/client.py`) → API Mistral `/v1/chat/completions` |
 | Configuration | `pydantic-settings`, préfixe `APP_`, fichier `.env` (clé API, modèles, timeouts, garde-fous) |
@@ -62,6 +63,7 @@ app/
 │   ├── analyse.py        # Orchestrateur des jobs (§7), fabrique _client_llm injectable
 │   └── rendu.py          # Pur : fusion des chevauchements, blocs g-XXXX, segments annotés
 ├── routes/web.py    # Écrans E1, E3, E4, E5 + polling HTMX
+│   ├── routes/api.py# API JSON /api/v1 (F1) : projets E1 + analyses récentes
 ├── templates/       # base.html, index.html, analyses/{nouveau,suivi,fragment_statut,
 │                    #  erreur,resultat,_cas}.html
 └── static/          # style.css (palette WCAG AA), app.js (navigation clavier),
@@ -258,7 +260,7 @@ Navigation clavier : `←`/`→` entre corrections visibles (centrage + `outline
 
 | Écran | État | Contenu |
 |---|---|---|
-| **E1 — Accueil/Projets** | ✅ Livré | Projets (statut de chaîne, chapitre courant), création, projet actif, **analyses récentes** (10 dernières : statut coloré, catégorie, extrait, lien) |
+| **E1 — Accueil/Projets** | ✅ Livré (écran Svelte depuis F1) | Projets (statut de chaîne, chapitre courant), création, **activation**, projet actif, **suppression avec confirmation** (projet actif protégé, suppression totale en cascade), **analyses récentes** (10 dernières : statut coloré, catégorie, extrait, lien) — écran Svelte servi à `/` (repli Jinja2 si build absent) ; données via `GET/POST /api/v1/projets`, `POST /api/v1/projets/{id}/activer`, `DELETE /api/v1/projets/{id}`, `GET /api/v1/analyses` (`app/routes/api.py`, jalon F1) |
 | **E2 — Timeline de chaîne** | ⬜ J3 | Chapitres officiels (Prologue=0, 1..N), numéro attendu en évidence, reclassés grisés « hors chaîne » |
 | **E3 — Soumission** | ✅ Livré | Éditeur Word-fidèle (contenteditable, gras/italique/souligné) + compteur live `max_caracteres` ; catégorie auto en direct + forçage ; 4 cases de phases pré-cochées décochables (§5.4) + **jauge de créativité** (si Embellissement) ; case remplacement officiel ; refus explicites (400) |
 | **E4 — Suivi de job** | ✅ Livré | Polling HTMX 2 s, étape courante, redirection finale ; écrans d'échec/refus avec gabarits §7.2-7.3 |

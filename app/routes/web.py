@@ -10,7 +10,7 @@ import string
 from pathlib import Path
 
 from fastapi import APIRouter, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from app import db
@@ -19,6 +19,9 @@ from app.services import analyse as service_analyse
 
 TEMPLATES = Jinja2Templates(directory=str(Path(__file__).parent.parent / "templates"))
 router = APIRouter()
+
+# Depuis F1, l'accueil est la SPA Svelte compilée (build frontend → app/static/spa/).
+SPA_INDEX = Path(__file__).resolve().parent.parent / "static" / "spa" / "index.html"
 
 # Références fortes des tâches asynchrones (jobs d'analyse — cahier §4.4)
 _TACHES: set[asyncio.Task] = set()
@@ -50,6 +53,10 @@ async def _analyse(identifiant: int):
 
 @router.get("/")
 async def accueil(request: Request):
+    # Depuis F1, l'accueil est la SPA Svelte compilée (frontend/ → app/static/spa/),
+    # servie telle quelle ; repli Jinja2 tant que le build n'est pas présent (dev).
+    if SPA_INDEX.exists():
+        return FileResponse(SPA_INDEX)
     projets = await db.interroger("SELECT * FROM projets ORDER BY created_at DESC, projet_id DESC")
     analyses = await db.interroger(
         "SELECT id, statut, categorie, substr(texte_source, 1, 60) AS extrait, cree_a "
