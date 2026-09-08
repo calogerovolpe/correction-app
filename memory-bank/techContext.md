@@ -11,7 +11,7 @@
 | Base de données | SQLite WAL, `busy_timeout=15000`, accès `asyncio.to_thread`, verrou `threading.Lock` (`app/db.py`) |
 | LLM | **Mistral API uniquement**, `mistral-small-latest` ; client maison compatible OpenAI (`app/llm/client.py`) |
 | Conteneurisation | Dockerfile + docker-compose.yml (parité dev/prod) |
-| Tests | pytest — **99 tests** (unitaires métier pur + intégration TestClient + MockLLM) + E2E réel Mistral (`scripts/e2e_j25.py`, isolé `data_e2e/`) |
+| Tests | pytest — **121 tests** (unitaires métier pur + intégration TestClient + MockLLM) + E2E réel Mistral (`scripts/e2e_j25.py`, isolé `data_e2e/`) |
 
 ## Setup de développement
 
@@ -22,7 +22,7 @@
 ## Commandes (PowerShell, depuis la racine du projet)
 
 ```powershell
-.venv\Scripts\python -m pytest -q            # tests — OBLIGATOIRE avant tout commit (99 verts attendus)
+.venv\Scripts\python -m pytest -q            # tests — OBLIGATOIRE avant tout commit (121 verts attendus)
 .venv\Scripts\python -m uvicorn app.main:app --reload   # serveur dev → http://localhost:8000
 .venv\Scripts\python scripts\tester_llm.py   # ping fail-fast des modèles Mistral (coût négligeable)
 .venv\Scripts\python scripts\e2e_j25.py      # E2E réel Mistral — environnement de données ISOLÉ (data_e2e/)

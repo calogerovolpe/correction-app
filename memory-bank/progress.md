@@ -1,6 +1,6 @@
 # Progression — jalons, état, décisions
 
-> Dernière mise à jour : 2026-09-09 (jalon R1-b livré — stockage par phase + fin de `CorrectionFusionnee` + déduplication devenue règle d'affichage ; prochain jalon = UX1).
+> Dernière mise à jour : 2026-09-08 (jalon R2 livré — base immuable + annotations, fin du remappage d'offsets ; prochain jalon = UX1).
 
 ## État des jalons
 
@@ -20,16 +20,16 @@
 | Memory Bank — découpage R1 en R1-a/R1-b (deux conversations, handoff) | ✅ Terminé | `a4dfe98` |
 | **R1-a — Onglets UI + projection par phase (rendu seul)** | ✅ **Terminé** | `245071b` |
 | **R1-b — Stockage par phase + déduplication affichage (fin `CorrectionFusionnee`)** | ✅ **Terminé (E2E réel Mistral)** | `c911547` |
+| **R2 — Base immuable + annotations (fin du remappage d'offsets)** | ✅ **Terminé (E2E réel Mistral)** | `e886d3a` |
 | UX1 — Menu contextuel riche (ex-B) | ⬜ **Prochain jalon** | — |
 | UX2 — Confort d'affichage : toggle, layout, style onglets (ex-C) | ⬜ À faire (après R1) | — |
 | UX3 — Navigation, projets : activation, navbar, suppression (ex-D, indépendant) | ⬜ À faire (intercalable) | — |
-| R2 — Base immuable + annotations (refonte `reconstruction.py`) | ⬜ À faire (avant UX4 et J3) | — |
 | UX4 — Édition directe sans IA temps réel (ex-E) | ⬜ À faire (après R2) | — |
 | J3 — Chaîne séquentielle & Codex narratif | ⬜ En attente (après UX4/R2) | — |
 | J4 — Confort | ⬜ À faire | — |
 | J5 — Mise en ligne | ⬜ À faire | — |
 
-**Tests : 114/114 verts** (`pytest`). E2E réel rejoué au jalon R1-b : `scripts/e2e_j25.py` (isolé dans `data_e2e/`).
+**Tests : 121/121 verts** (`pytest`). E2E réel rejoué au jalon R2 : `scripts/e2e_j25.py` (isolé dans `data_e2e/`).
 
 ## Ce qui marche (validé de bout en bout)
 
@@ -94,3 +94,4 @@
 - **2026-09-09 (réorganisation)** : après arbitrage « refonte rendu/état » avec l'auteur, la roadmap est RÉORGANISÉE — ex-B/C/D/E deviennent UX1/UX2/UX3/UX4 et s'intercalent avec deux refontes : **R1** (onglets hybrides + stockage des corrections par phase + déduplication devenue règle d'affichage — révisant la décision 29 « couches superposables ») et **R2** (base immuable + annotations/patches : fin du remappage d'offsets dans `reconstruction.py`). Ordre imposé : R1-a → R1-b → UX1 → UX2 → UX3 → R2 → UX4 → J3 → J4 → J5 (UX3 intercalable). Rationale : chaque phase LLM produit déjà SA collection de corrections indépendante — c'est le RENDU qui fusionnait ; les onglets n'ajoutent aucun appel LLM (zéro token). Cible : « base immuable + annotations + projections ». Détail : `plan-correctifs-atelier-ux.md` (« Architecture cible ») et `activeContext.md` (décisions).
 - **2026-09-09 (R1-a)** : **onglets hybrides + projection par phase LIVRÉS** (`245071b`, 116 tests verts) — `preparer_document_par_phase` (rendu), routage `onglet` (GET query + POST Form + route `/analyses/{id}/onglet`), barre d'onglets `Tout | Forme | Style | Technique` (+ `Embellissement` conditionnel), retrait des pastilles/`.filtre-*-off` ; spec §8.2/§8.3/§11 décision 29 révisée dans le même commit. **Stockage et `dedupliquer()` intacts (état intermédiaire volontaire — handoff « À LA FIN de R1-a » dans le plan) ; prochain jalon = R1-b, AUTRE conversation.**
 - **2026-09-09 (R1-b)** : **stockage par phase + déduplication d'affichage LIVRÉS** (`c911547`, 114 tests verts + E2E réel Mistral rejoué) — fin de `CorrectionFusionnee`/`EmbellissementMigre` (code mort), `dedupliquer()` supprimée (recouvrement exact Style/Embellissement → les DEUX coexistent), `renumeroter()` sur `list[Correction]`, `corrections.data_json` en dict par phase, renommage complet `entree["fusion"]` → `entree["correction"]` ; spec §3/§4.4/§7.1/§11 décision 29 dans le même commit. **Le handoff R1-a est CONSOMMÉ ; prochain jalon = UX1.**
+- **2026-09-08 (R2)** : **base immuable + annotations LIVRÉES** (`e886d3a`, 121 tests verts + E2E réel Mistral rejoué OK) — fin du « texte mutable + remappage d'offsets » : état `documents` = base (texte normalisé immuable) + corrections en coordonnées de la base (jamais décalées) + choix/refus + patches manuels ; « texte courant » = projection calculée ; refuser une Forme = un filtre ; réévaluation ré-ancrée sur la base (Forme appliquées → patches) ; migration des états antérieurs à la volée (choix préservés par id, modifs manuelles abandonnées — décision) ; spec §4.1/§8.2/§8.3/§11 décisions 28 (révisée) et 39 dans le même commit. **R2 livré en avance (décision de l'auteur) ; prochain jalon = UX1.**

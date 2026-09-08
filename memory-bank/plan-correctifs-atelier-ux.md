@@ -38,11 +38,13 @@ sans régresser. Chaque jalon : pytest verts → commit « Jx — contenu — N 
 
 Deux refontes :
 - **R1 — onglets hybrides + stockage par phase** (rendu/affichage), DÉCOUPÉE en deux conversations : **R1-a** (UI + projection par phase, rendu seul) puis **R1-b** (stockage par phase + fin de `CorrectionFusionnee`) ;
-- **R2 — base immuable + annotations/patches** (état : fin du remappage d'offsets).
+- **R2 — base immuable + annotations/patches** (état : fin du remappage d'offsets) — ✅ **LIVRÉ** (`e886d3a`).
 
 Ordre imposé : **R1-a → R1-b avant UX1/UX2** (l'UI se construit sur les onglets) ;
 **R2 avant UX4 et J3** (édition directe et validation officielle lisent l'état) ;
 **UX3 est indépendant** (intercalable à tout moment).
+**R2 a été livré DÈS APRÈS R1-b** (décision de l'auteur : il ne dépend de rien d'autre
+que R1 et il est exigé avant UX4 et J3) — UX1/UX2/UX3 restent à faire dans l'ordre.
 
 ## Correspondance avec l'ancien plan (B/C/D/E)
 
@@ -60,6 +62,7 @@ Ordre imposé : **R1-a → R1-b avant UX1/UX2** (l'UI se construit sur les ongle
 | ✅ | A | Fiabilité du cœur : ids uniques, no-op rejetés, menu contextuel fiable | ✅ | `b5545f0` |
 | 1 | **R1-a** | Onglets UI + projection par phase (rendu SEUL — stockage et `dedupliquer` inchangés) | ✅ | `245071b` |
 | 2 | **R1-b** | Stockage PAR PHASE + déduplication devenue règle d'affichage + fin de `CorrectionFusionnee` | ✅ | `c911547` |
+| 3* | **R2** | Base immuable + annotations (patches) : refonte `reconstruction.py`, fin du remappage d'offsets | ✅ | `e886d3a` |
 | 3 | **UX1** | Menu contextuel riche (clic droit sur marque, choix Forme dans le menu) | ⬜ | — |
 | 4 | **UX2** | Toggle « masquer les paragraphes sans correction », layout ~1200 px, style des onglets (WCAG AA) | ⬜ | — |
 | 5 | **UX3** | Navigation, projets : activation, navbar, suppression (indépendant, intercalable) | ⬜ | — |
@@ -223,6 +226,9 @@ Historique complet : voir `progress.md`. Contenu : ids de correction uniques
 
 ## Jalon R2 — Base immuable + annotations (patches)
 
+> ✅ **LIVRÉ** (commit `e886d3a`) — livré EN AVANCE (décision de l'auteur, dès après R1-b).
+> Le contenu ci-dessous décrit ce qui a été construit.
+>
 > Le plus gros levier de propreté : fin du « texte mutable + remappage d'offsets ».
 > Fichier central et très testé : à faire derrière le filet des tests + tests de rendu.
 

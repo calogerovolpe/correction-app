@@ -1,25 +1,53 @@
 # Contexte actif — où nous en sommes MAINTENANT
 
-> Fichier le plus souvent mis à jour. Dernière mise à jour : 2026-09-09 (jalon R1-b livré — stockage par phase + fin de `CorrectionFusionnee` + déduplication devenue règle d'affichage ; prochain jalon = UX1).
+> Fichier le plus souvent mis à jour. Dernière mise à jour : 2026-09-08 (jalon R2 livré — base immuable + annotations, fin du remappage d'offsets ; prochain jalon = UX1).
 
 ## Focus du moment
 
 **Série R1-a/R1-b → UX4 (refonte rendu/état + correctifs UX) — AVANT J3.**
 La roadmap détaillée est dans **`plan-correctifs-atelier-ux.md`** (même dossier) : la RELIRE EN DÉBUT DE SESSION — elle contient l'ordre des jalons, leurs dépendances et l'architecture cible. Un commit par jalon ; le suivi (statut/commit) est tenu à jour dans ce plan ET dans `progress.md`.
 
-- **Où on en est** : jalon A ✅ (`b5545f0`) ; réorganisation du plan ✅ (`fac3463`) ; découpage R1-a/R1-b ✅ (`a4dfe98`) ; R1-a ✅ (`245071b`) ; **R1-b ✅ (`c911547`) — Stockage par phase + fin de `CorrectionFusionnee`** ; **prochain jalon = UX1 — Menu contextuel riche**.
+- **Où on en est** : jalon A ✅ (`b5545f0`) ; réorganisation du plan ✅ (`fac3463`) ; découpage R1-a/R1-b ✅ (`a4dfe98`) ; R1-a ✅ (`245071b`) ; **R1-b ✅ (`c911547`) — Stockage par phase + fin de `CorrectionFusionnee`** ; **R2 ✅ (`e886d3a`) — Base immuable + annotations (fin du remappage d'offsets)** ; **prochain jalon = UX1 — Menu contextuel riche**.
 - **R1 était DÉCOUPÉ en DEUX conversations** : R1-a (UI + rendu) ✅ puis R1-b (stockage par phase + fin de `CorrectionFusionnee`) ✅ — le handoff « À LA FIN de R1-a » du plan est CONSOMMÉ (section conservée pour l'historique).
-- **Ordre imposé** : R1-a → R1-b → UX1 → UX2 → UX3 → R2 → UX4 → J3 → J4 → J5 (UX3 indépendant, intercalable).
-- R1 est CODÉ (R1-a rendu/UI ✅ + R1-b stockage par phase ✅) ; reste **R2** (base immuable + annotations) : les corrections portent encore des offsets du texte courant, remappés après chaque splice — c'est la cible de R2.
+- **Ordre imposé** : R1-a → R1-b → UX1 → UX2 → UX3 → R2 → UX4 → J3 → J4 → J5 (UX3 indépendant, intercalable). **R2 a été livré dès après R1-b** (décision de l'auteur : il ne dépend de rien d'autre que R1, et il est exigé AVANT UX4 et J3) — les jalons UX1/UX2/UX3 restent à faire dans l'ordre.
+- R1 est CODÉ (R1-a rendu/UI ✅ + R1-b stockage par phase ✅) ; **R2 est CODÉ** (base immuable + annotations) : les corrections portent leurs offsets D'ORIGINE (base), plus AUCUN remappage — le « texte courant » est une projection calculée.
 
 ## État global
 
-- Jalons terminés : **J2.5 — Atelier v2**, **A — Fiabilité du cœur**, **R1-a — Onglets hybrides**, **R1-b — Stockage par phase**.
-- Tests : **114/114 verts** (`pytest`).
-- **E2E réel Mistral OK** de bout en bout (`scripts/e2e_j25.py`, environnement isolé `data_e2e/`) : analyse 3 phases → nouvelle version (texte courant repris) → validation (chapitre officiel corrigé, hash, chaîne N+1, backup natif créé).
+- Jalons terminés : **J2.5 — Atelier v2**, **A — Fiabilité du cœur**, **R1-a — Onglets hybrides**, **R1-b — Stockage par phase**, **R2 — Base immuable + annotations**.
+- Tests : **121/121 verts** (`pytest`).
+- **E2E réel Mistral OK** de bout en bout (`scripts/e2e_j25.py`, environnement isolé `data_e2e/`) : analyse 3 phases → nouvelle version (texte courant repris) → validation (chapitre officiel corrigé, hash, chaîne N+1, backup natif créé). — **rejoué au jalon R2**.
 - Application validée de bout en bout avec Mistral Small.
 
-## Changements récents (R1-b — Stockage par phase + fin de `CorrectionFusionnee`, commit `c911547`)
+## Changements récents (R2 — Base immuable + annotations, commit `e886d3a`)
+
+- **Modèle d'état (R2)** — `reconstruction.py` réécrit : l'état `documents`
+  devient `{modele: 2, base, corrections, choix, patches, modifies}`. La BASE
+  (texte normalisé d'origine, runs) est IMMUABLE ; les corrections sont TOUTES
+  exprimées en coordonnées de la base (JAMAIS décalées) ; « texte courant » =
+  PROJECTION calculée (`projeter_paragraphes`, fragments texte/remplacements).
+- **Refuser une Forme = un FILTRE** (`basculer_choix`) : plus aucun remappage.
+- **Patches manuels** (`appliquer_modification`) : alternative/embellissement =
+  remplacement ancré base ; les Forme actives intersectées deviennent
+  obsolètes ; une sélection qui recouvre partiellement une zone déjà modifiée
+  est REFUSÉE (`ZoneDejaModifiee`).
+- **Réévaluation** (`remplacer_corrections_paragraphe`) : les corrections
+  retournées par le LLM (texte courant) sont RÉ-ANCRÉES sur la base ; les Forme
+  appliquées deviennent des patches (le texte corrigé reste affiché).
+- **Rendu** — `rendu.py` : nouveau point d'entrée
+  `preparer_document_depuis_etat(etat, onglet)` (projette depuis la base +
+  annotations) ; la logique de segments reste unique.
+- **Migration** — `migrer_ancien_format` : les états antérieurs (texte muté)
+  sont migrés à la volée au chargement (`_charger_etat`) : base reconstruite
+  depuis `analyses.texte_source`, corrections depuis `corrections.data_json`,
+  choix/refus préservés par id, modifications manuelles abandonnées (décision).
+- **Pipeline LLM inchangé** (3 passes parallèles, zéro token en plus) ; UI
+  atelier inchangée (onglets R1-a conservés).
+- **Tests** : `test_reconstruction.py` réécrit (offsets jamais décalés,
+  projection, patches, migration) + test d'intégration migration atelier ;
+  114 → **121 verts** + E2E réel Mistral rejoué (OK).
+
+## Changements précédents (R1-b — Stockage par phase + fin de `CorrectionFusionnee`, commit `c911547`)
 
 - **Modèles** — `models.py` : `CorrectionFusionnee` et `EmbellissementMigre` SUPPRIMÉS (code mort) ; tout le cœur travaille sur `Correction` direct.
 - **Réconciliation** — `reconciliation.py` : `dedupliquer()` SUPPRIMÉE (décision consignée au commit : elle ne faisait plus rien d'utile — aucune correction `embellissement` n'est produite par le pipeline, l'embellissement est à la demande) ; `renumeroter(list[Correction]) -> list[Correction]` (ids globaux uniques/déterministes conservés — jalon A). **Déduplication = règle d'AFFICHAGE** : en recouvrement (exact ou partiel), Style et Embellissement COEXISTENT.
@@ -73,12 +101,12 @@ La roadmap détaillée est dans **`plan-correctifs-atelier-ux.md`** (même dossi
   1. **Onglets hybrides** : « Tout » (vue superposée actuelle, conservée) + un onglet par phase (`Forme | Style | Technique | Embellissement si suggestions`) — **RÉVISE la décision 29 « couches superposables »** ; remplace les pastilles-filtres cumulables.
   2. **Stockage par phase** ✅ (R1-b) : collections de corrections indépendantes par phase (fin du JSON fusionné unique de la table `corrections`) ; `renumeroter()` conservé (jalon A).
   3. **Déduplication = règle d'affichage** ✅ (R1-b) : l'Embellissement n'est plus *absorbé* dans le tooltip du Style ; les deux coexistent (superposés dans « Tout », séparés dans leurs onglets).
-  4. **Base immuable + annotations/projections (R2)** : remplace « texte mutable + remappage d'offsets » de `reconstruction.py` ; à faire AVANT UX4 et J3 (la validation officielle lit l'état courant).
+  4. **Base immuable + annotations/projections (R2)** ✅ (`e886d3a`) : remplace « texte mutable + remappage d'offsets » de `reconstruction.py` — la validation officielle et « Soumettre une nouvelle version » lisent la PROJECTION.
   5. **Multi-passes conservé** : 3 appels LLM parallèles, texte complet chacun ; les onglets ne changent RIEN aux tokens (zéro appel LLM ajouté/supprimé).
   6. **R1 découpé en R1-a / R1-b** (DEUX conversations distinctes) : R1-a = UI onglets + projection par phase (rendu seul — stockage et `dedupliquer` intacts) ; R1-b = stockage par phase + suppression de `CorrectionFusionnee`/`embellissement_migre` (code mort : aucune correction `embellissement` n'est produite par le pipeline, l'embellissement est à la demande). Handoff d'état intermédiaire documenté dans le plan (« État du code À LA FIN de R1-a ») — CONSOMMÉ : R1-a `245071b` ✅ et R1-b `c911547` ✅.
 - Anciennes décisions arbitrées (2026-09-09) : spec §11 **décisions 33-38** (ids de correction uniques, rejet des no-op, toggle « masquer » — **RÉVISE la décision 24**, menu contextuel riche, suppression de projet, édition sans IA temps réel) — voir `plan-correctifs-atelier-ux.md`.
 - Précision d'implémentation du jalon A (décision 34) : le rejet des no-op ne concerne que la **phase Forme** — Style/Technique marquent SANS réécrire (`original == correction` y est le mode de marquage légitime, ex. fond jaune Technique).
-- À arbitrer au moment de R2 : migration des analyses `terminee` antérieures (adaptateur de lecture de l'ancien format `documents` vs re-parsing depuis `analyses.texte_source` + `corrections.data_json`).
+- Migration des analyses antérieures ARBITRÉE (2026-09-08, jalon R2) : re-parsing depuis `analyses.texte_source` + `corrections.data_json`, choix/refus préservés par id, modifications manuelles abandonnées — livré en `e886d3a`.
 - Décisions antérieures figées : `projectbrief.md` (+ spec §11 décisions 1-32) ; historique : `progress.md`.
 
 ## Dettes / anomalies connues (documentation)
