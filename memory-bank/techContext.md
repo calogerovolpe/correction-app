@@ -4,15 +4,17 @@
 
 ## Stack
 
-> **Refonte frontend PLANIFIÉE F0→F5** : Svelte 5 + TypeScript + Vite →
-> `app/static/spa/`, API JSON `/api/v1/` (réutilise les services purs existants),
-> routes Jinja2 conservées jusqu'à F5. Source de vérité : `plan-refonte-frontend.md`.
-> ⚠️ La stack actuelle du code reste celle décrite ci-dessous (Jinja2/HTMX/Alpine) —
-> la bascule Svelte n'est PAS encore réalisée et ne sera répercutée qu'aux jalons F0/F5.
+> **Refonte frontend EN COURS — F0 livré** (`4cbb55c`) : Svelte 5 + TypeScript +
+> Vite → `app/static/spa/` (gitignoré), API JSON `/api/v1/` (réutilise les services
+> purs existants), routes Jinja2 conservées jusqu'à F5. Source de vérité :
+> `plan-refonte-frontend.md`. ⚠️ Au code, l'application tourne TOUJOURS en
+> Jinja2/HTMX/Alpine — le socle `frontend/` (F0) est versionné et compilé dans
+> `app/static/spa/`, mais PAS encore branché comme écran principal.
 | Couche | Choix |
 |---|---|
 | Backend | Python 3.11+ (3.14.3 en pratique), FastAPI, Uvicorn, Pydantic v2, pydantic-settings (préfixe `APP_`, lit `.env`), httpx, python-multipart |
 | Frontend | Jinja2 (autoescape) + HTMX (polling) + Alpine.js — servis depuis `app/static/vendor/`, aucun CDN, aucun build Node |
+| Frontend (refonte F0→F5) | **Svelte 5 + TypeScript + Vite** — `frontend/` versionné (F0 ✅ `4cbb55c`), build → `app/static/spa/` (gitignoré), non branché jusqu'à F5 ; tests Vitest (`npm test`) |
 | Base de données | SQLite WAL, `busy_timeout=15000`, accès `asyncio.to_thread`, verrou `threading.Lock` (`app/db.py`) |
 | LLM | **Mistral API uniquement**, `mistral-small-latest` ; client maison compatible OpenAI (`app/llm/client.py`) |
 | Conteneurisation | Dockerfile + docker-compose.yml (parité dev/prod) |

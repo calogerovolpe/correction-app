@@ -1,6 +1,6 @@
 # Progression — jalons, état, décisions
 
-> Dernière mise à jour : 2026-09-09 (roadmap de refonte frontend F0→F5 actée — absorbe UX1→UX4 ; prochain jalon = F0).
+> Dernière mise à jour : 2026-09-09 (jalon F0 livré — socle Svelte ; prochain jalon = F1).
 
 ## État des jalons
 
@@ -21,8 +21,8 @@
 | **R1-a — Onglets UI + projection par phase (rendu seul)** | ✅ **Terminé** | `245071b` |
 | **R1-b — Stockage par phase + déduplication affichage (fin `CorrectionFusionnee`)** | ✅ **Terminé (E2E réel Mistral)** | `c911547` |
 | **R2 — Base immuable + annotations (fin du remappage d'offsets)** | ✅ **Terminé (E2E réel Mistral)** | `e886d3a` |
-| **F0 — Socle** (Vite+Svelte+TS, design tokens, layout, routage, coquille accueil, client fetch, `.gitignore`) | ⬜ **Prochain jalon** | — |
-| **F1 — Accueil & projets E1** (`/api/v1/projets`, création, activation, suppression + protection, analyses récentes, états vides) | ⬜ À faire | — |
+| **F0 — Socle** (Vite+Svelte+TS, design tokens, layout, routage, coquille accueil, client fetch, `.gitignore`) | ✅ **Terminé** | `4cbb55c` |
+| **F1 — Accueil & projets E1** (`/api/v1/projets`, création, activation, suppression + protection, analyses récentes, états vides) | ⬜ **Prochain jalon** | — |
 | **F2 — Soumission E3 + suivi E4** (`/api/v1/analyses`, collage Word, matrice dérogable, compteur 30 000, polling, fail-fast) | ⬜ À faire | — |
 | **F3 — Atelier E5** (couches, onglets + compteurs, menu riche [UX1], édition + « ↻ Re-corriger » [UX4], toggle [UX2], validation, navigation clavier) | ⬜ À faire | — |
 | **F4 — Finitions UX & identité** (cohérence visuelle, états vides, toasts, accessibilité AA, responsive, layout ~1200 px [UX2], microcopy) | ⬜ À faire | — |
@@ -69,16 +69,15 @@
 > Ordre détaillé, étapes, architecture cible et design system : **`plan-refonte-frontend.md`** (roadmap maîtresse F0→F5, créée le 2026-09-09).
 > **Les jalons UX1→UX4 de `plan-correctifs-atelier-ux.md` sont ABSORBÉS par F0→F5** (UX1 → F3 ; UX2 → F4 layout + F3 toggle ; UX3 → F1 ; UX4 → F3) — ils ne seront plus exécutés séparément. R1/R2 sont LIVRÉS et ne sont plus à réaliser.
 
-1. **F0 — Socle** : Vite + Svelte 5 + TS ; design tokens (thème + couches de correction réelles) ; layout global + routage ; page d'accueil coquille ; client fetch typé `/api/v1/` ; MAJ `.gitignore` (`spa/`, `node_modules/`, `dist/`). **PROCHAIN JALON.**
-2. **F1 — Accueil & projets E1** : endpoints `/api/v1/projets` (liste, création, activation, suppression avec confirmation + protection du projet actif), analyses récentes, états vides.
-3. **F2 — Soumission E3 + suivi E4** : endpoints `/api/v1/analyses` ; collage Word fidèle ; catégorie ; numéro N+1 ; matrice de phases dérogable ; compteur 30 000 car. ; statuts explicites ; polling ; fail-fast visible ; E2E réel adapté `/api/v1`.
-4. **F3 — Atelier E5** : endpoints `/api/v1/analyses/{id}` ; couches superposables ; onglets par phase + compteurs ; menu contextuel riche **[absorbe UX1]** ; édition directe sans IA temps réel + « ↻ Re-corriger » **[absorbe UX4]** ; barre latérale ; toggle « masquer » **[absorbe la partie toggle d'UX2]** ; navigation clavier ; validation du texte affiché.
-5. **F4 — Finitions UX & identité** : cohérence visuelle ; états vides ; toasts ; accessibilité/focus/contrastes/aria (vérification AA des nouvelles couleurs) ; responsive ; layout ~1200 px **[absorbe le reste d'UX2]** ; microcopy.
-6. **F5 — Nettoyage & bascule** : retrait Jinja2/HTMX/Alpine + routes HTML inutiles ; spec + README + `systemPatterns`/`techContext` à jour ; E2E Mistral rejoué `/api/v1` ; lanceur `.bat` vérifié.
-7. **J3 — Chaîne & codex** (EN ATTENTE, après F5) : écritures narratives (transaction, `avec_codex` câblé, codex/journaux), phase 2 LLM (extraction codex, cohérence, relecture-diff), écrans E2/E6/E7 + bandeau d'alertes, RAG alias.
-8. **J4 — Confort** : E9 (backups liste/restauration/purge, exports md/docx, statistiques, logs debug), E8 (paramètres + test de connexion), import .docx (italique/gras), correction hors-ligne locale (candidat).
-9. **J5 — Mise en ligne** : durcissement (auth simple), Caddy (TLS), compose production + volumes, sauvegardes programmées, doc de déploiement VPS, option Tailscale documentée.
-10. **R3 — Extension des catégories** (futur) : une phase = une config + un onglet + une projection, zéro changement au cœur.
+1. **F1 — Accueil & projets E1** : endpoints `/api/v1/projets` (liste, création, activation, suppression avec confirmation + protection du projet actif), analyses récentes, états vides. **PROCHAIN JALON.**
+2. **F2 — Soumission E3 + suivi E4** : endpoints `/api/v1/analyses` ; collage Word fidèle ; catégorie ; numéro N+1 ; matrice de phases dérogable ; compteur 30 000 car. ; statuts explicites ; polling ; fail-fast visible ; E2E réel adapté `/api/v1`.
+3. **F3 — Atelier E5** : endpoints `/api/v1/analyses/{id}` ; couches superposables ; onglets par phase + compteurs ; menu contextuel riche **[absorbe UX1]** ; édition directe sans IA temps réel + « ↻ Re-corriger » **[absorbe UX4]** ; barre latérale ; toggle « masquer » **[absorbe la partie toggle d'UX2]** ; navigation clavier ; validation du texte affiché.
+4. **F4 — Finitions UX & identité** : cohérence visuelle ; états vides ; toasts ; accessibilité/focus/contrastes/aria (vérification AA des nouvelles couleurs) ; responsive ; layout ~1200 px **[absorbe le reste d'UX2]** ; microcopy.
+5. **F5 — Nettoyage & bascule** : retrait Jinja2/HTMX/Alpine + routes HTML inutiles ; spec + README + `systemPatterns`/`techContext` à jour ; E2E Mistral rejoué `/api/v1` ; lanceur `.bat` vérifié.
+6. **J3 — Chaîne & codex** (EN ATTENTE, après F5) : écritures narratives (transaction, `avec_codex` câblé, codex/journaux), phase 2 LLM (extraction codex, cohérence, relecture-diff), écrans E2/E6/E7 + bandeau d'alertes, RAG alias.
+7. **J4 — Confort** : E9 (backups liste/restauration/purge, exports md/docx, statistiques, logs debug), E8 (paramètres + test de connexion), import .docx (italique/gras), correction hors-ligne locale (candidat).
+8. **J5 — Mise en ligne** : durcissement (auth simple), Caddy (TLS), compose production + volumes, sauvegardes programmées, doc de déploiement VPS, option Tailscale documentée.
+9. **R3 — Extension des catégories** (futur) : une phase = une config + un onglet + une projection, zéro changement au cœur.
 
 ## Problèmes connus
 
@@ -101,3 +100,4 @@
 - **2026-09-09 (R1-a)** : **onglets hybrides + projection par phase LIVRÉS** (`245071b`, 116 tests verts) — `preparer_document_par_phase` (rendu), routage `onglet` (GET query + POST Form + route `/analyses/{id}/onglet`), barre d'onglets `Tout | Forme | Style | Technique` (+ `Embellissement` conditionnel), retrait des pastilles/`.filtre-*-off` ; spec §8.2/§8.3/§11 décision 29 révisée dans le même commit. **Stockage et `dedupliquer()` intacts (état intermédiaire volontaire — handoff « À LA FIN de R1-a » dans le plan) ; prochain jalon = R1-b, AUTRE conversation.**
 - **2026-09-09 (R1-b)** : **stockage par phase + déduplication d'affichage LIVRÉS** (`c911547`, 114 tests verts + E2E réel Mistral rejoué) — fin de `CorrectionFusionnee`/`EmbellissementMigre` (code mort), `dedupliquer()` supprimée (recouvrement exact Style/Embellissement → les DEUX coexistent), `renumeroter()` sur `list[Correction]`, `corrections.data_json` en dict par phase, renommage complet `entree["fusion"]` → `entree["correction"]` ; spec §3/§4.4/§7.1/§11 décision 29 dans le même commit. **Le handoff R1-a est CONSOMMÉ ; prochain jalon = UX1.**
 - **2026-09-08 (R2)** : **base immuable + annotations LIVRÉES** (`e886d3a`, 121 tests verts + E2E réel Mistral rejoué OK) — fin du « texte mutable + remappage d'offsets » : état `documents` = base (texte normalisé immuable) + corrections en coordonnées de la base (jamais décalées) + choix/refus + patches manuels ; « texte courant » = projection calculée ; refuser une Forme = un filtre ; réévaluation ré-ancrée sur la base (Forme appliquées → patches) ; migration des états antérieurs à la volée (choix préservés par id, modifs manuelles abandonnées — décision) ; spec §4.1/§8.2/§8.3/§11 décisions 28 (révisée) et 39 dans le même commit. **R2 livré en avance (décision de l'auteur) ; prochain jalon = UX1.**
+- **2026-09-09 (F0)** : **socle frontend Svelte livré** (`4cbb55c`, 121 pytest + 7 Vitest verts, `svelte-check` 0 erreur) — `frontend/` (Vite + Svelte 5 + TypeScript) versionné avec `package-lock.json` ; design tokens (thème + couches de correction réelles) ; layout global + routage hash ; page d'accueil coquille servable (build → `app/static/spa/`, gitignoré) ; client fetch typé `/api/v1/` (prêt F1) ; `.gitignore` étendu (`frontend/node_modules/`, `frontend/dist/`, `app/static/spa/`). **Backend intact (121 pytest) ; l'application tourne toujours en Jinja2/HTMX/Alpine ; prochain jalon = F1.**

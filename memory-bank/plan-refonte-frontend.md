@@ -120,7 +120,7 @@ F0→F5 et ne seront plus exécutés séparément.**
 
 | Jalon | Contenu | Statut | Commit |
 |---|---|---|---|
-| F0 | Socle : Vite+Svelte+TS, design tokens, layout global, routage, page d'accueil coquille, client fetch typé ; MAJ `.gitignore` (`spa/`, `node_modules/`, `dist/` gitignorés) | ⬜ | — |
+| F0 | Socle : Vite+Svelte+TS, design tokens, layout global, routage, page d'accueil coquille, client fetch typé ; MAJ `.gitignore` (`spa/`, `node_modules/`, `dist/` gitignorés) | ✅ | `4cbb55c` |
 | F1 | Accueil & projets E1 : endpoints `/api/v1/projets`, création, activation, suppression avec confirmation + protection du projet actif, analyses récentes, états vides | ⬜ | — |
 | F2 | Soumission E3 + suivi E4 : endpoints `/api/v1/analyses`, collage Word fidèle, catégorie, numéro N+1, matrice de phases dérogable, compteur 30 000 car., statuts explicites, polling, fail-fast visible | ⬜ | — |
 | F3 | Atelier E5 : endpoints `/api/v1/analyses/{id}`, couches superposables, onglets par phase + compteurs, menu contextuel riche **[absorbe UX1]**, édition directe sans IA temps réel + « ↻ Re-corriger » **[absorbe UX4]**, barre latérale, toggle « masquer », navigation clavier, validation du texte affiché | ⬜ | — |
@@ -128,6 +128,10 @@ F0→F5 et ne seront plus exécutés séparément.**
 | F5 | Nettoyage & bascule : retrait Jinja2/HTMX/Alpine et routes HTML inutiles, spec + README + `systemPatterns`/`techContext` à jour, E2E Mistral rejoué (adapté à `/api/v1`), lanceur `.bat` vérifié | ⬜ | — |
 
 ## Jalon F0 — Socle
+
+> ✅ **LIVRÉ** (commit `4cbb55c`) — socle Vite + Svelte 5 + TS, design tokens,
+> layout, routage, coquille servable, client fetch ; backend intact (121 pytest) ;
+> 7 tests Vitest verts ; `svelte-check` 0 erreur.
 
 1. **Scaffolding** : `frontend/` (Vite + Svelte 5 + TypeScript), build dirigé vers
    `app/static/spa/` ; **MAJ `.gitignore`** : `app/static/spa/`,

@@ -1,13 +1,13 @@
 # Contexte actif — où nous en sommes MAINTENANT
 
-> Fichier le plus souvent mis à jour. Dernière mise à jour : 2026-09-09 (roadmap de refonte frontend F0→F5 actée — absorbe UX1→UX4 ; prochain jalon = F0).
+> Fichier le plus souvent mis à jour. Dernière mise à jour : 2026-09-09 (jalon F0 livré — socle Svelte ; prochain jalon = F1).
 
 ## Focus du moment
 
 **Refonte frontend — série F0→F5 (remplacement Jinja2 + HTMX + Alpine.js par Svelte 5 + TypeScript + Vite) — AVANT J3.**
 La roadmap détaillée est dans **`plan-refonte-frontend.md`** (même dossier) : la RELIRE EN DÉBUT DE SESSION — elle contient l'ordre des jalons F0→F5, leurs dépendances, les choix techniques, le design system et l'architecture cible. Un commit par jalon ; le suivi (statut/commit) est tenu à jour dans ce plan ET dans `progress.md`.
 
-- **Où on en est** : la série R est LIVRÉE — R1-a ✅ (`245071b`) ; R1-b ✅ (`c911547`) ; R2 ✅ (`e886d3a`) — **121 tests verts, E2E réel Mistral rejoué OK** ; **prochain jalon = F0 — Socle** (Vite + Svelte 5 + TS, design tokens, layout global, routage, page d'accueil coquille, client fetch typé, MAJ `.gitignore`).
+- **Où on en est** : la série R est LIVRÉE — R1-a ✅ (`245071b`) ; R1-b ✅ (`c911547`) ; R2 ✅ (`e886d3a`) ; **F0 ✅ (`4cbb55c`) — Socle Svelte 5 + TS + Vite (design tokens, layout, routage, coquille servable, client fetch typé, `.gitignore` à jour)** — **121 pytest + 7 Vitest verts** ; **prochain jalon = F1 — Accueil & projets E1** (`/api/v1/projets`).
 - **UX1→UX4 sont ABSORBÉS par F0→F5** (correspondance : UX1 → F3 ; UX2 → F4 layout + F3 toggle ; UX3 → F1 ; UX4 → F3) — ils ne seront plus exécutés séparément ; `plan-correctifs-atelier-ux.md` reste l'historique de la série R1/UX.
 - **Révision de décision actée** : décision A2 (cahier des charges) et spec §2.1 (stack frontend « décisions figées ») sont RÉVISÉES par la bascule Svelte — la révision n'est PAS encore codée : l'application tourne TOUJOURS en Jinja2/HTMX/Alpine ; la transition sera répercutée dans la spec + `systemPatterns.md` + `techContext.md` au fil des jalons (F0 amorce, F5 bascule finale).
 - **Backend intact** : services purs + pipeline LLM (3 phases parallèles, fail-fast, Option B, « liste vide = jamais une panne ») inchangés ; l'API JSON `/api/v1/` réutilise les services purs existants ; les routes Jinja2 sont conservées jusqu'à F5.
@@ -19,6 +19,26 @@ La roadmap détaillée est dans **`plan-refonte-frontend.md`** (même dossier) :
 - Tests : **121/121 verts** (`pytest`).
 - **E2E réel Mistral OK** de bout en bout (`scripts/e2e_j25.py`, environnement isolé `data_e2e/`) : analyse 3 phases → nouvelle version (texte courant repris) → validation (chapitre officiel corrigé, hash, chaîne N+1, backup natif créé). — **rejoué au jalon R2**.
 - Application validée de bout en bout avec Mistral Small.
+
+## Changements récents (F0 — Socle Svelte 5 + TypeScript + Vite, commit `4cbb55c`)
+
+- **Scaffolding** — `frontend/` créé (Vite + Svelte 5 + TS ; `npm install` OK,
+  `package-lock.json` versionné) ; `.gitignore` étendu (`frontend/node_modules/`,
+  `frontend/dist/`, `app/static/spa/` — le SPA compilé n'est JAMAIS commité).
+- **Design tokens** (`frontend/src/lib/styles/tokens.css`) : thème (identité
+  visuelle) + couches de correction RÉELLES (`app/static/style.css`) ;
+  typographies interface/manuscrit ; base 16px, interligne 1.6.
+- **Layout global + routage** : `App.svelte` (NavBar, contenu, pied), routeur
+  hash zéro-dépendance (`lib/router.ts`), page d'accueil **coquille** non
+  branchée à l'API.
+- **Client fetch typé** (`lib/api/`) : module TS orienté `/api/v1/`, prêt pour F1
+  (le serveur n'expose pas encore l'endpoint).
+- **Vitest** : 7 tests verts (coquille + client fetch) ; `svelte-check` 0 erreur —
+  config : `environment: 'jsdom'` + `resolve.conditions: ['browser']` (Svelte 5 :
+  sans 'browser', `mount()` indisponible — leçon à retenir).
+- **Backend intact** : 121/121 pytest ; l'application tourne TOUJOURS en
+  Jinja2/HTMX/Alpine ; coquille compilée servable sous `/static/spa/` (assets
+  relatifs) mais PAS encore câblée comme écran principal.
 
 ## Changements récents (R2 — Base immuable + annotations, commit `e886d3a`)
 
@@ -88,14 +108,13 @@ La roadmap détaillée est dans **`plan-refonte-frontend.md`** (même dossier) :
 
 ## Prochaines étapes (ordre)
 
-1. **F0 — Socle** : Vite + Svelte 5 + TS ; design tokens (thème + couches réelles) ; layout global + routage ; page d'accueil coquille ; client fetch typé `/api/v1/` ; MAJ `.gitignore` (`spa/`, `node_modules/`, `dist/`). **PROCHAIN JALON.**
-2. **F1 — Accueil & projets E1** : endpoints `/api/v1/projets` (liste, création, activation, suppression avec confirmation + protection du projet actif), analyses récentes, états vides.
-3. **F2 — Soumission E3 + suivi E4** : endpoints `/api/v1/analyses` ; collage Word fidèle ; catégorie ; numéro N+1 ; matrice de phases dérogable ; compteur 30 000 car. ; statuts explicites ; polling ; fail-fast visible ; E2E réel adapté `/api/v1`.
-4. **F3 — Atelier E5** : endpoints `/api/v1/analyses/{id}` ; couches superposables ; onglets par phase + compteurs ; menu contextuel riche **[absorbe UX1]** ; édition directe sans IA temps réel + « ↻ Re-corriger » **[absorbe UX4]** ; barre latérale ; toggle « masquer » **[part d'UX2]** ; navigation clavier ; validation du texte affiché ; nouvel accent Technique AA (fin du violet obsolète).
-5. **F4 — Finitions UX & identité** : cohérence visuelle ; états vides ; toasts ; accessibilité/focus/contrastes/aria (vérification AA des nouvelles couleurs) ; responsive ; layout ~1200 px **[absorbe UX2]** ; microcopy.
-6. **F5 — Nettoyage & bascule** : retrait Jinja2/HTMX/Alpine + routes HTML inutiles ; spec + README + `systemPatterns`/`techContext` à jour ; E2E Mistral rejoué `/api/v1` ; lanceur `.bat` vérifié.
-7. **J3 — Chaîne & codex** (EN ATTENTE, après F5) : écritures narratives (transaction, `avec_codex` câblé, codex/journaux), phase 2 LLM (extraction codex, cohérence, relecture-diff), écrans E2/E6/E7 + bandeau d'alertes, RAG alias. Critère d'acceptation : Prologue → ch.1 → ch.2 → resoumission N=N sans remplacement → remplacement officiel (relecture-diff) → alerte → « Choix d'auteur » → non re-détectée.
-8. **J4 — Confort** puis **J5 — Mise en ligne** (inchangés) ; **R3 — extension des catégories** (futur : une phase = une config + un onglet + une projection, zéro changement au cœur).
+1. **F1 — Accueil & projets E1** : endpoints `/api/v1/projets` (liste, création, activation, suppression avec confirmation + protection du projet actif), analyses récentes, états vides. **PROCHAIN JALON.**
+2. **F2 — Soumission E3 + suivi E4** : endpoints `/api/v1/analyses` ; collage Word fidèle ; catégorie ; numéro N+1 ; matrice de phases dérogable ; compteur 30 000 car. ; statuts explicites ; polling ; fail-fast visible ; E2E réel adapté `/api/v1`.
+3. **F3 — Atelier E5** : endpoints `/api/v1/analyses/{id}` ; couches superposables ; onglets par phase + compteurs ; menu contextuel riche **[absorbe UX1]** ; édition directe sans IA temps réel + « ↻ Re-corriger » **[absorbe UX4]** ; barre latérale ; toggle « masquer » **[part d'UX2]** ; navigation clavier ; validation du texte affiché ; nouvel accent Technique AA (fin du violet obsolète).
+4. **F4 — Finitions UX & identité** : cohérence visuelle ; états vides ; toasts ; accessibilité/focus/contrastes/aria (vérification AA des nouvelles couleurs) ; responsive ; layout ~1200 px **[absorbe UX2]** ; microcopy.
+5. **F5 — Nettoyage & bascule** : retrait Jinja2/HTMX/Alpine + routes HTML inutiles ; spec + README + `systemPatterns`/`techContext` à jour ; E2E Mistral rejoué `/api/v1` ; lanceur `.bat` vérifié.
+6. **J3 — Chaîne & codex** (EN ATTENTE, après F5) : écritures narratives (transaction, `avec_codex` câblé, codex/journaux), phase 2 LLM (extraction codex, cohérence, relecture-diff), écrans E2/E6/E7 + bandeau d'alertes, RAG alias. Critère d'acceptation : Prologue → ch.1 → ch.2 → resoumission N=N sans remplacement → remplacement officiel (relecture-diff) → alerte → « Choix d'auteur » → non re-détectée.
+7. **J4 — Confort** puis **J5 — Mise en ligne** (inchangés) ; **R3 — extension des catégories** (futur : une phase = une config + un onglet + une projection, zéro changement au cœur).
 
 ## Décisions en cours / à arbitrer
 
