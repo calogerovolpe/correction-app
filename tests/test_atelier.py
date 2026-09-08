@@ -253,6 +253,116 @@ def test_prefill_dernieres_options_sur_e3(client, monkeypatch):
     assert 'id="case-style" checked' not in page.text
 
 
+# --- Jalon R1-a : onglets hybrides + projection par phase -----------------------
+
+
+REPONSE_STYLE = json.dumps(
+    {
+        "corrections": [
+            {
+                "id": "c-0001", "phase": "style", "type": "marquage",
+                "paragraphe_id": "p-1", "debut": 36, "fin": 40,
+                "contexte_avant": "à l'aube vers la ", "original": "cité",
+                "correction": "cité", "explication": "Marquage Style sans réécriture.",
+                "regle": "", "variantes": [],
+            }
+        ]
+    },
+    ensure_ascii=False,
+)
+
+
+def _chapitre_multi_phases(client, monkeypatch):
+    """Chapitre analysé avec une correction Forme ET une correction Style."""
+    _modeles_distincts(monkeypatch)
+    mock = MockLLM(reponses={
+        "m-forme": REPONSE_FORME,
+        "m-style": REPONSE_STYLE,
+        "m-technique": '{"corrections": []}',
+    })
+    monkeypatch.setattr(service_analyse, "_client_llm", lambda: mock)
+    client.post("/projets", data={"titre": "Mon roman"}, follow_redirects=True)
+    identifiant = _lancer(client, {
+        "texte": TEXTE, "categorie": "chapitre", "numero_chapitre": "1",
+    })
+    assert _attendre(client, identifiant) == "terminee"
+    return identifiant
+
+
+def test_barre_onglets_rendue_avec_etat_actif(client, monkeypatch):
+    """La barre d'onglets hybrides remplace les pastilles-filtres ; « Tout » est
+    actif par défaut ; aucun onglet Embellissement (aucune correction de cette
+    phase — demandée à la demande par clic droit)."""
+    identifiant = _chapitre_multi_phases(client, monkeypatch)
+    page = client.get(f"/analyses/{identifiant}")
+    assert 'class="onglets" role="tablist"' in page.text
+    for onglet in ("tout", "forme", "style", "technique"):
+        assert f'data-onglet="{onglet}"' in page.text
+    assert 'data-onglet="tout" aria-selected="true"' in page.text
+    assert 'data-onglet="forme" aria-selected="false"' in page.text
+    assert 'data-onglet="embellissement"' not in page.text
+    assert "pastille" not in page.text          # anciens filtres retirés
+    assert "filtre-" not in page.text
+
+
+def test_onglet_par_query_string_rend_la_projection(client, monkeypatch):
+    identifiant = _chapitre_multi_phases(client, monkeypatch)
+
+    page_tout = client.get(f"/analyses/{identifiant}")
+    assert "ins--forme" in page_tout.text       # « Tout » : superposition complète
+    assert "mark-style" in page_tout.text
+
+    page_forme = client.get(f"/analyses/{identifiant}?onglet=forme")
+    assert "partent" in page_forme.text         # la Forme est là…
+    assert "mark-style" not in page_forme.text  # …le Style n'y est pas
+    assert 'data-onglet="forme" aria-selected="true"' in page_forme.text
+
+    page_style = client.get(f"/analyses/{identifiant}?onglet=style")
+    assert "mark-style" in page_style.text      # le Style est là…
+    assert "ins--forme" not in page_style.text  # …la Forme n'y est pas
+    assert 'data-onglet="style" aria-selected="true"' in page_style.text
+
+
+def test_onglet_inconnu_retombe_sur_tout(client, monkeypatch):
+    identifiant = _chapitre_multi_phases(client, monkeypatch)
+    page = client.get(f"/analyses/{identifiant}?onglet=inconnu")
+    assert 'data-onglet="tout" aria-selected="true"' in page.text
+    assert "ins--forme" in page.text and "mark-style" in page.text
+
+
+def test_route_post_onglet_re_rend_sans_modifier_l_etat(client, monkeypatch):
+    identifiant = _chapitre_multi_phases(client, monkeypatch)
+    reponse = client.post(f"/analyses/{identifiant}/onglet", data={"onglet": "style"})
+    assert reponse.status_code == 200
+    assert 'data-onglet="style" aria-selected="true"' in reponse.text
+    assert "mark-style" in reponse.text
+    assert "ins--forme" not in reponse.text
+    # l'état n'a pas bougé : re-GET « tout » identique (les deux phases présentes)
+    page = client.get(f"/analyses/{identifiant}")
+    assert "ins--forme" in page.text and "mark-style" in page.text
+
+
+def test_choix_forme_conserve_l_onglet_actif(client, monkeypatch):
+    """Après un choix Forme posté depuis l'onglet Forme, on RESTE sur Forme
+    (l'onglet circule dans le POST et ressort dans le rendu)."""
+    import re as module_re
+
+    identifiant = _chapitre_multi_phases(client, monkeypatch)
+    page = client.get(f"/analyses/{identifiant}?onglet=forme")
+    source = module_re.search(
+        r'<script id="donnees-corrections"[^>]*>(.*?)</script>', page.text, module_re.S
+    ).group(1)
+    forme = next(c for c in json.loads(source) if c["phase"] == "forme")
+
+    reponse = client.post(f"/analyses/{identifiant}/choix-forme", data={
+        "correction_id": forme["id"], "decision": "original", "onglet": "forme",
+    })
+    assert reponse.status_code == 200
+    assert 'data-onglet="forme" aria-selected="true"' in reponse.text
+    assert "refusee" in reponse.text            # la décision s'applique dans la projection
+    assert "mark-style" not in reponse.text     # toujours la projection Forme
+
+
 # --- Jalon A : menu contextuel fiable (rendu) ---------------------------------
 
 

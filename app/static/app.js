@@ -13,6 +13,13 @@
 
   const zoneAtelier = () => document.getElementById("zone-atelier");
 
+  /* Onglet actif (jalon R1-a) : rendu par le serveur sur #zone-atelier[data-onglet],
+     transmis à chaque POST qui re-rend l'atelier pour y rester après l'action. */
+  function ongletActif() {
+    const zone = zoneAtelier();
+    return (zone && zone.dataset.onglet) || "tout";
+  }
+
   function afficherErreur(message) {
     const zone = zoneAtelier();
     if (!zone) return;
@@ -199,10 +206,18 @@
     const idAnalyse = zone ? zone.dataset.analyseId : "";
     if (action === "fermer") {
       fermerPopover();
+    } else if (action === "onglet") {
+      /* Onglets hybrides (jalon R1-a) : la projection par phase est calculée
+         côté serveur (rendu.py) — zéro token LLM en plus. */
+      evenement.preventDefault();
+      await poster(`/analyses/${idAnalyse}/onglet`, {
+        onglet: declencheur.dataset.onglet || "tout",
+      });
     } else if (action === "reevaluer") {
       evenement.preventDefault();
       await poster(`/analyses/${idAnalyse}/reevaluer`, {
         paragraphe_id: declencheur.dataset.paragrapheId,
+        onglet: ongletActif(),
       });
     } else if (action === "embellir" || action === "alternatives") {
       evenement.preventDefault();
@@ -216,6 +231,7 @@
         fragment: selection.fragment,
         contexte: selection.contexte,
         texte: declencheur.dataset.texte || "",
+        onglet: ongletActif(),
       });
     }
   });
@@ -252,7 +268,8 @@
 
   document.addEventListener("alpine:init", () => {
     Alpine.data("relectureApp", () => ({
-      filtres: { forme: true, style: true, technique: true },
+      /* (jalon R1-a) : les filtres cumulables ont disparu — remplacés par les
+         onglets (projection par phase calculée côté serveur). */
       correctionsBarre: [],
       correctionsTechniques: [],
       correctionActive: null,
@@ -283,6 +300,7 @@
         await poster(`/analyses/${idAnalyse}/choix-forme`, {
           correction_id: correction.id,
           decision,
+          onglet: ongletActif(),
         });
       },
     }));

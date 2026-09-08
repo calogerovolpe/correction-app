@@ -144,3 +144,67 @@ def test_ids_dupliques_entre_phases_groupes_et_barre_distincts():
     assert g_forme != g_style
     seg_forme = next(s for s in doc["paragraphes"][0]["segments"] if s["type"] == "forme")
     assert seg_forme["groupe"] == g_forme  # le clic cible la BONNE correction
+
+
+# --- Jalon R1-a : projection par phase (onglets) --------------------------------
+
+
+def _etat_deux_phases():
+    etat = reconstruction.etat_initial(
+        [
+            _fusion("c-1", "forme", 16, 22, "veille", "veillent"),
+            _fusion("c-2", "style", 40, 50, "silencieux", "silencieux"),
+        ],
+        [_p()],
+    )
+    return etat
+
+
+def test_projection_par_phase_n_affiche_que_sa_phase():
+    """Chaque onglet ne montre QUE les corrections de sa phase : la projection
+    filtre les `entrees` puis réutilise `preparer_document` (logique unique)."""
+    etat = _etat_deux_phases()
+
+    doc_forme = rendu.preparer_document_par_phase(
+        etat["paragraphes"], etat["corrections"], "forme",
+        etat["choix"], etat["modifies"],
+    )
+    segments = doc_forme["paragraphes"][0]["segments"]
+    assert [s["type"] for s in segments] == ["texte", "forme", "texte"]
+    assert all("mark-style" not in s["classes"] for s in segments)
+    assert [i["phase"] for i in doc_forme["corrections_barre"]] == ["forme"]
+
+    doc_style = rendu.preparer_document_par_phase(
+        etat["paragraphes"], etat["corrections"], "style",
+        etat["choix"], etat["modifies"],
+    )
+    segments = doc_style["paragraphes"][0]["segments"]
+    assert all(s["type"] == "texte" for s in segments)  # aucune Forme appliquée ici
+    assert any("mark-style" in s["classes"] for s in segments)
+    assert [i["phase"] for i in doc_style["corrections_barre"]] == ["style"]
+
+
+def test_tout_reste_la_superposition_complete():
+    """Régression : `preparer_document` (onglet « Tout ») reste inchangée —
+    les deux phases restent superposées dans la même vue."""
+    etat = _etat_deux_phases()
+    doc = rendu.preparer_document(
+        etat["paragraphes"], etat["corrections"], etat["choix"], etat["modifies"]
+    )
+    assert [i["phase"] for i in doc["corrections_barre"]] == ["forme", "style"]
+    segments = doc["paragraphes"][0]["segments"]
+    assert any(s["type"] == "forme" for s in segments)
+    assert any("mark-style" in s["classes"] for s in segments if s["type"] == "texte")
+
+
+def test_projection_phase_absente_rend_le_texte_neutre():
+    """Aucune correction de la phase : aucun paragraphe actif → le texte est
+    masqué (comportement existant de `preparer_document` conservé)."""
+    etat = _etat_deux_phases()
+    doc = rendu.preparer_document_par_phase(
+        etat["paragraphes"], etat["corrections"], "technique",
+        etat["choix"], etat["modifies"],
+    )
+    assert doc["corrections_barre"] == []
+    assert doc["paragraphes"] == []
+    assert doc["nb_masques"] == 1

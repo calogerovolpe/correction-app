@@ -98,39 +98,28 @@ footer { border-top: 1px solid var(--bordure); color: var(--texte-secondaire); f
 .tooltip__variantes { margin: 0.25rem 0 0; padding-left: 1.1rem; }
 .tooltip__cas--embellissement { margin-top: 0.4rem; }
 
-/* ===== Légende interactive (v6 §7.4) ===== */
-.legende { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin: 1rem 0; }
-.pastille {
-  border: 2px solid; border-radius: 999px; padding: 0.15rem 0.9rem;
-  cursor: pointer; background: #ffffff; font-size: 0.9rem;
+/* ===== Onglets hybrides (jalon R1-a — remplacent les pastilles-filtres) ===== */
+/* « Tout » = superposition des couches ; un onglet par phase = projection.
+   Couleurs alignées sur les marquages du texte ; palette WCAG AA (≥ 4,5:1). */
+.onglets { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin: 1rem 0; }
+.onglet {
+  border: 2px solid; border-radius: 6px; padding: 0.25rem 1rem;
+  cursor: pointer; background: #ffffff; font-size: 0.9rem; font-weight: 600;
+  font-family: inherit;
 }
-.pastille--forme           { color: var(--corr-forme);           border-color: var(--corr-forme); }
-.pastille--style           { color: var(--corr-style);           border-color: var(--corr-style); }
-.pastille--technique       { color: var(--corr-technique);       border-color: var(--corr-technique); }
-.pastille--embellissement  { color: var(--corr-embellissement);  border-color: var(--corr-embellissement); }
-.pastille--off { opacity: 0.35; }
-.bouton-lecture {
-  border: 2px solid #212121; border-radius: 6px; background: #ffffff;
-  padding: 0.15rem 0.8rem; cursor: pointer; font-size: 0.9rem;
-}
-.bouton-lecture--on { background: #212121; color: #ffffff; }
+.onglet--tout          { color: #212121;                       border-color: #757575; }
+.onglet--forme         { color: var(--corr-forme);             border-color: var(--corr-forme); }
+.onglet--style         { color: var(--corr-style);             border-color: var(--corr-style); }
+.onglet--technique     { color: var(--corr-technique);         border-color: var(--corr-technique); }
+.onglet--embellissement { color: var(--corr-embellissement);   border-color: var(--corr-embellissement); }
+.onglet[aria-selected="true"] { color: #ffffff; }
+.onglet--tout[aria-selected="true"]          { background: #424242;   border-color: #424242; }
+.onglet--forme[aria-selected="true"]         { background: var(--corr-forme); }
+.onglet--style[aria-selected="true"]         { background: var(--corr-style); }
+.onglet--technique[aria-selected="true"]     { background: var(--corr-technique); }
+.onglet--embellissement[aria-selected="true"] { background: var(--corr-embellissement); }
+.onglet[aria-selected="false"]:hover { background: #f5f5f5; }
 .compteur-masques { color: #757575; font-size: 0.85rem; margin-left: auto; }
-
-/* Filtres par catégorie : la correction masquée reprend l'apparence du texte neutre (v6 §7.4) */
-.filtre-forme-off .ins--forme,
-.filtre-style-off .ins--style,
-.filtre-technique-off .ins--technique { display: none; }
-.filtre-forme-off .corr--forme > .del { text-decoration: none; color: inherit; }
-.filtre-style-off .corr--style > .del { text-decoration: none; color: inherit; }
-.filtre-technique-off .corr--technique > .del { text-decoration: none; color: inherit; }
-.filtre-embellissement-off .corr-sugg > .sugg { background: none; border-bottom: none; color: inherit; }
-.filtre-embellissement-off .sugg { background: none; border-bottom: none; color: inherit; }
-.filtre-embellissement-off .corr-sugg:focus-within .tooltip { display: none; }
-
-/* Mode « Lecture Embellissement » (v6 §7.4) : suggestions exclusives */
-.lecture-embellissement .ins:not(.ins--embellissement) { display: none; }
-.lecture-embellissement .del { text-decoration: none; color: inherit; font-style: normal; font-weight: normal; border-bottom: none; }
-.lecture-embellissement .corr > .tooltip { display: none !important; }
 
 /* ===== Bandeaux, formulaire E3, suivi E4 ===== */
 .bandeau { padding: 0.6rem 0.9rem; margin: 0.8rem 0; border-radius: 4px; white-space: pre-line; }
@@ -328,11 +317,9 @@ footer { border-top: 1px solid var(--bordure); color: var(--texte-secondaire); f
 #document-texte [data-groupe] { cursor: pointer; }
 #document-texte [data-groupe]:focus { outline: 2px solid #212121; outline-offset: 2px; }
 
-/* Filtres : la catégorie masquée reprend l'apparence neutre (v6 §7.4) */
-.filtre-style-off .mark-style { border-bottom-color: transparent; }
-.filtre-technique-off .mark-technique { background: transparent; }
-.filtre-forme-off .ins--forme { display: none; }
-.filtre-forme-off .del { text-decoration: none; color: inherit; }
+/* (jalon R1-a) : les règles .filtre-*-off sont supprimées — les filtres
+   cumulables côté client sont remplacés par les onglets (projection par phase
+   calculée côté serveur, rendu.py). */
 
 .info-selection { font-size: 0.85rem; color: #757575; }
 .obsolete-note { color: #c62828; font-size: 0.85rem; }

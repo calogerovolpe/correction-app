@@ -81,11 +81,27 @@ async def _sauver_etat(identifiant: int, etat: dict) -> None:
     )
 
 
-def _contexte_resultat(analyse, etat, erreur=None) -> dict:
-    document = service_rendu.preparer_document(
-        etat["paragraphes"], etat["corrections"],
-        etat.get("choix", {}), etat.get("modifies", []),
-    )
+# Onglets hybrides (jalon R1-a) : « tout » = superposition actuelle, sinon la
+# projection d'UNE phase. Aucun effet sur le stockage ni sur les appels LLM.
+_ONGLETS = ("forme", "style", "technique", "embellissement")
+
+
+def _onglet_valide(onglet: str | None) -> str:
+    return onglet if onglet in _ONGLETS else "tout"
+
+
+def _contexte_resultat(analyse, etat, erreur=None, onglet="tout") -> dict:
+    onglet = _onglet_valide(onglet)
+    if onglet == "tout":
+        document = service_rendu.preparer_document(
+            etat["paragraphes"], etat["corrections"],
+            etat.get("choix", {}), etat.get("modifies", []),
+        )
+    else:
+        document = service_rendu.preparer_document_par_phase(
+            etat["paragraphes"], etat["corrections"], onglet,
+            etat.get("choix", {}), etat.get("modifies", []),
+        )
     actives = [e for e in etat["corrections"] if e["etat"] == "active"]
     return {
         "analyse": analyse,
@@ -93,12 +109,20 @@ def _contexte_resultat(analyse, etat, erreur=None) -> dict:
         "nb_corrections": len(actives),
         "est_chapitre": (analyse["categorie"] == "chapitre"),
         "erreur_atelier": erreur,
+        "onglet": onglet,
+        # Onglet « Embellissement » affiché seulement si une correction de cette
+        # phase existe (calculé sur l'état COMPLET : la projection d'un onglet
+        # filtrerait sinon la barre et ferait disparaître l'onglet).
+        "a_embellissement": any(
+            e["fusion"].correction.phase == "embellissement" for e in etat["corrections"]
+        ),
     }
 
 
-def _rendre_atelier(request: Request, analyse, etat, erreur=None):
+def _rendre_atelier(request: Request, analyse, etat, erreur=None, onglet="tout"):
     return TEMPLATES.TemplateResponse(
-        request, "analyses/_atelier.html", _contexte_resultat(analyse, etat, erreur)
+        request, "analyses/_atelier.html",
+        _contexte_resultat(analyse, etat, erreur, onglet),
     )
 
 
@@ -115,8 +139,24 @@ async def page_analyse(request: Request, identifiant: int):
 
     etat = await _charger_etat(analyse)
     return TEMPLATES.TemplateResponse(
-        request, "analyses/resultat.html", _contexte_resultat(analyse, etat)
+        request, "analyses/resultat.html",
+        _contexte_resultat(analyse, etat, onglet=request.query_params.get("onglet", "tout")),
     )
+
+
+@router.post("/analyses/{identifiant}/onglet")
+async def changer_onglet(
+    request: Request,
+    identifiant: int,
+    onglet: str = Form("tout"),
+):
+    """Change d'onglet (projection par phase, jalon R1-a) : AUCUN état modifié,
+    le document est simplement re-rendu avec la projection de l'onglet demandé."""
+    analyse = await _analyse(identifiant)
+    if not analyse or analyse["statut"] != "terminee":
+        return HTMLResponse("Analyse introuvable ou non terminée.", status_code=404)
+    etat = await _charger_etat(analyse)
+    return _rendre_atelier(request, analyse, etat, onglet=onglet)
 
 
 @router.post("/analyses/{identifiant}/choix-forme")
@@ -125,6 +165,7 @@ async def choix_forme(
     identifiant: int,
     correction_id: str = Form(...),
     decision: str = Form(...),
+    onglet: str = Form("tout"),
 ):
     """Accepte ('corrige', défaut) ou refuse ('original') une correction Forme :
     le texte courant est immédiatement reconstruit (splice + remappage)."""
@@ -136,7 +177,7 @@ async def choix_forme(
     etat = await _charger_etat(analyse)
     reconstruction.basculer_choix(etat, correction_id, decision)
     await _sauver_etat(identifiant, etat)
-    return _rendre_atelier(request, analyse, etat)
+    return _rendre_atelier(request, analyse, etat, onglet=onglet)
 
 
 @router.post("/analyses/{identifiant}/appliquer-alternative")
@@ -147,6 +188,7 @@ async def appliquer_alternative(
     fragment: str = Form(...),
     texte: str = Form(...),
     contexte: str = Form(""),
+    onglet: str = Form("tout"),
 ):
     """Applique l'alternative choisie par l'auteur (clic droit sur sélection)."""
     analyse = await _analyse(identifiant)
@@ -154,7 +196,7 @@ async def appliquer_alternative(
         return HTMLResponse("Analyse introuvable ou non terminée.", status_code=404)
     etat = await _charger_etat(analyse)
     if not texte.strip():
-        return _rendre_atelier(request, analyse, etat, "Le texte de remplacement est vide.")
+        return _rendre_atelier(request, analyse, etat, "Le texte de remplacement est vide.", onglet=onglet)
     localisation = reconstruction.localiser(
         reconstruction.texte_paragraphe(etat, paragraphe_id), fragment, contexte
     )
@@ -163,11 +205,12 @@ async def appliquer_alternative(
             request, analyse, etat,
             "Fragment introuvable dans le texte courant (zone déjà modifiée ?) — "
             "réévaluez le paragraphe avant de recommencer.",
+            onglet=onglet,
         )
     debut, fin = localisation
     reconstruction.appliquer_modification(etat, paragraphe_id, debut, fin, texte)
     await _sauver_etat(identifiant, etat)
-    return _rendre_atelier(request, analyse, etat)
+    return _rendre_atelier(request, analyse, etat, onglet=onglet)
 
 
 async def _reevaluer_corrections(analyse, etat, paragraphe_id: str) -> list[CorrectionFusionnee]:
@@ -207,6 +250,7 @@ async def reevaluer(
     request: Request,
     identifiant: int,
     paragraphe_id: str = Form(...),
+    onglet: str = Form("tout"),
 ):
     """Réévaluation manuelle des corrections d'un paragraphe (bouton « ↻ »)."""
     analyse = await _analyse(identifiant)
@@ -219,10 +263,11 @@ async def reevaluer(
         return _rendre_atelier(
             request, analyse, etat,
             f"Réévaluation impossible (modèle indisponible ?) : {erreur}",
+            onglet=onglet,
         )
     reconstruction.remplacer_corrections_paragraphe(etat, paragraphe_id, nouvelles)
     await _sauver_etat(identifiant, etat)
-    return _rendre_atelier(request, analyse, etat)
+    return _rendre_atelier(request, analyse, etat, onglet=onglet)
 
 
 @router.post("/analyses/{identifiant}/appliquer-embellissement")
@@ -233,6 +278,7 @@ async def appliquer_embellissement(
     fragment: str = Form(...),
     texte: str = Form(...),
     contexte: str = Form(""),
+    onglet: str = Form("tout"),
 ):
     """Applique l'embellissement choisi, PUIS réévalue les corrections du
     paragraphe (décision de l'auteur : le texte change et les corrections de la
@@ -243,7 +289,7 @@ async def appliquer_embellissement(
         return HTMLResponse("Analyse introuvable ou non terminée.", status_code=404)
     etat = await _charger_etat(analyse)
     if not texte.strip():
-        return _rendre_atelier(request, analyse, etat, "Le texte embelli est vide.")
+        return _rendre_atelier(request, analyse, etat, "Le texte embelli est vide.", onglet=onglet)
     localisation = reconstruction.localiser(
         reconstruction.texte_paragraphe(etat, paragraphe_id), fragment, contexte
     )
@@ -252,6 +298,7 @@ async def appliquer_embellissement(
             request, analyse, etat,
             "Fragment introuvable dans le texte courant (zone déjà modifiée ?) — "
             "réévaluez le paragraphe avant de recommencer.",
+            onglet=onglet,
         )
     debut, fin = localisation
     reconstruction.appliquer_modification(etat, paragraphe_id, debut, fin, texte)
@@ -262,10 +309,11 @@ async def appliquer_embellissement(
             request, analyse, etat,
             f"Réévaluation impossible après embellissement : {erreur} — "
             "le texte n'a pas été modifié, réessayez.",
+            onglet=onglet,
         )
     reconstruction.remplacer_corrections_paragraphe(etat, paragraphe_id, nouvelles)
     await _sauver_etat(identifiant, etat)
-    return _rendre_atelier(request, analyse, etat)
+    return _rendre_atelier(request, analyse, etat, onglet=onglet)
 
 
 # --- Suggestions à la demande (JSON, aucun état modifié) ----------------------

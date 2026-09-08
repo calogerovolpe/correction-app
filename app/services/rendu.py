@@ -87,6 +87,20 @@ def preparer_document(
     }
 
 
+def preparer_document_par_phase(
+    paragraphes: list[ParagrapheRiche],
+    entrees: list[dict],
+    phase: str,
+    choix: dict,
+    modifies: list[str] | None = None,
+) -> dict:
+    """Projection d'UN onglet (jalon R1-a) : ne conserve que les corrections de
+    `phase`, puis délègue à `preparer_document` — AUCUNE logique de segments
+    dupliquée. `preparer_document()` reste la projection « Tout » (superposition)."""
+    filtrees = [e for e in entrees if e["fusion"].correction.phase == phase]
+    return preparer_document(paragraphes, filtrees, choix, modifies)
+
+
 def _classe_marque(entree: dict) -> str:
     phase = entree["fusion"].correction.phase
     if phase in _CLASSE_MARQUE:

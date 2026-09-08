@@ -86,7 +86,7 @@ def test_analyse_complete_extrait(client, monkeypatch):
     assert "ins--forme" in page.text          # annotation colorée
     assert "partent" in page.text
     assert 'data-paragraphe-id="p-1"' in page.text
-    assert "pastille--forme" in page.text     # légende interactive
+    assert "onglet--forme" in page.text       # barre d'onglets hybrides (jalon R1-a)
     # Matrice Extrait (J2.5) : Forme + Style actifs, PAS de Technique,
     # et PAS d'Embellissement (demandé à la demande par clic droit)
     appels = [modele for modele, _ in mock.appels]
