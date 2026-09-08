@@ -4,21 +4,26 @@
 
 ## Vue d'ensemble (flux de données)
 
-> **Refonte frontend EN COURS — F2 livré** (`6cdfb22`) : Svelte 5 + TypeScript +
+> **Refonte frontend EN COURS — F3 livré** (`023534a`) : Svelte 5 + TypeScript +
 > Vite → `app/static/spa/`, API JSON `/api/v1/` (`app/routes/api.py` : projets,
-> analyses récentes, `/soumission`, `POST /analyses`, `GET /analyses/{id}`),
-> routes Jinja2 conservées jusqu'à F5. Source de vérité :
-> `plan-refonte-frontend.md`.
-> **Les écrans E1 (accueil), E3 (soumission) et E4 (suivi) sont servis par le
-> SPA compilé depuis F1/F2** (repli Jinja2 si build absent) ; E5 (atelier)
-> tourne encore en Jinja2/HTMX/Alpine (jusqu'à F3/F5). Le flux ci-dessous décrit
-> l'état des écrans Jinja2 — en plus, le SPA Svelte consomme l'API JSON
-> `/api/v1` (routeur `app/routes/api.py` → `db.py`), y compris le suivi
-> asynchrone E4 en polling JSON (même contrat de statuts que le fragment HTMX).
+> analyses récentes, `/soumission`, `POST /analyses`, suivi, **atelier E5**
+> `GET /api/v1/analyses/{id}/atelier` + actions), routes Jinja2 conservées
+> jusqu'à F5. Source de vérité : `plan-refonte-frontend.md`.
+> **Les écrans E1 (accueil), E3 (soumission), E4 (suivi) et E5 (atelier) sont
+> servis par le SPA compilé depuis F1/F2/F3** (repli Jinja2 si build absent ;
+> E5 encore rendu par les routes Jinja2, déléguant à `app/services/atelier.py`,
+> jusqu'à la bascule F5). Le flux ci-dessous décrit les DEUX clients (Jinja2
+> conservé + SPA) ; les deux réutilisent les mêmes services purs et le même
+> orchestrateur d'atelier.
 ```
-Navigateur (Jinja2 + HTMX polling + Alpine.js — vendor local ; fetch pour l'atelier)
-  → routes FastAPI : web.py (écrans E1/E3/E4) + atelier.py (E5 : état courant,
-    choix Forme, alternatives/embellissement à la demande, réévaluation, workflow)
+Navigateur :
+  SPA Svelte (depuis F1/F2/F3) — API JSON /api/v1 pour E1/E3/E4/E5
+  Jinja2 + HTMX + Alpine (vendor local) conservés jusqu'à F5 (E5 → fetch atelier)
+  → routes FastAPI :
+      web.py (E1/E3/E4 HTML) ‣ atelier.py (E5 HTML — délègue à app/services/atelier.py)
+      api.py (/api/v1 — projets, soumission, suivi, ATELIER E5 ; délègue au même service)
+  → app/services/atelier.py (orchestration E5 partagée : état documents, choix
+      Forme, patches, embellissement, réévaluation, édition directe, workflow)
   → job asynchrone asyncio.create_task (référencé dans _TACHES)
   → analyse.executer(id) : en_attente → en_cours (normalisation, chaîne, fail_fast,
       phases Forme/Style/Technique, ecriture) → terminee | echec (Option B) | rejetee
@@ -72,7 +77,7 @@ Navigateur (Jinja2 + HTMX polling + Alpine.js — vendor local ; fetch pour l'at
 
 ## Chemins critiques (à surveiller)
 
-- `app/routes/atelier.py` — E5 (état courant, clic droit, workflow) : ~400 lignes, fractionnement fin planifié pendant J3 si croissance (règle n° 8).
+- `app/routes/atelier.py` — E5 Jinja2 (amené au F3 à ~259 lignes) : délègue à `app/services/atelier.py` (orchestration partagée avec `/api/v1`, ~390 lignes — choix Forme, patches, embellissement, édition directe, workflow) ; ressources conservées jusqu'à F5.
 - `app/services/reconstruction.py` — base immuable + annotations (projection du texte courant) : cœur de la cohérence texte affiché ↔ version validée ; 100 % pur et testé.
 - `app/routes/web.py` — E1/E3/E4 (allégé en J2.5, ~230 lignes).
 - `app/db.py` — verrou `threading.Lock` (choix délibéré) ; `sauvegarder()` = backup natif avant écriture narrative.

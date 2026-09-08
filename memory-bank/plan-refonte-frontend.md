@@ -123,7 +123,7 @@ F0→F5 et ne seront plus exécutés séparément.**
 | F0 | Socle : Vite+Svelte+TS, design tokens, layout global, routage, page d'accueil coquille, client fetch typé ; MAJ `.gitignore` (`spa/`, `node_modules/`, `dist/` gitignorés) | ✅ | `4cbb55c` |
 | F1 | Accueil & projets E1 : endpoints `/api/v1/projets`, création, activation, suppression avec confirmation + protection du projet actif, analyses récentes, états vides | ✅ | `cb6abc1` |
 | F2 | Soumission E3 + suivi E4 : endpoints `/api/v1/analyses`, collage Word fidèle, catégorie, numéro N+1, matrice de phases dérogable, compteur 30 000 car., statuts explicites, polling, fail-fast visible | ✅ | `6cdfb22` |
-| F3 | Atelier E5 : endpoints `/api/v1/analyses/{id}`, couches superposables, onglets par phase + compteurs, menu contextuel riche **[absorbe UX1]**, édition directe sans IA temps réel + « ↻ Re-corriger » **[absorbe UX4]**, barre latérale, toggle « masquer », navigation clavier, validation du texte affiché | ⬜ | — |
+| F3 | Atelier E5 : endpoints `/api/v1/analyses/{id}`, couches superposables, onglets par phase + compteurs, menu contextuel riche **[absorbe UX1]**, édition directe sans IA temps réel + « ↻ Re-corriger » **[absorbe UX4]**, barre latérale, toggle « masquer », navigation clavier, validation du texte affiché | ✅ | `023534a` |
 | F4 | Finitions UX & identité : cohérence visuelle, états vides, toasts, accessibilité/focus/contrastes/aria (vérification AA des nouvelles couleurs), responsive, layout ~1200 px **[absorbe UX2]**, microcopy | ⬜ | — |
 | F5 | Nettoyage & bascule : retrait Jinja2/HTMX/Alpine et routes HTML inutiles, spec + README + `systemPatterns`/`techContext` à jour, E2E Mistral rejoué (adapté à `/api/v1`), lanceur `.bat` vérifié | ⬜ | — |
 
@@ -209,6 +209,16 @@ F0→F5 et ne seront plus exécutés séparément.**
 
 ## Jalon F3 — Atelier E5
 
+> ✅ **LIVRÉ** (commit `023534a`) — l'atelier E5 est servi par le SPA Svelte
+> (route `#/atelier/{id}`) contre l'API JSON `/api/v1` ; la logique métier est
+> extraite dans **`app/services/atelier.py`** (partagée avec les routes Jinja2,
+> conservées jusqu'à F5 — aucune duplication) ; UI : couches superposables,
+> onglets par phase + compteurs, **menu contextuel riche** **[UX1]**, barre
+> latérale, toggle « masquer », navigation clavier, **édition directe sans IA
+> temps réel + « ↻ Re-corriger »** **[UX4]**, validation du texte affiché ;
+> **accent Technique AA** ocre `#6e5400` (fin du violet obsolète, décision 40) ;
+> 159 pytest + 45 Vitest verts ; `svelte-check` 0 erreur / 0 warning.
+
 1. **Endpoints `/api/v1/analyses/{id}` (atelier)** : état courant (base +
    annotations/projections), choix Forme, alternatives, embellissement,
    réévaluation, édition directe, « ↻ Re-corriger », validation du texte affiché.
@@ -224,10 +234,14 @@ F0→F5 et ne seront plus exécutés séparément.**
 
 ### État du code À LA FIN de F3
 
-- L'atelier Svelte couvre E5 ; `app.js` / `_atelier.html` ne sont plus utilisés
-  pour l'atelier ; Jinja2 ne sert plus que les écrans résiduels (accueil E1 si
-  non totalement absorbé).
-- UX1 et UX4 sont ABSORBÉS ; la partie « toggle » d'UX2 est en place.
+- L'atelier Svelte couvre E5 : route `#/atelier/{id}`, `GET /api/v1/analyses/{id}/atelier`
+  + actions JSON (`choix-forme`, `editer`, `appliquer-alternative`,
+  `appliquer-embellissement`, `reevaluer`, `nouvelle-version`, `valider`) et
+  suggestions `POST /api/v1/embellir` / `POST /api/v1/alternatives` ; le SPA ne
+  consomme plus les routes Jinja2 de l'atelier — **elles restent en place
+  (délèguent à `app/services/atelier.py`) jusqu'à la bascule F5**.
+- UX1 et UX4 sont ABSORBÉS ; la partie « toggle » d'UX2 est en place ;
+  l'accent Technique AA ocre remplace le violet obsolète (décision 40).
 
 ## Jalon F4 — Finitions UX & identité
 

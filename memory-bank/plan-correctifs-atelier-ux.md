@@ -63,10 +63,10 @@ que R1 et il est exigé avant UX4 et J3) — UX1/UX2/UX3 restent à faire dans l
 | 1 | **R1-a** | Onglets UI + projection par phase (rendu SEUL — stockage et `dedupliquer` inchangés) | ✅ | `245071b` |
 | 2 | **R1-b** | Stockage PAR PHASE + déduplication devenue règle d'affichage + fin de `CorrectionFusionnee` | ✅ | `c911547` |
 | 3* | **R2** | Base immuable + annotations (patches) : refonte `reconstruction.py`, fin du remappage d'offsets | ✅ | `e886d3a` |
-| 4 | **UX1** | Menu contextuel riche (clic droit sur marque, choix Forme dans le menu) | ⬜ | — |
-| 5 | **UX2** | Toggle « masquer les paragraphes sans correction », layout ~1200 px, style des onglets (WCAG AA) | ⬜ | — |
-| 6 | **UX3** | Navigation, projets : activation, navbar, suppression (indépendant, intercalable) | ⬜ | — |
-| 7 | **UX4** | Édition directe sans IA temps réel (« ↻ Re-corriger ») | ⬜ | — |
+| 4 | **UX1** | Menu contextuel riche (clic droit sur marque, choix Forme dans le menu) | ✅ **absorbé par F3** (`023534a`) | — |
+| 5 | **UX2** | Toggle « masquer les paragraphes sans correction » (partie toggle livrée en F3 ; layout ~1200 px + vérification AA au F4), style des onglets (WCAG AA) | 🟡 toggle ✅ F3 / reste F4 | — |
+| 6 | **UX3** | Navigation, projets : activation, navbar, suppression | ✅ **absorbé par F1** (`cb6abc1`) | — |
+| 7 | **UX4** | Édition directe sans IA temps réel (« ↻ Re-corriger ») | ✅ **absorbé par F3** (`023534a`) | — |
 | 8 | J3 | Chaîne séquentielle & Codex narratif (inchangé) | ⬜ | — |
 | 9 | J4 | Confort (backups, exports, stats, paramètres, import .docx) | ⬜ | — |
 | 10 | J5 | Mise en ligne (auth, Caddy/TLS, compose prod, doc VPS) | ⬜ | — |

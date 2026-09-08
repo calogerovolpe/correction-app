@@ -4,23 +4,25 @@
 
 ## Stack
 
-> **Refonte frontend EN COURS — F2 livré** (`6cdfb22`) : Svelte 5 + TypeScript +
+> **Refonte frontend EN COURS — F3 livré** (`023534a`) : Svelte 5 + TypeScript +
 > Vite → `app/static/spa/` (gitignoré), API JSON `/api/v1/` (`app/routes/api.py` :
-> projets E1, analyses récentes, soumission E3 + suivi E4 — réutilise les
-> services purs existants), routes Jinja2 conservées jusqu'à F5. Source de
-> vérité : `plan-refonte-frontend.md`.
-> ⚠️ **Les écrans E1 (accueil), E3 (soumission) et E4 (suivi) sont servis par le
-> SPA compilé** (repli Jinja2 si le build est absent) ; E5 (atelier) tourne
-> encore en Jinja2/HTMX/Alpine (jusqu'à F3/F5).
+> projets E1, analyses récentes, soumission E3 + suivi E4, **atelier E5**
+> `GET /api/v1/analyses/{id}/atelier` + actions — réutilise les services purs
+> existants ET l'orchestrateur `app/services/atelier.py` partagé), routes Jinja2
+> conservées jusqu'à F5. Source de vérité : `plan-refonte-frontend.md`.
+> ⚠️ **Les écrans E1 (accueil), E3 (soumission), E4 (suivi) et E5 (atelier) sont
+> servis par le SPA compilé** (repli Jinja2 si le build est absent ; E5 est
+> encore rendu par les routes Jinja2, déléguant à `app/services/atelier.py`,
+> jusqu'à la bascule F5).
 | Couche | Choix |
 |---|---|
 | Backend | Python 3.11+ (3.14.3 en pratique), FastAPI, Uvicorn, Pydantic v2, pydantic-settings (préfixe `APP_`, lit `.env`), httpx, python-multipart |
 | Frontend | Jinja2 (autoescape) + HTMX (polling) + Alpine.js — servis depuis `app/static/vendor/`, aucun CDN, aucun build Node |
-| Frontend (refonte F0→F5) | **Svelte 5 + TypeScript + Vite** — `frontend/` versionné (F0 ✅ `4cbb55c`, F1 ✅ `cb6abc1`, F2 ✅ `6cdfb22`), build → `app/static/spa/` (gitignoré) ; **accueil E1 depuis F1, soumission E3 + suivi E4 depuis F2** ; tests Vitest (`npm test`) |
+| Frontend (refonte F0→F5) | **Svelte 5 + TypeScript + Vite** — `frontend/` versionné (F0 ✅ `4cbb55c`, F1 ✅ `cb6abc1`, F2 ✅ `6cdfb22`, F3 ✅ `023534a`), build → `app/static/spa/` (gitignoré) ; **accueil E1 depuis F1, soumission E3 + suivi E4 depuis F2, atelier E5 depuis F3** ; tests Vitest (`npm test` — **45**) |
 | Base de données | SQLite WAL, `busy_timeout=15000`, accès `asyncio.to_thread`, verrou `threading.Lock` (`app/db.py`) |
 | LLM | **Mistral API uniquement**, `mistral-small-latest` ; client maison compatible OpenAI (`app/llm/client.py`) |
 | Conteneurisation | Dockerfile + docker-compose.yml (parité dev/prod) |
-| Tests | pytest — **145 tests** (dont **17 tests d'intégration TestClient/MockLLM sur `/api/v1/`** depuis F2) + **42 Vitest** (frontend Svelte) + E2E réel Mistral (`scripts/e2e_j25.py`, isolé `data_e2e/`) |
+| Tests | pytest — **159 tests** (dont **28 tests d'intégration TestClient/MockLLM sur `/api/v1/`** : 17 depuis F2 + 11 atelier F3) + **45 Vitest** (frontend Svelte) + E2E réel Mistral (`scripts/e2e_j25.py`, isolé `data_e2e/`) |
 
 ## Setup de développement
 

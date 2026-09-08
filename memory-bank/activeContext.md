@@ -1,24 +1,66 @@
 # Contexte actif — où nous en sommes MAINTENANT
 
-> Fichier le plus souvent mis à jour. Dernière mise à jour : 2026-09-09 (jalon F2 livré — Soumission E3 + suivi E4 ; prochain jalon = F3).
+> Fichier le plus souvent mis à jour. Dernière mise à jour : 2026-09-09 (jalon F3 livré —
+> Atelier E5 Svelte + API `/api/v1` ; prochain jalon = F4).
 
 ## Focus du moment
 
 **Refonte frontend — série F0→F5 (remplacement Jinja2 + HTMX + Alpine.js par Svelte 5 + TypeScript + Vite) — AVANT J3.**
 La roadmap détaillée est dans **`plan-refonte-frontend.md`** (même dossier) : la RELIRE EN DÉBUT DE SESSION — elle contient l'ordre des jalons F0→F5, leurs dépendances, les choix techniques, le design system et l'architecture cible. Un commit par jalon ; le suivi (statut/commit) est tenu à jour dans ce plan ET dans `progress.md`.
 
-- **Où on en est** : la série R est LIVRÉE — R1-a ✅ (`245071b`) ; R1-b ✅ (`c911547`) ; R2 ✅ (`e886d3a`) ; **F0 ✅ (`4cbb55c`) — Socle** ; **F1 ✅ (`cb6abc1`) — Accueil & projets E1** ; **F2 ✅ (`6cdfb22`) — Soumission E3 + suivi E4** (`/api/v1/analyses` POST + GET `{id}`, `/api/v1/soumission` ; écrans Svelte `#/soumission` et `#/analyses/{id}` : collage Word, numéro N+1, matrice dérogable, compteur 30 000, statuts explicites, polling, fail-fast visible) — **145 pytest + 42 Vitest verts** ; **prochain jalon = F3 — Atelier E5** (payload complet `/api/v1/analyses/{id}`, couches, onglets, menu riche, édition, validation).
+- **Où on en est** : la série R est LIVRÉE — R1-a ✅ (`245071b`) ; R1-b ✅ (`c911547`) ; R2
+  ✅ (`e886d3a`) ; **F0 ✅ (`4cbb55c`) — Socle** ; **F1 ✅ (`cb6abc1`) — Accueil & projets
+  E1** ; **F2 ✅ (`6cdfb22`) — Soumission E3 + suivi E4** ; **F3 ✅ (`023534a`) — Atelier E5**
+  (`GET /api/v1/analyses/{id}/atelier` + actions `choix-forme`, `editer`,
+  `appliquer-alternative`, `appliquer-embellissement`, `reevaluer`, `nouvelle-version`,
+  `valider` ; écran Svelte `#/atelier/{id}` : couches, onglets + compteurs, menu contextuel
+  riche, barre latérale, toggle « masquer », navigation clavier, édition directe + « ↻
+  Re-corriger », validation ; accent Technique AA ocre `#6e5400`) — **159 pytest + 45 Vitest
+  verts, `svelte-check` 0 erreur** ; **prochain jalon = F4 — Finitions UX & identité**.
 - **UX1→UX4 sont ABSORBÉS par F0→F5** (correspondance : UX1 → F3 ; UX2 → F4 layout + F3 toggle ; UX3 → F1 ; UX4 → F3) — ils ne seront plus exécutés séparément ; `plan-correctifs-atelier-ux.md` reste l'historique de la série R1/UX.
 - **Révision de décision actée** : décision A2 (cahier des charges) et spec §2.1 (stack frontend « décisions figées ») sont RÉVISÉES par la bascule Svelte — répercutée dans la spec + `systemPatterns.md` + `techContext.md` AU FIL des jalons ; les écrans E1 (accueil), E3 (soumission) et E4 (suivi) sont **déjà servis par le SPA Svelte** à côté des routes Jinja2 conservées ; le retrait final de Jinja2/HTMX/Alpine reste au jalon F5.
-- **Backend intact** : services purs + pipeline LLM (3 phases parallèles, fail-fast, Option B, « liste vide = jamais une panne ») inchangés ; l'API JSON `/api/v1/` réutilise les services purs existants ; les routes Jinja2 sont conservées jusqu'à F5.
+- **Backend intact** : services purs + pipeline LLM (3 phases parallèles, fail-fast, Option B, « liste vide = jamais une panne ») inchangés ; l'API JSON `/api/v1/` réutilise les services purs existants ; **la logique de l'atelier vit dans `app/services/atelier.py`** (partagée entre les routes Jinja2 et l'API JSON — aucune duplication) ; les routes Jinja2 sont conservées jusqu'à F5.
 - R1/R2 restent CODÉS : les corrections portent leurs offsets D'ORIGINE (base), plus AUCUN remappage — le « texte courant » est une projection calculée ; le frontend Svelte consommera ces projections.
 
 ## État global
 
-- Jalons terminés : **J2.5 — Atelier v2**, **A — Fiabilité du cœur**, **R1-a — Onglets hybrides**, **R1-b — Stockage par phase**, **R2 — Base immuable + annotations**, **F0 — Socle**, **F1 — Accueil & projets E1**, **F2 — Soumission E3 + suivi E4**.
-- Tests : **145/145 verts** (`pytest`) + **42 tests Vitest** (frontend Svelte) ; `svelte-check` 0 erreur.
+- Jalons terminés : **J2.5 — Atelier v2**, **A — Fiabilité du cœur**, **R1-a — Onglets hybrides**, **R1-b — Stockage par phase**, **R2 — Base immuable + annotations**, **F0 — Socle**, **F1 — Accueil & projets E1**, **F2 — Soumission E3 + suivi E4**, **F3 — Atelier E5**.
+- Tests : **159/159 verts** (`pytest`) + **45 tests Vitest** (frontend Svelte) ; `svelte-check` 0 erreur / 0 warning.
 - **E2E réel Mistral OK** de bout en bout (`scripts/e2e_j25.py`, environnement isolé `data_e2e/`) : **soumission + suivi via `/api/v1/` (F2)**, puis analyse 3 phases → nouvelle version (texte courant repris) → validation (chapitre officiel corrigé, hash, chaîne N+1, backup natif créé). — **rejoué au jalon F2**.
 - Application validée de bout en bout avec Mistral Small.
+
+## Changements récents (F3 — Atelier E5 Svelte + API `/api/v1`, commit `023534a`)
+
+- **Logique atelier extraite** dans `app/services/atelier.py` (~390 lignes) : état
+  `documents` (chargement + migration R2), `contexte_resultat` (document annoté +
+  **compteurs par phase**), choix Forme, alternatives, embellissement **sans état
+  partiel** (patch appliqué sur une copie, sauvé seulement après réévaluation OK),
+  réévaluation, **édition directe** (`reconstruction.remplacer_texte_paragraphe` —
+  patch de paragraphe entier ancré base, corrections/patches antérieurs retirés),
+  suggestions à la demande, nouvelle version, validation officielle. `app/routes/atelier.py`
+  aminci (~259 lignes) : délègue au service et rend le template (conservé jusqu'à F5).
+- **API JSON atelier (F3)** — `app/routes/api.py` : `GET /api/v1/analyses/{id}/atelier?onglet=`
+  (contrat `EtatAtelier` = document annoté + compteurs, lecture pure jamais de statut
+  fantôme), `POST …/choix-forme`, `…/editer`, `…/appliquer-alternative`,
+  `…/appliquer-embellissement`, `…/reevaluer`, `…/nouvelle-version` (→ `{nouvel_id}`),
+  `…/valider` (→ `{ok, numero, titre, hash}`) ; suggestions `POST /api/v1/embellir` et
+  `POST /api/v1/alternatives`. Erreurs métier → `ErreurAtelier` → HTTPException détaillée.
+- **Écran Svelte `#/atelier/{id}`** (`Atelier.svelte` + `OngletsPhase`, `DocumentAnnote`,
+  `BarreLaterale`, `MenuContextuel`, `PopoverSuggestion`, `EditionParagraphe`,
+  `ToggleMasquer`, `lib/api/atelier.ts`, types F3) : couches réelles (del/ins rouge, mark-style,
+  mark-technique fond jaune), onglets + compteurs, menu contextuel riche au clic droit
+  (marque Forme : Appliquer / Garder l'original ; sélection : Embellir / Alternative), barre
+  latérale, toggle « masquer », navigation clavier ←/→, édition directe + « ↻ Re-corriger »,
+  validation ; `Suivi.svelte` → lien « Ouvrir le résultat » vers `#/atelier/{id}`.
+- **Accent Technique AA** : l'ancien violet `#6a1b9a` est remplacé par l'ocre `#6e5400`
+  (tokens Svelte + `app/static/style.css`) — fond jaune `#fff9c4` jamais changé ;
+  spec §11 **décision 40**.
+- **Tests** : 11 tests d'intégration `tests/test_api_atelier.py` (TestClient/MockLLM :
+  lecture pure, projection onglet, choix Forme, édition, alternative, embellissement sans
+  état partiel, réévaluation, suggestions, nouvelle version, validation) + 3 tests unitaires
+  d'édition directe (`test_reconstruction.py`) + 3 Vitest atelier (`frontend/tests/atelier.test.ts`).
+- **Spec** : §2.1 (stack + endpoints F3), §2.2 (service atelier), §2.3 (atelier JSON),
+  §8.2-E5 (écran Svelte), §10 (série F0→F5), §11 décision 40 — même commit.
 
 ## Changements récents (F2 — Soumission E3 + suivi E4, commit `6cdfb22`)
 
@@ -148,9 +190,9 @@ La roadmap détaillée est dans **`plan-refonte-frontend.md`** (même dossier) :
 ## Prochaines étapes (ordre)
 
 1. **F1 — Accueil & projets E1** : ✅ **LIVRÉ** (`cb6abc1`).
-2. **F2 — Soumission E3 + suivi E4** : endpoints `/api/v1/analyses` ; collage Word fidèle ; catégorie ; numéro N+1 ; matrice de phases dérogable ; compteur 30 000 car. ; statuts explicites ; polling ; fail-fast visible ; E2E réel adapté `/api/v1`. **PROCHAIN JALON.**
-3. **F3 — Atelier E5** : endpoints `/api/v1/analyses/{id}` ; couches superposables ; onglets par phase + compteurs ; menu contextuel riche **[absorbe UX1]** ; édition directe sans IA temps réel + « ↻ Re-corriger » **[absorbe UX4]** ; barre latérale ; toggle « masquer » **[part d'UX2]** ; navigation clavier ; validation du texte affiché ; nouvel accent Technique AA (fin du violet obsolète).
-4. **F4 — Finitions UX & identité** : cohérence visuelle ; états vides ; toasts ; accessibilité/focus/contrastes/aria (vérification AA des nouvelles couleurs) ; responsive ; layout ~1200 px **[absorbe UX2]** ; microcopy.
+2. **F2 — Soumission E3 + suivi E4** : ✅ **LIVRÉ** (`6cdfb22`).
+3. **F3 — Atelier E5** : ✅ **LIVRÉ** (`023534a`) — API atelier JSON + écran Svelte `#/atelier/{id}` (couches, onglets + compteurs, menu riche **[UX1]**, édition directe + « ↻ Re-corriger » **[UX4]**, barre latérale, toggle **[UX2]**, navigation clavier, validation), accent Technique AA ocre.
+4. **F4 — Finitions UX & identité** : cohérence visuelle ; états vides ; toasts ; accessibilité/focus/contrastes/aria (vérification AA des nouvelles couleurs) ; responsive ; layout ~1200 px **[absorbe UX2]** ; microcopy. **PROCHAIN JALON.**
 5. **F5 — Nettoyage & bascule** : retrait Jinja2/HTMX/Alpine + routes HTML inutiles ; spec + README + `systemPatterns`/`techContext` à jour ; E2E Mistral rejoué `/api/v1` ; lanceur `.bat` vérifié.
 6. **J3 — Chaîne & codex** (EN ATTENTE, après F5) : écritures narratives (transaction, `avec_codex` câblé, codex/journaux), phase 2 LLM (extraction codex, cohérence, relecture-diff), écrans E2/E6/E7 + bandeau d'alertes, RAG alias. Critère d'acceptation : Prologue → ch.1 → ch.2 → resoumission N=N sans remplacement → remplacement officiel (relecture-diff) → alerte → « Choix d'auteur » → non re-détectée.
 7. **J4 — Confort** puis **J5 — Mise en ligne** (inchangés) ; **R3 — extension des catégories** (futur : une phase = une config + un onglet + une projection, zéro changement au cœur).
@@ -165,6 +207,7 @@ La roadmap détaillée est dans **`plan-refonte-frontend.md`** (même dossier) :
   5. **Multi-passes conservé** : 3 appels LLM parallèles, texte complet chacun ; les onglets ne changent RIEN aux tokens (zéro appel LLM ajouté/supprimé).
   6. **R1 découpé en R1-a / R1-b** (DEUX conversations distinctes) : R1-a = UI onglets + projection par phase (rendu seul — stockage et `dedupliquer` intacts) ; R1-b = stockage par phase + suppression de `CorrectionFusionnee`/`embellissement_migre` (code mort : aucune correction `embellissement` n'est produite par le pipeline, l'embellissement est à la demande). Handoff d'état intermédiaire documenté dans le plan (« État du code À LA FIN de R1-a ») — CONSOMMÉ : R1-a `245071b` ✅ et R1-b `c911547` ✅.
 - Anciennes décisions arbitrées (2026-09-09) : spec §11 **décisions 33-38** (ids de correction uniques, rejet des no-op, toggle « masquer » — **RÉVISE la décision 24**, menu contextuel riche, suppression de projet, édition sans IA temps réel) — voir `plan-correctifs-atelier-ux.md`.
+- **Décision 40 ACTÉE (F3)** : accent Technique AA ocre `#6e5400` (fin du violet) + atelier E5 servi par le SPA contre l'API JSON `/api/v1` (logique `app/services/atelier.py`) — détail spec §11.
 - Précision d'implémentation du jalon A (décision 34) : le rejet des no-op ne concerne que la **phase Forme** — Style/Technique marquent SANS réécrire (`original == correction` y est le mode de marquage légitime, ex. fond jaune Technique).
 - Migration des analyses antérieures ARBITRÉE (2026-09-08, jalon R2) : re-parsing depuis `analyses.texte_source` + `corrections.data_json`, choix/refus préservés par id, modifications manuelles abandonnées — livré en `e886d3a`.
 - Décisions antérieures figées : `projectbrief.md` (+ spec §11 décisions 1-32) ; historique : `progress.md`.
@@ -172,5 +215,5 @@ La roadmap détaillée est dans **`plan-refonte-frontend.md`** (même dossier) :
 ## Dettes / anomalies connues (documentation)
 
 - **Limite connue (jalon A, hors des 3 bugs)** : `_reevaluer_corrections` (`atelier.py`) régénère des ids `c-r0001…` avec un compteur remis à zéro à CHAQUE appel — deux réévaluations de paragraphes DIFFÉRENTS dans la même session peuvent théoriquement produire le même id (même classe de collision que le bug 1). Cas rare, non constaté ; à traiter si l'atelier le révèle (piste : continuer la séquence `c-r` à l'échelle du document).
-- `app/routes/atelier.py` (~400 lignes) > cible 300 : le fractionnement fin (par écran) reste planifié pendant J3 si le fichier grossit encore (règle systemPatterns n° 8).
+- `app/routes/atelier.py` **aminci au F3** (~259 lignes) : la logique a été extraite dans `app/services/atelier.py` (orchestration) — le fractionnement fin (par écran) reste planifié pendant J3 si le fichier grossit encore (règle systemPatterns n° 8).
 - Le déballage `(lastrowid, rowcount)` est documenté comme piège — un commentaire de garde figure sur le seul site restant (`nouvelle-version`).
