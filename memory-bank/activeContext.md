@@ -1,50 +1,63 @@
 # Contexte actif — où nous en sommes MAINTENANT
 
-> Fichier le plus souvent mis à jour. Dernière mise à jour : 2026-09-09 (jalon F1 livré — Accueil & projets E1 ; prochain jalon = F2).
+> Fichier le plus souvent mis à jour. Dernière mise à jour : 2026-09-09 (jalon F2 livré — Soumission E3 + suivi E4 ; prochain jalon = F3).
 
 ## Focus du moment
 
 **Refonte frontend — série F0→F5 (remplacement Jinja2 + HTMX + Alpine.js par Svelte 5 + TypeScript + Vite) — AVANT J3.**
 La roadmap détaillée est dans **`plan-refonte-frontend.md`** (même dossier) : la RELIRE EN DÉBUT DE SESSION — elle contient l'ordre des jalons F0→F5, leurs dépendances, les choix techniques, le design system et l'architecture cible. Un commit par jalon ; le suivi (statut/commit) est tenu à jour dans ce plan ET dans `progress.md`.
 
-- **Où on en est** : la série R est LIVRÉE — R1-a ✅ (`245071b`) ; R1-b ✅ (`c911547`) ; R2 ✅ (`e886d3a`) ; **F0 ✅ (`4cbb55c`) — Socle Svelte 5 + TS + Vite** ; **F1 ✅ (`cb6abc1`) — Accueil & projets E1** (`/api/v1/projets` : liste, création, activation, suppression avec confirmation + protection du projet actif ; analyses récentes ; états vides — **accueil Svelte branché**) — **128 pytest + 19 Vitest verts** ; **prochain jalon = F2 — Soumission E3 + suivi E4** (`/api/v1/analyses`).
+- **Où on en est** : la série R est LIVRÉE — R1-a ✅ (`245071b`) ; R1-b ✅ (`c911547`) ; R2 ✅ (`e886d3a`) ; **F0 ✅ (`4cbb55c`) — Socle** ; **F1 ✅ (`cb6abc1`) — Accueil & projets E1** ; **F2 ✅ (`6cdfb22`) — Soumission E3 + suivi E4** (`/api/v1/analyses` POST + GET `{id}`, `/api/v1/soumission` ; écrans Svelte `#/soumission` et `#/analyses/{id}` : collage Word, numéro N+1, matrice dérogable, compteur 30 000, statuts explicites, polling, fail-fast visible) — **145 pytest + 42 Vitest verts** ; **prochain jalon = F3 — Atelier E5** (payload complet `/api/v1/analyses/{id}`, couches, onglets, menu riche, édition, validation).
 - **UX1→UX4 sont ABSORBÉS par F0→F5** (correspondance : UX1 → F3 ; UX2 → F4 layout + F3 toggle ; UX3 → F1 ; UX4 → F3) — ils ne seront plus exécutés séparément ; `plan-correctifs-atelier-ux.md` reste l'historique de la série R1/UX.
-- **Révision de décision actée** : décision A2 (cahier des charges) et spec §2.1 (stack frontend « décisions figées ») sont RÉVISÉES par la bascule Svelte — la révision n'est PAS encore codée : l'application tourne TOUJOURS en Jinja2/HTMX/Alpine ; la transition sera répercutée dans la spec + `systemPatterns.md` + `techContext.md` au fil des jalons (F0 amorce, F5 bascule finale).
+- **Révision de décision actée** : décision A2 (cahier des charges) et spec §2.1 (stack frontend « décisions figées ») sont RÉVISÉES par la bascule Svelte — répercutée dans la spec + `systemPatterns.md` + `techContext.md` AU FIL des jalons ; les écrans E1 (accueil), E3 (soumission) et E4 (suivi) sont **déjà servis par le SPA Svelte** à côté des routes Jinja2 conservées ; le retrait final de Jinja2/HTMX/Alpine reste au jalon F5.
 - **Backend intact** : services purs + pipeline LLM (3 phases parallèles, fail-fast, Option B, « liste vide = jamais une panne ») inchangés ; l'API JSON `/api/v1/` réutilise les services purs existants ; les routes Jinja2 sont conservées jusqu'à F5.
 - R1/R2 restent CODÉS : les corrections portent leurs offsets D'ORIGINE (base), plus AUCUN remappage — le « texte courant » est une projection calculée ; le frontend Svelte consommera ces projections.
 
 ## État global
 
-- Jalons terminés : **J2.5 — Atelier v2**, **A — Fiabilité du cœur**, **R1-a — Onglets hybrides**, **R1-b — Stockage par phase**, **R2 — Base immuable + annotations**.
-- Tests : **128/128 verts** (`pytest`) + **19 tests Vitest** (frontend Svelte).
-- **E2E réel Mistral OK** de bout en bout (`scripts/e2e_j25.py`, environnement isolé `data_e2e/`) : analyse 3 phases → nouvelle version (texte courant repris) → validation (chapitre officiel corrigé, hash, chaîne N+1, backup natif créé). — **rejoué au jalon R2**.
+- Jalons terminés : **J2.5 — Atelier v2**, **A — Fiabilité du cœur**, **R1-a — Onglets hybrides**, **R1-b — Stockage par phase**, **R2 — Base immuable + annotations**, **F0 — Socle**, **F1 — Accueil & projets E1**, **F2 — Soumission E3 + suivi E4**.
+- Tests : **145/145 verts** (`pytest`) + **42 tests Vitest** (frontend Svelte) ; `svelte-check` 0 erreur.
+- **E2E réel Mistral OK** de bout en bout (`scripts/e2e_j25.py`, environnement isolé `data_e2e/`) : **soumission + suivi via `/api/v1/` (F2)**, puis analyse 3 phases → nouvelle version (texte courant repris) → validation (chapitre officiel corrigé, hash, chaîne N+1, backup natif créé). — **rejoué au jalon F2**.
 - Application validée de bout en bout avec Mistral Small.
 
-## Changements récents (F1 — Accueil & projets E1, commit `cb6abc1`)
+## Changements récents (F2 — Soumission E3 + suivi E4, commit `6cdfb22`)
 
-- **API JSON `/api/v1/`** (`app/routes/api.py`, routeur dédié, « aucune logique
-  métier dupliquée ») : `GET`/`POST /api/v1/projets` (création ; le premier
-  projet d'un espace vierge devient actif), `POST /api/v1/projets/{id}/activer`
-  (UPSERT `parametres.projet_actif` — un seul projet actif), `DELETE
-  /api/v1/projets/{id}` (suppression TOTALE en cascade ; projet actif → **409**,
-  le trigger SQL `trg_projet_actif_restrict` reste la garantie ultime),
-  `GET /api/v1/analyses` (10 plus récentes, extrait 60 caractères).
-- **Écran accueil Svelte branché** (`routes/Accueil.svelte`) : liste des
-  manuscrits (badge de chaîne + « actif », chapitre courant), création,
-  **activation**, **suppression avec confirmation** (composant `Modale.svelte`),
-  **analyses récentes cliquables** (liens vers l'atelier Jinja2), **états
-  vides** en microcopy française. La route Jinja2 `GET /` (`web.py`) sert le
-  SPA compilé (`app/static/spa/`) quand il existe, **repli Jinja2** sinon.
-- **Socle UI** : composants `Bouton` (primaire/secondaire/danger), `Badge`
-  (chaîne + statuts d'analyse), `Modale` (confirmation) ;
-  module typé `lib/api/projets.ts` ; type `Projet` enrichi (`chain_status`,
-  `current_chapter_num`, `last_chapter_title`).
-- **Vitest** : 19 tests verts (client, module API, écran accueil — fetch
-  mocké) ; `svelte-check` 0 erreur ; build Vite → `app/static/spa/`
-  (config `base: '/static/spa/'`).
-- **Backend métier intact** : 128/128 pytest (121 antérieurs + F1) ; les
-  routes Jinja2 E3/E4/E5 et le template `index.html` (repli) sont conservés
-  jusqu'à F5. Spécification §2.1/§2.2/§8.2 mise à jour dans le même commit.
+- **API JSON `/api/v1/` étendue** (`app/routes/api.py`, mêmes règles : « aucune
+  logique métier dupliquée », moteur de jobs asynchrones réutilisé tel quel) :
+  `GET /api/v1/soumission` (projet actif, numéro N+1 attendu, dernières
+  configurations mémorisées, `max_caracteres` — source unique du compteur),
+  `POST /api/v1/analyses` (équivalent JSON du POST `/analyses` Jinja2 : refus
+  explicites 400 — texte vide, dépassement sans troncature, aucune phase,
+  aucun projet actif — puis job `analyse.executer(id)` référencé dans
+  `_TACHES`), `GET /api/v1/analyses/{analyse_id}` (statut/étape/erreur pour le
+  polling + synthèse `resultat` lecture seule pour `terminee`, étendue au F3).
+- **Écran Svelte soumission E3** (`routes/Soumission.svelte`, route hash
+  `#/soumission`) : éditeur Word-fidèle (`EditeurWord.svelte` +
+  `lib/editeur/nettoyage.ts` — nettoyage strict au collage, sérialisation v2
+  identique au template Jinja2), catégorie Chapitre/Passage/Extrait, numéro
+  **N+1 pré-rempli** (indicateur « attendu par la suite »), **matrice de
+  phases dérogable** (pré-coches par catégorie, mémoire des dernières options),
+  **compteur 30 000 caractères** visible (refus explicite au-delà), bouton
+  désactivé si texte vide, bandeaux `Bandeau.svelte` pour les refus 400.
+- **Écran Svelte suivi E4** (`routes/Suivi.svelte`, route hash
+  `#/analyses/{id}`) : **polling 2 s** (arrêt à l'état final), **statuts
+  explicites** (badges `en_attente → en_cours → terminee | echec | rejetee`),
+  **fail-fast visible** (gabarits verbatim), **jamais de statut fantôme**
+  (statut inconnu → erreur ; `404` → bandeau), résultat `terminee` → synthèse
+  par phase + lien « Ouvrir le résultat » vers l'atelier E5 (Jinja2, jusqu'à F3).
+- **Intégration** : `App.svelte` routeur (union `/`, `/soumission`,
+  `/analyses/{id}`), `NavBar` (lien « Soumettre un texte »), types +
+  module typé `lib/api/analyses.ts`, composants `Bandeau`/`EditeurWord`,
+  bouton « Réessayer » en cas d'échec de préparation.
+- **Tests** : 17 tests d'intégration TestClient/MockLLM sur `/api/v1/`
+  (`tests/test_api_analyses.py` — soumission, refus 400, matrices, fail-fast,
+  Option B, 404, lecture pure, ids incrémentaux) + 23 tests Vitest
+  (`editeur`, `apiAnalyses`, `soumission`, `suivi`) — 42 au total.
+- **E2E réel Mistral adapté** (`scripts/e2e_j25.py`) : soumission + suivi
+  branchés sur `/api/v1/` (les étapes atelier restent Jinja2) — **rejoué OK**.
+- **Backend métier intact** : 145/145 pytest ; pipeline LLM, Option B,
+  fail-fast, « liste vide = jamais une panne », base immuable : inchangés.
+  Spécification §2.1/§2.2/§2.3/§8.2 mise à jour dans le même commit.
 
 ## Changements récents (F0 — Socle Svelte 5 + TypeScript + Vite, commit `4cbb55c`)
 

@@ -122,7 +122,7 @@ F0→F5 et ne seront plus exécutés séparément.**
 |---|---|---|---|
 | F0 | Socle : Vite+Svelte+TS, design tokens, layout global, routage, page d'accueil coquille, client fetch typé ; MAJ `.gitignore` (`spa/`, `node_modules/`, `dist/` gitignorés) | ✅ | `4cbb55c` |
 | F1 | Accueil & projets E1 : endpoints `/api/v1/projets`, création, activation, suppression avec confirmation + protection du projet actif, analyses récentes, états vides | ✅ | `cb6abc1` |
-| F2 | Soumission E3 + suivi E4 : endpoints `/api/v1/analyses`, collage Word fidèle, catégorie, numéro N+1, matrice de phases dérogable, compteur 30 000 car., statuts explicites, polling, fail-fast visible | ⬜ | — |
+| F2 | Soumission E3 + suivi E4 : endpoints `/api/v1/analyses`, collage Word fidèle, catégorie, numéro N+1, matrice de phases dérogable, compteur 30 000 car., statuts explicites, polling, fail-fast visible | ✅ | `6cdfb22` |
 | F3 | Atelier E5 : endpoints `/api/v1/analyses/{id}`, couches superposables, onglets par phase + compteurs, menu contextuel riche **[absorbe UX1]**, édition directe sans IA temps réel + « ↻ Re-corriger » **[absorbe UX4]**, barre latérale, toggle « masquer », navigation clavier, validation du texte affiché | ⬜ | — |
 | F4 | Finitions UX & identité : cohérence visuelle, états vides, toasts, accessibilité/focus/contrastes/aria (vérification AA des nouvelles couleurs), responsive, layout ~1200 px **[absorbe UX2]**, microcopy | ⬜ | — |
 | F5 | Nettoyage & bascule : retrait Jinja2/HTMX/Alpine et routes HTML inutiles, spec + README + `systemPatterns`/`techContext` à jour, E2E Mistral rejoué (adapté à `/api/v1`), lanceur `.bat` vérifié | ⬜ | — |
@@ -176,6 +176,14 @@ F0→F5 et ne seront plus exécutés séparément.**
 
 ## Jalon F2 — Soumission E3 + suivi E4
 
+> ✅ **LIVRÉ** (commit `6cdfb22`) — endpoints `/api/v1/analyses` (POST
+> soumission, GET `{id}` statut/suivi) + `/api/v1/soumission` (préparation E3) ;
+> écrans Svelte E3 (`#/soumission` : collage Word fidèle, catégorie, numéro
+> N+1, matrice dérogable, compteur 30 000) et E4 (`#/analyses/{id}` : statuts
+> explicites, polling 2 s, fail-fast visible) ; refus explicites 400 inchangés ;
+> backend intact (145 pytest) ; 42 tests Vitest ; `svelte-check` 0 erreur ;
+> E2E réel Mistral rejoué (soumission/suivi via `/api/v1`).
+
 1. **Endpoints `/api/v1/analyses`** : POST soumission, GET statut/suivi,
    lecture du résultat — réutilise le moteur de jobs asynchrones INTACT.
 2. **Collage Word fidèle** (nettoyage au collage, comme aujourd'hui) ;
@@ -190,8 +198,12 @@ F0→F5 et ne seront plus exécutés séparément.**
 
 ### État du code À LA FIN de F2
 
-- Soumission + suivi Svelte couvrent E3/E4 ; l'atelier E5 reste en Jinja2
-  (inchangé) jusqu'à F3.
+- Soumission + suivi Svelte couvrent E3/E4 : routes hash `#/soumission` et
+  `#/analyses/{id}` (accueil F1 inchangé, lien « Ouvrir le résultat » vers
+  l'atelier E5) ; l'atelier E5 reste en Jinja2 (inchangé) jusqu'à F3.
+- Le **résultat** `terminee` exposé par `GET /api/v1/analyses/{id}` est une
+  synthèse lecture seule (nb corrections par phase) — contrat pensé pour être
+  étendu par le payload complet de l'atelier au jalon F3.
 - Pipeline LLM, Option B, fail-fast, « liste vide = jamais une panne »,
   base immuable : INTACTS.
 

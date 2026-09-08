@@ -4,13 +4,17 @@
 
 ## Vue d'ensemble (flux de données)
 
-> **Refonte frontend EN COURS — F1 livré** (`cb6abc1`) : Svelte 5 + TypeScript +
-> Vite → `app/static/spa/`, API JSON `/api/v1/` (`app/routes/api.py`), routes
-> Jinja2 conservées jusqu'à F5. Source de vérité : `plan-refonte-frontend.md`.
-> **L'accueil `/` est servi par le SPA compilé depuis F1** (repli Jinja2 si build
-> absent) ; les écrans E3/E4/E5 tournent encore en Jinja2/HTMX/Alpine (jusqu'à
-> F3/F5). Le flux ci-dessous décrit l'état des écrans Jinja2 — en plus, le SPA
-> Svelte consomme l'API JSON `/api/v1` (routeur `app/routes/api.py` → `db.py`).
+> **Refonte frontend EN COURS — F2 livré** (`6cdfb22`) : Svelte 5 + TypeScript +
+> Vite → `app/static/spa/`, API JSON `/api/v1/` (`app/routes/api.py` : projets,
+> analyses récentes, `/soumission`, `POST /analyses`, `GET /analyses/{id}`),
+> routes Jinja2 conservées jusqu'à F5. Source de vérité :
+> `plan-refonte-frontend.md`.
+> **Les écrans E1 (accueil), E3 (soumission) et E4 (suivi) sont servis par le
+> SPA compilé depuis F1/F2** (repli Jinja2 si build absent) ; E5 (atelier)
+> tourne encore en Jinja2/HTMX/Alpine (jusqu'à F3/F5). Le flux ci-dessous décrit
+> l'état des écrans Jinja2 — en plus, le SPA Svelte consomme l'API JSON
+> `/api/v1` (routeur `app/routes/api.py` → `db.py`), y compris le suivi
+> asynchrone E4 en polling JSON (même contrat de statuts que le fragment HTMX).
 ```
 Navigateur (Jinja2 + HTMX polling + Alpine.js — vendor local ; fetch pour l'atelier)
   → routes FastAPI : web.py (écrans E1/E3/E4) + atelier.py (E5 : état courant,
