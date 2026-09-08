@@ -4,6 +4,11 @@
 
 ## Vue d'ensemble (flux de données)
 
+> **Refonte frontend PLANIFIÉE F0→F5** : Svelte 5 + TypeScript + Vite →
+> `app/static/spa/`, API JSON `/api/v1/`, routes Jinja2 conservées jusqu'à F5.
+> Source de vérité : `plan-refonte-frontend.md`. Le flux ci-dessous décrit l'état
+> ACTUEL (Jinja2/HTMX/Alpine toujours actifs) — AUCUN état non encore réalisé
+> n'est décrit comme acquis.
 ```
 Navigateur (Jinja2 + HTMX polling + Alpine.js — vendor local ; fetch pour l'atelier)
   → routes FastAPI : web.py (écrans E1/E3/E4) + atelier.py (E5 : état courant,

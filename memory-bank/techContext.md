@@ -4,6 +4,11 @@
 
 ## Stack
 
+> **Refonte frontend PLANIFIÉE F0→F5** : Svelte 5 + TypeScript + Vite →
+> `app/static/spa/`, API JSON `/api/v1/` (réutilise les services purs existants),
+> routes Jinja2 conservées jusqu'à F5. Source de vérité : `plan-refonte-frontend.md`.
+> ⚠️ La stack actuelle du code reste celle décrite ci-dessous (Jinja2/HTMX/Alpine) —
+> la bascule Svelte n'est PAS encore réalisée et ne sera répercutée qu'aux jalons F0/F5.
 | Couche | Choix |
 |---|---|
 | Backend | Python 3.11+ (3.14.3 en pratique), FastAPI, Uvicorn, Pydantic v2, pydantic-settings (préfixe `APP_`, lit `.env`), httpx, python-multipart |

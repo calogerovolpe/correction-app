@@ -1,6 +1,6 @@
 # Progression — jalons, état, décisions
 
-> Dernière mise à jour : 2026-09-08 (jalon R2 livré — base immuable + annotations, fin du remappage d'offsets ; prochain jalon = UX1).
+> Dernière mise à jour : 2026-09-09 (roadmap de refonte frontend F0→F5 actée — absorbe UX1→UX4 ; prochain jalon = F0).
 
 ## État des jalons
 
@@ -21,15 +21,19 @@
 | **R1-a — Onglets UI + projection par phase (rendu seul)** | ✅ **Terminé** | `245071b` |
 | **R1-b — Stockage par phase + déduplication affichage (fin `CorrectionFusionnee`)** | ✅ **Terminé (E2E réel Mistral)** | `c911547` |
 | **R2 — Base immuable + annotations (fin du remappage d'offsets)** | ✅ **Terminé (E2E réel Mistral)** | `e886d3a` |
-| UX1 — Menu contextuel riche (ex-B) | ⬜ **Prochain jalon** | — |
-| UX2 — Confort d'affichage : toggle, layout, style onglets (ex-C) | ⬜ À faire (après R1) | — |
-| UX3 — Navigation, projets : activation, navbar, suppression (ex-D, indépendant) | ⬜ À faire (intercalable) | — |
-| UX4 — Édition directe sans IA temps réel (ex-E) | ⬜ À faire (après R2) | — |
-| J3 — Chaîne séquentielle & Codex narratif | ⬜ En attente (après UX4/R2) | — |
+| **F0 — Socle** (Vite+Svelte+TS, design tokens, layout, routage, coquille accueil, client fetch, `.gitignore`) | ⬜ **Prochain jalon** | — |
+| **F1 — Accueil & projets E1** (`/api/v1/projets`, création, activation, suppression + protection, analyses récentes, états vides) | ⬜ À faire | — |
+| **F2 — Soumission E3 + suivi E4** (`/api/v1/analyses`, collage Word, matrice dérogable, compteur 30 000, polling, fail-fast) | ⬜ À faire | — |
+| **F3 — Atelier E5** (couches, onglets + compteurs, menu riche [UX1], édition + « ↻ Re-corriger » [UX4], toggle [UX2], validation, navigation clavier) | ⬜ À faire | — |
+| **F4 — Finitions UX & identité** (cohérence visuelle, états vides, toasts, accessibilité AA, responsive, layout ~1200 px [UX2], microcopy) | ⬜ À faire | — |
+| **F5 — Nettoyage & bascule** (retrait Jinja2/HTMX/Alpine, spec+README+patterns à jour, E2E `/api/v1`, `.bat`) | ⬜ À faire | — |
+| J3 — Chaîne séquentielle & Codex narratif | ⬜ En attente (après F5) | — |
 | J4 — Confort | ⬜ À faire | — |
 | J5 — Mise en ligne | ⬜ À faire | — |
 
 **Tests : 121/121 verts** (`pytest`). E2E réel rejoué au jalon R2 : `scripts/e2e_j25.py` (isolé dans `data_e2e/`).
+
+> **Absorption UX1→UX4 (2026-09-09)** : la roadmap de refonte frontend **F0→F5** absorbe UX1→UX4 (UX1 → F3 ; UX2 → F4 layout + F3 toggle ; UX3 → F1 ; UX4 → F3) — ils ne seront plus exécutés séparément. Source de vérité : `plan-refonte-frontend.md`.
 
 ## Ce qui marche (validé de bout en bout)
 
@@ -62,21 +66,23 @@
 
 ## Reste à faire (priorisé)
 
-> Ordre détaillé, dépendances et architecture cible : **`plan-correctifs-atelier-ux.md`** (roadmap maîtresse, réorganisée le 2026-09-09).
+> Ordre détaillé, étapes, architecture cible et design system : **`plan-refonte-frontend.md`** (roadmap maîtresse F0→F5, créée le 2026-09-09).
+> **Les jalons UX1→UX4 de `plan-correctifs-atelier-ux.md` sont ABSORBÉS par F0→F5** (UX1 → F3 ; UX2 → F4 layout + F3 toggle ; UX3 → F1 ; UX4 → F3) — ils ne seront plus exécutés séparément. R1/R2 sont LIVRÉS et ne sont plus à réaliser.
 
-1. **UX1 — Menu contextuel riche** (ex-B) : clic droit sur marque, choix Forme dans le menu, barre latérale lecture seule. **PROCHAIN JALON.**
-2. **UX2 — Confort d'affichage** (ex-C) : toggle « masquer les paragraphes sans correction », layout ~1200 px, style des onglets (les pastilles sont remplacées par les onglets de R1-a).
-3. **UX3 — Navigation, projets** (ex-D, indépendant/intercalable) : activation, navbar, suppression de projet.
-4. **R2 — Base immuable + annotations (patches)** : refonte de `reconstruction.py` (fin du remappage d'offsets) ; E2E requis.
-5. **UX4 — Édition directe sans IA temps réel** (ex-E, après R2) : texte éditable + « ↻ Re-corriger ».
-6. **J3 — Chaîne & codex** (EN ATTENTE, après R2/UX4) : écritures narratives (transaction, `avec_codex` câblé, codex/journaux), phase 2 LLM (extraction codex, cohérence, relecture-diff), écrans E2/E6/E7 + bandeau d'alertes, RAG alias.
-7. **J4 — Confort** : E9 (backups liste/restauration/purge, exports md/docx, statistiques, logs debug), E8 (paramètres + test de connexion), import .docx (italique/gras), correction hors-ligne locale (candidat).
-8. **J5 — Mise en ligne** : durcissement (auth simple), Caddy (TLS), compose production + volumes, sauvegardes programmées, doc de déploiement VPS, option Tailscale documentée.
-9. **R3 — Extension des catégories** (futur) : une phase = une config + un onglet + une projection, zéro changement au cœur.
+1. **F0 — Socle** : Vite + Svelte 5 + TS ; design tokens (thème + couches de correction réelles) ; layout global + routage ; page d'accueil coquille ; client fetch typé `/api/v1/` ; MAJ `.gitignore` (`spa/`, `node_modules/`, `dist/`). **PROCHAIN JALON.**
+2. **F1 — Accueil & projets E1** : endpoints `/api/v1/projets` (liste, création, activation, suppression avec confirmation + protection du projet actif), analyses récentes, états vides.
+3. **F2 — Soumission E3 + suivi E4** : endpoints `/api/v1/analyses` ; collage Word fidèle ; catégorie ; numéro N+1 ; matrice de phases dérogable ; compteur 30 000 car. ; statuts explicites ; polling ; fail-fast visible ; E2E réel adapté `/api/v1`.
+4. **F3 — Atelier E5** : endpoints `/api/v1/analyses/{id}` ; couches superposables ; onglets par phase + compteurs ; menu contextuel riche **[absorbe UX1]** ; édition directe sans IA temps réel + « ↻ Re-corriger » **[absorbe UX4]** ; barre latérale ; toggle « masquer » **[absorbe la partie toggle d'UX2]** ; navigation clavier ; validation du texte affiché.
+5. **F4 — Finitions UX & identité** : cohérence visuelle ; états vides ; toasts ; accessibilité/focus/contrastes/aria (vérification AA des nouvelles couleurs) ; responsive ; layout ~1200 px **[absorbe le reste d'UX2]** ; microcopy.
+6. **F5 — Nettoyage & bascule** : retrait Jinja2/HTMX/Alpine + routes HTML inutiles ; spec + README + `systemPatterns`/`techContext` à jour ; E2E Mistral rejoué `/api/v1` ; lanceur `.bat` vérifié.
+7. **J3 — Chaîne & codex** (EN ATTENTE, après F5) : écritures narratives (transaction, `avec_codex` câblé, codex/journaux), phase 2 LLM (extraction codex, cohérence, relecture-diff), écrans E2/E6/E7 + bandeau d'alertes, RAG alias.
+8. **J4 — Confort** : E9 (backups liste/restauration/purge, exports md/docx, statistiques, logs debug), E8 (paramètres + test de connexion), import .docx (italique/gras), correction hors-ligne locale (candidat).
+9. **J5 — Mise en ligne** : durcissement (auth simple), Caddy (TLS), compose production + volumes, sauvegardes programmées, doc de déploiement VPS, option Tailscale documentée.
+10. **R3 — Extension des catégories** (futur) : une phase = une config + un onglet + une projection, zéro changement au cœur.
 
 ## Problèmes connus
 
-- 114/114 tests verts ; E2E réel Mistral OK (rejoué au jalon R1-b sur le nouveau format de stockage).
+- **121/121 tests verts** ; E2E réel Mistral OK (rejoué aux jalons R1-b et R2).
 - **Bugs constatés par l'auteur (correctifs — roadmap `plan-correctifs-atelier-ux.md`)** : ~~barre latérale désynchronisée (ids non uniques entre phases)~~ ✅ jalon A ; ~~corrections no-op (« cous » → « cous »)~~ ✅ jalon A ; ~~menu contextuel non fiable (`hidden` neutralisé, popover hors écran)~~ ✅ jalon A ; pas de menu contextuel sur une marque (jalon B) ; numéro attendu erroné pour un nouveau projet (jalon D).
 - **Limite connue** : `_reevaluer_corrections` régénère des ids `c-r0001…` avec compteur remis à zéro par appel — deux réévaluations de paragraphes différents dans une même session peuvent théoriquement entrer en collision (même classe de bug que le jalon A, cas rare non constaté ; piste : séquence `c-r` continue à l'échelle du document).
 - Dette : `atelier.py` ~400 lignes — fractionnement fin planifié pendant J3 si croissance (règle 300 lignes).

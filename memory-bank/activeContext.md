@@ -1,16 +1,17 @@
 # Contexte actif — où nous en sommes MAINTENANT
 
-> Fichier le plus souvent mis à jour. Dernière mise à jour : 2026-09-08 (jalon R2 livré — base immuable + annotations, fin du remappage d'offsets ; prochain jalon = UX1).
+> Fichier le plus souvent mis à jour. Dernière mise à jour : 2026-09-09 (roadmap de refonte frontend F0→F5 actée — absorbe UX1→UX4 ; prochain jalon = F0).
 
 ## Focus du moment
 
-**Série R1-a/R1-b → UX4 (refonte rendu/état + correctifs UX) — AVANT J3.**
-La roadmap détaillée est dans **`plan-correctifs-atelier-ux.md`** (même dossier) : la RELIRE EN DÉBUT DE SESSION — elle contient l'ordre des jalons, leurs dépendances et l'architecture cible. Un commit par jalon ; le suivi (statut/commit) est tenu à jour dans ce plan ET dans `progress.md`.
+**Refonte frontend — série F0→F5 (remplacement Jinja2 + HTMX + Alpine.js par Svelte 5 + TypeScript + Vite) — AVANT J3.**
+La roadmap détaillée est dans **`plan-refonte-frontend.md`** (même dossier) : la RELIRE EN DÉBUT DE SESSION — elle contient l'ordre des jalons F0→F5, leurs dépendances, les choix techniques, le design system et l'architecture cible. Un commit par jalon ; le suivi (statut/commit) est tenu à jour dans ce plan ET dans `progress.md`.
 
-- **Où on en est** : jalon A ✅ (`b5545f0`) ; réorganisation du plan ✅ (`fac3463`) ; découpage R1-a/R1-b ✅ (`a4dfe98`) ; R1-a ✅ (`245071b`) ; **R1-b ✅ (`c911547`) — Stockage par phase + fin de `CorrectionFusionnee`** ; **R2 ✅ (`e886d3a`) — Base immuable + annotations (fin du remappage d'offsets)** ; **prochain jalon = UX1 — Menu contextuel riche**.
-- **R1 était DÉCOUPÉ en DEUX conversations** : R1-a (UI + rendu) ✅ puis R1-b (stockage par phase + fin de `CorrectionFusionnee`) ✅ — le handoff « À LA FIN de R1-a » du plan est CONSOMMÉ (section conservée pour l'historique).
-- **Ordre imposé** : R1-a → R1-b → UX1 → UX2 → UX3 → R2 → UX4 → J3 → J4 → J5 (UX3 indépendant, intercalable). **R2 a été livré dès après R1-b** (décision de l'auteur : il ne dépend de rien d'autre que R1, et il est exigé AVANT UX4 et J3) — les jalons UX1/UX2/UX3 restent à faire dans l'ordre.
-- R1 est CODÉ (R1-a rendu/UI ✅ + R1-b stockage par phase ✅) ; **R2 est CODÉ** (base immuable + annotations) : les corrections portent leurs offsets D'ORIGINE (base), plus AUCUN remappage — le « texte courant » est une projection calculée.
+- **Où on en est** : la série R est LIVRÉE — R1-a ✅ (`245071b`) ; R1-b ✅ (`c911547`) ; R2 ✅ (`e886d3a`) — **121 tests verts, E2E réel Mistral rejoué OK** ; **prochain jalon = F0 — Socle** (Vite + Svelte 5 + TS, design tokens, layout global, routage, page d'accueil coquille, client fetch typé, MAJ `.gitignore`).
+- **UX1→UX4 sont ABSORBÉS par F0→F5** (correspondance : UX1 → F3 ; UX2 → F4 layout + F3 toggle ; UX3 → F1 ; UX4 → F3) — ils ne seront plus exécutés séparément ; `plan-correctifs-atelier-ux.md` reste l'historique de la série R1/UX.
+- **Révision de décision actée** : décision A2 (cahier des charges) et spec §2.1 (stack frontend « décisions figées ») sont RÉVISÉES par la bascule Svelte — la révision n'est PAS encore codée : l'application tourne TOUJOURS en Jinja2/HTMX/Alpine ; la transition sera répercutée dans la spec + `systemPatterns.md` + `techContext.md` au fil des jalons (F0 amorce, F5 bascule finale).
+- **Backend intact** : services purs + pipeline LLM (3 phases parallèles, fail-fast, Option B, « liste vide = jamais une panne ») inchangés ; l'API JSON `/api/v1/` réutilise les services purs existants ; les routes Jinja2 sont conservées jusqu'à F5.
+- R1/R2 restent CODÉS : les corrections portent leurs offsets D'ORIGINE (base), plus AUCUN remappage — le « texte courant » est une projection calculée ; le frontend Svelte consommera ces projections.
 
 ## État global
 
@@ -87,13 +88,14 @@ La roadmap détaillée est dans **`plan-correctifs-atelier-ux.md`** (même dossi
 
 ## Prochaines étapes (ordre)
 
-1. **UX1 — Menu contextuel riche** (ex-B) : clic droit sur marque SANS sélection, choix Forme déplacé dans le menu, barre latérale lecture seule. **PROCHAIN JALON.**
-2. **UX2 — Confort d'affichage** (ex-C) : toggle « masquer » (révise la décision 24), layout élargi ~1200 px, style des onglets (les pastilles ont disparu avec R1-a).
-3. **UX3 — Navigation, projets** (ex-D) : activation — bug du « 2 » bloqué, navbar, suppression de projet avec confirmation + protection du projet actif. *Indépendant, intercalable à tout moment.*
-4. **R2 — Base immuable + annotations (patches)** : refonte de `reconstruction.py`, fin du remappage d'offsets ; E2E requis (l'état est touché).
-5. **UX4 — Édition directe sans IA temps réel** (ex-E) : texte éditable + « ↻ Re-corriger » ; dépend de R2.
-6. **J3 — Chaîne & codex** (EN ATTENTE) : écritures narratives (transaction, `avec_codex` câblé, codex/journaux), phase 2 LLM (extraction codex, cohérence, relecture-diff), écrans E2/E6/E7 + bandeau d'alertes, RAG alias. Ne démarre qu'APRÈS R2 (la validation officielle lit l'état courant). Critère d'acceptation : Prologue → ch.1 → ch.2 → resoumission N=N sans remplacement → remplacement officiel (relecture-diff) → alerte → « Choix d'auteur » → non re-détectée.
-7. **J4 — Confort** puis **J5 — Mise en ligne** (inchangés) ; **R3 — extension des catégories** (futur : une phase = une config + un onglet + une projection, zéro changement au cœur).
+1. **F0 — Socle** : Vite + Svelte 5 + TS ; design tokens (thème + couches réelles) ; layout global + routage ; page d'accueil coquille ; client fetch typé `/api/v1/` ; MAJ `.gitignore` (`spa/`, `node_modules/`, `dist/`). **PROCHAIN JALON.**
+2. **F1 — Accueil & projets E1** : endpoints `/api/v1/projets` (liste, création, activation, suppression avec confirmation + protection du projet actif), analyses récentes, états vides.
+3. **F2 — Soumission E3 + suivi E4** : endpoints `/api/v1/analyses` ; collage Word fidèle ; catégorie ; numéro N+1 ; matrice de phases dérogable ; compteur 30 000 car. ; statuts explicites ; polling ; fail-fast visible ; E2E réel adapté `/api/v1`.
+4. **F3 — Atelier E5** : endpoints `/api/v1/analyses/{id}` ; couches superposables ; onglets par phase + compteurs ; menu contextuel riche **[absorbe UX1]** ; édition directe sans IA temps réel + « ↻ Re-corriger » **[absorbe UX4]** ; barre latérale ; toggle « masquer » **[part d'UX2]** ; navigation clavier ; validation du texte affiché ; nouvel accent Technique AA (fin du violet obsolète).
+5. **F4 — Finitions UX & identité** : cohérence visuelle ; états vides ; toasts ; accessibilité/focus/contrastes/aria (vérification AA des nouvelles couleurs) ; responsive ; layout ~1200 px **[absorbe UX2]** ; microcopy.
+6. **F5 — Nettoyage & bascule** : retrait Jinja2/HTMX/Alpine + routes HTML inutiles ; spec + README + `systemPatterns`/`techContext` à jour ; E2E Mistral rejoué `/api/v1` ; lanceur `.bat` vérifié.
+7. **J3 — Chaîne & codex** (EN ATTENTE, après F5) : écritures narratives (transaction, `avec_codex` câblé, codex/journaux), phase 2 LLM (extraction codex, cohérence, relecture-diff), écrans E2/E6/E7 + bandeau d'alertes, RAG alias. Critère d'acceptation : Prologue → ch.1 → ch.2 → resoumission N=N sans remplacement → remplacement officiel (relecture-diff) → alerte → « Choix d'auteur » → non re-détectée.
+8. **J4 — Confort** puis **J5 — Mise en ligne** (inchangés) ; **R3 — extension des catégories** (futur : une phase = une config + un onglet + une projection, zéro changement au cœur).
 
 ## Décisions en cours / à arbitrer
 
