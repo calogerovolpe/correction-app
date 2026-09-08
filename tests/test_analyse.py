@@ -322,8 +322,11 @@ def test_ids_de_corrections_uniques_entre_phases(client, monkeypatch):
 
     lignes = asyncio.run(db.interroger(
         "SELECT data_json FROM corrections WHERE analyse_id = ?", (identifiant,)))
-    fusion = json.loads(lignes[0]["data_json"])
-    ids = [f["correction"]["id"] for f in fusion]
+    par_phase = json.loads(lignes[0]["data_json"])
+    # Stockage PAR PHASE (R1-b) : data_json = dict {"forme": [...], "style": [...]}
+    # (valeurs = Correction.model_dump()) — l'aplati suit l'ordre des phases.
+    assert set(par_phase) == {"forme", "style"}
+    ids = [c["id"] for corrections in par_phase.values() for c in corrections]
     assert len(ids) == 2
     assert len(set(ids)) == 2           # plus aucun doublon entre phases
     assert ids == ["c-0001", "c-0002"]  # réassignation déterministe

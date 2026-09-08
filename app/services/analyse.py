@@ -4,7 +4,7 @@ Séquence (adaptation v6 §14.1) :
   normalisation -> chaîne déclarative (catégorie choisie par l'auteur)
   -> fail-fast (ping des modèles actifs) -> phases parallèles (Forme, Style,
   Technique) (Option B : aucune panne tolérée, aucun résultat partiel)
-  -> validation/réconciliation -> déduplication -> écritures.
+  -> validation/réconciliation -> écritures (stockage PAR PHASE, R1-b).
 
 J2.5 : l'Embellissement n'est plus une phase d'analyse — il est demandé À LA
 DEMANDE sur sélection (app/routes/atelier.py). Aucune écriture narrative ici
@@ -180,17 +180,24 @@ async def _executer_interne(identifiant: int) -> None:
         return
 
     toutes = [correction for resultat in resultats for correction in resultat]
-    fusion = reconciliation.dedupliquer(toutes)
     # IDs globaux uniques et déterministes (jalon A) : chaque phase émet ses
     # propres ids sans coordination — un doublon casserait les groupes g-XXXX
     # du rendu (barre latérale désynchronisée, choix Forme partagés).
-    fusion = reconciliation.renumeroter(fusion)
+    # Déduplication = règle d'AFFICHAGE (R1-b) : l'ancienne `dedupliquer()`
+    # (migration Style/Embellissement, v6 §8.4) est supprimée — AUCUNE
+    # correction n'est absorbée ici (rendu.py gère la coexistence).
+    corrections = reconciliation.renumeroter(toutes)
 
-    # Écritures — métadonnées uniquement en J2 (narratif au jalon J3)
+    # Écritures — métadonnées uniquement en J2 (narratif au jalon J3).
+    # Stockage PAR PHASE (R1-b) : data_json = dict {"forme": […], "style": […],
+    # "technique": […]} (valeurs = Correction.model_dump()) — colonne inchangée.
+    par_phase: dict[str, list[dict]] = {}
+    for correction in corrections:
+        par_phase.setdefault(correction.phase, []).append(correction.model_dump())
     await _maj(identifiant, etape="ecriture")
     await db.executer(
         "INSERT INTO corrections (analyse_id, data_json) VALUES (?, ?)",
-        (identifiant, json.dumps([f.model_dump() for f in fusion], ensure_ascii=False)),
+        (identifiant, json.dumps(par_phase, ensure_ascii=False)),
     )
     await _maj(identifiant, statut="terminee", etape=None, fini_a=_maintenant())
 

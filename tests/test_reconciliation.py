@@ -5,7 +5,7 @@ import json
 
 import pytest
 
-from app.models import Correction, CorrectionFusionnee, PannePhase
+from app.models import Correction, PannePhase
 from app.services import reconciliation as reco
 from app.services.normalisation import Paragraphe
 
@@ -148,10 +148,17 @@ def test_fragment_introuvable_rejete():
     )
     assert correction is None
 
-# --- Déduplication Style prioritaire (v6 §8.4) ------------------------------
+# --- Déduplication = règle d'AFFICHAGE (R1-b) -------------------------------
+# L'ancienne `dedupliquer()` (v6 §8.4 : Style prioritaire, Embellissement migré
+# dans le tooltip du Style) est SUPPRIMÉE : en réconciliation, AUCUNE correction
+# n'est absorbée — en cas de recouvrement (exact ou partiel), Style et
+# Embellissement COEXISTENT (superposés dans « Tout », séparés par onglet).
 
 
-def test_recouvrement_exact_style_prioritaire_embellissement_migre():
+def test_recouvrement_exact_style_et_embellissement_coexistent():
+    """Recouvrement exact Style/Embellissement : les DEUX sont conservées et
+    renumérotées — aucune migration, aucune absorption (l'ancienne règle
+    « Style prioritaire » v6 §8.4 est supprimée, décision R1-b)."""
     style = _correction(
         id="c-0001", phase="style", type="repetition",
         correction="s'élancent", variantes=["bondissent"],
@@ -161,32 +168,18 @@ def test_recouvrement_exact_style_prioritaire_embellissement_migre():
         correction="s'envolent", variantes=["volent", "fendent l'air"],
         explication="Assonance discrète.",
     )
-    fusion = reco.dedupliquer([style, embellissement])
-    assert len(fusion) == 1
-    assert fusion[0].correction.id == "c-0001"  # Style conservé (v6 §8.4)
-    assert fusion[0].embellissement_migre is not None
-    assert fusion[0].embellissement_migre.suggestion == "s'envolent"
-    assert fusion[0].embellissement_migre.variantes == ["volent", "fendent l'air"]
-    assert fusion[0].embellissement_migre.explication == "Assonance discrète."
+    conservees = reco.renumeroter([style, embellissement])
+    assert [(c.phase, c.id) for c in conservees] == [
+        ("style", "c-0001"), ("embellissement", "c-0002"),
+    ]
+    assert conservees[1].correction == "s'envolent"  # rien n'a été absorbé
+    assert conservees[1].variantes == ["volent", "fendent l'air"]
 
 
-def test_chevauchement_partiel_coexistence():
-    style = _correction(id="c-0001", phase="style", type="repetition")
-    embellissement = _correction(
-        id="c-0003", phase="embellissement", type="prosodie",
-        debut=12, fin=16, original="rs p", correction="…",
-    )
-    fusion = reco.dedupliquer([style, embellissement])
-    assert len(fusion) == 2  # intervalles différents : bloc multi (v6 §8.4)
-    assert all(f.embellissement_migre is None for f in fusion)
-
-
-def test_embellissement_isole_sans_style_hote():
+def test_embellissement_sans_style_hote_est_conserve():
     embellissement = _correction(id="c-0004", phase="embellissement", type="prosodie")
-    fusion = reco.dedupliquer([embellissement])
-    assert len(fusion) == 1
-    assert fusion[0].correction.phase == "embellissement"
-    assert fusion[0].embellissement_migre is None
+    conservees = reco.renumeroter([embellissement])
+    assert [c.phase for c in conservees] == ["embellissement"]
 
 # --- Ids globaux uniques (jalon A, décision 33) ------------------------------
 
@@ -196,24 +189,11 @@ def test_renumeroter_assigne_des_ids_globaux_uniques_et_deterministes():
     la réassignation produit une suite unique ET déterministe."""
     style = _correction(id="c-0007", phase="style", type="repetition")
     forme = _correction(id="c-0001", phase="forme", type="accord")
-    entrees = [CorrectionFusionnee(correction=style), CorrectionFusionnee(correction=forme)]
+    entrees = [style, forme]
     fusion = reco.renumeroter(entrees)
-    assert [f.correction.id for f in fusion] == ["c-0001", "c-0002"]
+    assert [c.id for c in fusion] == ["c-0001", "c-0002"]
     encore = reco.renumeroter(entrees)  # déterministe : même entrée → mêmes ids
-    assert [f.correction.id for f in encore] == ["c-0001", "c-0002"]
-
-
-def test_renumeroter_conserve_l_embellissement_migre():
-    style = _correction(id="c-0001", phase="style", type="repetition")
-    embellissement = _correction(
-        id="c-0001", phase="embellissement", type="prosodie",
-        correction="s'envolent", variantes=["volent"],
-    )
-    fusion = reco.renumeroter(reco.dedupliquer([style, embellissement]))
-    assert len(fusion) == 1
-    assert fusion[0].correction.id == "c-0001"
-    assert fusion[0].embellissement_migre is not None
-    assert fusion[0].embellissement_migre.suggestion == "s'envolent"
+    assert [c.id for c in encore] == ["c-0001", "c-0002"]
 
 
 # --- Rejet des no-op Forme (jalon A, décision 34) ----------------------------

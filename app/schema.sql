@@ -95,7 +95,9 @@ CREATE TABLE IF NOT EXISTS analyses (
   fini_a       TEXT
 );
 
--- Historique de relecture : dernier jeu de corrections fusionnées par analyse
+-- Historique de relecture : corrections de la dernière analyse, stockées PAR
+-- PHASE (R1-b) : data_json = {"forme": [...], "style": [...], "technique": [...]}
+-- (valeurs = Correction.model_dump()).
 CREATE TABLE IF NOT EXISTS corrections (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
   analyse_id INTEGER NOT NULL REFERENCES analyses(id) ON DELETE CASCADE,

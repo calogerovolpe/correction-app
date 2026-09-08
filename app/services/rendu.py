@@ -32,7 +32,7 @@ _CLASSE_MARQUE = {"style": "mark-style", "technique": "mark-technique"}
 
 
 def _info(entree: dict, groupe: str) -> dict:
-    c = entree["fusion"].correction
+    c = entree["correction"]
     return {
         "id": c.id,
         "groupe": groupe,
@@ -58,8 +58,8 @@ def preparer_document(
     modifies: list[str] | None = None,
 ) -> dict:
     """Construit le document annoté (couches) + la liste pour la barre latérale."""
-    groupes = {e["fusion"].correction.id: f"g-{i + 1:04d}" for i, e in enumerate(entrees)}
-    infos_barre = [_info(e, groupes[e["fusion"].correction.id]) for e in entrees]
+    groupes = {e["correction"].id: f"g-{i + 1:04d}" for i, e in enumerate(entrees)}
+    infos_barre = [_info(e, groupes[e["correction"].id]) for e in entrees]
     for info in infos_barre:
         if info["phase"] == "forme":
             info["decision"] = "original" if choix.get(info["id"]) == "original" else "corrige"
@@ -69,7 +69,7 @@ def preparer_document(
     modifies_set = set(modifies or [])
     for p in paragraphes:
         entrees_pid = [
-            e for e in entrees if e["fusion"].correction.paragraphe_id == p.id
+            e for e in entrees if e["correction"].paragraphe_id == p.id
         ]
         actives = [e for e in entrees_pid if e["etat"] == "active"]
         if not actives and p.id not in modifies_set:
@@ -97,12 +97,12 @@ def preparer_document_par_phase(
     """Projection d'UN onglet (jalon R1-a) : ne conserve que les corrections de
     `phase`, puis délègue à `preparer_document` — AUCUNE logique de segments
     dupliquée. `preparer_document()` reste la projection « Tout » (superposition)."""
-    filtrees = [e for e in entrees if e["fusion"].correction.phase == phase]
+    filtrees = [e for e in entrees if e["correction"].phase == phase]
     return preparer_document(paragraphes, filtrees, choix, modifies)
 
 
 def _classe_marque(entree: dict) -> str:
-    phase = entree["fusion"].correction.phase
+    phase = entree["correction"].phase
     if phase in _CLASSE_MARQUE:
         return _CLASSE_MARQUE[phase]
     return "refusee"  # correction Forme refusée : texte original restauré
@@ -111,7 +111,7 @@ def _classe_marque(entree: dict) -> str:
 def _couvrants(marques: list[dict], a: int, b: int) -> list[dict]:
     return [
         e for e in marques
-        if e["fusion"].correction.debut < b and e["fusion"].correction.fin > a
+        if e["correction"].debut < b and e["correction"].fin > a
     ]
 
 
@@ -120,20 +120,20 @@ def _segments(p: ParagrapheRiche, actives: list[dict], choix: dict, groupes: dic
     formes = sorted(
         (
             e for e in actives
-            if e["fusion"].correction.phase == "forme"
-            and choix.get(e["fusion"].correction.id) != "original"
+            if e["correction"].phase == "forme"
+            and choix.get(e["correction"].id) != "original"
         ),
-        key=lambda e: e["fusion"].correction.debut,
+        key=lambda e: e["correction"].debut,
     )
     marques = [
         e for e in actives
-        if e["fusion"].correction.phase != "forme"
-        or choix.get(e["fusion"].correction.id) == "original"
+        if e["correction"].phase != "forme"
+        or choix.get(e["correction"].id) == "original"
     ]
     segments: list[dict] = []
     position = 0
     for entree in formes:
-        c = entree["fusion"].correction
+        c = entree["correction"]
         if c.debut > position:
             segments.extend(_segments_texte(p, position, c.debut, marques, groupes))
         segments.append(_segment_forme(entree, p, c, marques, groupes))
@@ -168,7 +168,7 @@ def _segments_texte(
         couvrants = _couvrants(marques, position, position + len(run.texte))
         position += len(run.texte)
         classes = " ".join(sorted({_classe_marque(e) for e in couvrants}))
-        groupe = groupes[couvrants[0]["fusion"].correction.id] if couvrants else None
+        groupe = groupes[couvrants[0]["correction"].id] if couvrants else None
         items.append({
             "type": "texte",
             "texte": run.texte,

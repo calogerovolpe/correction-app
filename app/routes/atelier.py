@@ -26,7 +26,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from app import db
 from app.config import settings
 from app.llm import prompts as service_prompts
-from app.models import CorrectionFusionnee, ReponseAlternatives, ReponseEmbellissement
+from app.models import Correction, ReponseAlternatives, ReponseEmbellissement
 from app.routes.web import TEMPLATES, _analyse, _TACHES
 from app.services import analyse as service_analyse
 from app.services import reconstruction, reconciliation as service_reconciliation
@@ -46,15 +46,19 @@ _MODELES_REEVALUATION = {
 # --- État courant (table `documents`) ----------------------------------------
 
 
-async def _charger_fusion(identifiant: int) -> list[CorrectionFusionnee]:
+async def _charger_corrections(identifiant: int) -> list[Correction]:
+    """Lit `corrections.data_json` — dict PAR PHASE (R1-b) — et l'aplatit en
+    `list[Correction]` (ordre = phases de l'écriture, ordre d'émission)."""
     lignes = await db.interroger(
         "SELECT data_json FROM corrections WHERE analyse_id = ?", (identifiant,)
     )
     if not lignes:
         return []
+    par_phase = json.loads(lignes[0]["data_json"])
     return [
-        CorrectionFusionnee.model_validate(d)
-        for d in json.loads(lignes[0]["data_json"])
+        Correction.model_validate(d)
+        for corrections in par_phase.values()
+        for d in corrections
     ]
 
 
@@ -65,7 +69,7 @@ async def _charger_etat(analyse) -> dict:
     if lignes:
         return reconstruction.depuis_json(lignes[0]["document_json"])
     paragraphes = service_texte_riche.parser_document_riche(analyse["texte_source"])
-    etat = reconstruction.etat_initial(await _charger_fusion(analyse["id"]), paragraphes)
+    etat = reconstruction.etat_initial(await _charger_corrections(analyse["id"]), paragraphes)
     await db.executer(
         "INSERT INTO documents (analyse_id, document_json) VALUES (?, ?)",
         (analyse["id"], reconstruction.vers_json(etat)),
@@ -114,7 +118,7 @@ def _contexte_resultat(analyse, etat, erreur=None, onglet="tout") -> dict:
         # phase existe (calculé sur l'état COMPLET : la projection d'un onglet
         # filtrerait sinon la barre et ferait disparaître l'onglet).
         "a_embellissement": any(
-            e["fusion"].correction.phase == "embellissement" for e in etat["corrections"]
+            e["correction"].phase == "embellissement" for e in etat["corrections"]
         ),
     }
 
@@ -213,7 +217,7 @@ async def appliquer_alternative(
     return _rendre_atelier(request, analyse, etat, onglet=onglet)
 
 
-async def _reevaluer_corrections(analyse, etat, paragraphe_id: str) -> list[CorrectionFusionnee]:
+async def _reevaluer_corrections(analyse, etat, paragraphe_id: str) -> list[Correction]:
     """Relance les phases actives de l'analyse sur le SEUL paragraphe modifié
     (texte courant) — décision de l'auteur : les corrections de la zone sont
     réévaluées avec la modification. Liste vide valide (jamais une panne)."""
@@ -222,7 +226,7 @@ async def _reevaluer_corrections(analyse, etat, paragraphe_id: str) -> list[Corr
     options = json.loads(analyse["options_json"] or "{}")
     actives = service_analyse.phases_actives(analyse["categorie"] or "chapitre", options)
     client = service_analyse._client_llm()
-    nouvelles: list[CorrectionFusionnee] = []
+    nouvelles: list[Correction] = []
     compteur = 0
     for phase in actives:
         modele = _MODELES_REEVALUATION[phase]()
@@ -241,7 +245,7 @@ async def _reevaluer_corrections(analyse, etat, paragraphe_id: str) -> list[Corr
             )
             reconciliee = service_reconciliation.reconcilier(renommee, paragraphe)
             if reconciliee is not None:
-                nouvelles.append(CorrectionFusionnee(correction=reconciliee))
+                nouvelles.append(reconciliee)
     return nouvelles
 
 

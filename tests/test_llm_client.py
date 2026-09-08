@@ -87,10 +87,10 @@ def test_sortie_non_parsable_leve_panne_de_phase():
         reco.extraire_corrections(sortie, "forme")
 
 
-# --- Pipeline complet sur réponses scriptées (v6 §8.2-8.4) -------------------
+# --- Pipeline complet sur réponses scriptées (v6 §8.2-8.3, R1-b) -------------
 
 
-def test_pipeline_complet_extraction_reconciliation_deduplication():
+def test_pipeline_complet_extraction_reconciliation():
     reponses = {
         "modele-style": json.dumps(
             {
@@ -136,10 +136,11 @@ def test_pipeline_complet_extraction_reconciliation_deduplication():
             reconciliees.append(resultat)
     assert len(reconciliees) == 2
 
-    fusion = reco.dedupliquer(reconciliees)
-    assert len(fusion) == 1  # recouvrement exact : Style prioritaire (v6 §8.4)
-    assert fusion[0].correction.phase == "style"
-    assert fusion[0].embellissement_migre.suggestion == "s'envolent"
+    conservees = reco.renumeroter(reconciliees)
+    # Déduplication = règle d'affichage (R1-b) : recouvrement exact — les DEUX
+    # coexistent, AUCUNE n'est absorbée (l'ancienne migration §8.4 est supprimée).
+    assert [c.phase for c in conservees] == ["style", "embellissement"]
+    assert [c.id for c in conservees] == ["c-0001", "c-0002"]
 
 
 def test_temperatures_par_phase_respectees():

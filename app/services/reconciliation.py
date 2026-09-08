@@ -6,8 +6,9 @@ Règles appliquées :
 - Panne de phase = JSON non parsable ou racine non conforme (v6 §8.5). Une liste
   valide vide n'est JAMAIS une panne ;
 - Réconciliation des offsets avec ancre `contexte_avant` (v6 §8.3) ;
-- Priorité Style (v6 §8.4) : recouvrement exact -> l'Embellissement migre en
-  variantes dans le tooltip du Style ; chevauchement partiel -> coexistence en bloc multi.
+- Déduplication = règle d'AFFICHAGE (R1-b) : AUCUNE correction n'est absorbée —
+  en cas de recouvrement (exact ou partiel), Style et Embellissement coexistent
+  (superposés dans la vue « Tout », séparés dans leurs onglets).
 """
 
 import json
@@ -16,7 +17,7 @@ import re
 
 from pydantic import ValidationError
 
-from app.models import Correction, CorrectionFusionnee, EmbellissementMigre, PannePhase
+from app.models import Correction, PannePhase
 from app.services.normalisation import Paragraphe
 
 JOURNAL = logging.getLogger("correction.reconciliation")
@@ -104,58 +105,23 @@ def reconcilier(correction: Correction, paragraphe: Paragraphe) -> Correction | 
     return None
 
 
-def renumeroter(fusions: list[CorrectionFusionnee]) -> list[CorrectionFusionnee]:
+def renumeroter(corrections: list[Correction]) -> list[Correction]:
     """Assigne des ids GLOBAUX uniques et déterministes (jalon A, décision 33).
 
     Chaque phase LLM émet ses propres ids (ex. `c-0001`) sans coordination :
     deux corrections de phases différentes peuvent partager le même id. Or
     `rendu.py` construit ses groupes `g-XXXX` par id — un doublon colle deux
     corrections (barre latérale désynchronisée, choix Forme partagé).
-    On réassigne donc `c-0001`, `c-0002`, … dans l'ordre de la liste fusionnée,
-    qui est déterministe (phases dans ORDRE_PHASES, ordre d'émission du LLM)."""
+    On réassigne donc `c-0001`, `c-0002`, … dans l'ordre de la liste, qui est
+    déterministe (phases dans ORDRE_PHASES, ordre d'émission du LLM)."""
     return [
-        CorrectionFusionnee(
-            correction=f.correction.model_copy(update={"id": f"c-{index:04d}"}),
-            embellissement_migre=f.embellissement_migre,
-        )
-        for index, f in enumerate(fusions, start=1)
+        c.model_copy(update={"id": f"c-{index:04d}"})
+        for index, c in enumerate(corrections, start=1)
     ]
 
 
-def dedupliquer(corrections: list[Correction]) -> list[CorrectionFusionnee]:
-    """Déduplication Style/Embellissement (v6 §8.4).
-
-    « Même fragment » = même `paragraphe_id` ET offsets strictement identiques :
-    le Style est prioritaire et l'Embellissement migre en variantes dans son tooltip.
-    Chevauchement partiel (intervalles différents) : les deux coexistent en bloc multi."""
-    styles = {
-        (c.paragraphe_id, c.debut, c.fin): c
-        for c in corrections
-        if c.phase == "style"
-    }
-    migrant_par_cle: dict[tuple[str, int, int], EmbellissementMigre] = {}
-    conservees: list[Correction] = []
-    for correction in corrections:
-        if correction.phase == "embellissement":
-            cle = (correction.paragraphe_id, correction.debut, correction.fin)
-            if cle in styles:
-                if cle not in migrant_par_cle:  # premier embellissement gagnant
-                    migrant_par_cle[cle] = EmbellissementMigre(
-                        suggestion=correction.correction,
-                        variantes=correction.variantes,
-                        explication=correction.explication,
-                    )
-                continue  # ne devient pas une entrée propre : absorbé par le Style
-        conservees.append(correction)
-
-    return [
-        CorrectionFusionnee(
-            correction=correction,
-            embellissement_migre=(
-                migrant_par_cle.get((correction.paragraphe_id, correction.debut, correction.fin))
-                if correction.phase == "style"
-                else None
-            ),
-        )
-        for correction in conservees
-    ]
+# (R1-b) L'ancienne `dedupliquer()` (v6 §8.4 : Style prioritaire, Embellissement
+# migré dans le tooltip du Style) est SUPPRIMÉE — décision consignée au commit :
+# elle ne faisait plus rien d'utile et la « déduplication » est désormais une
+# règle d'AFFICHAGE (rendu.py : couches superposées dans « Tout », séparées par
+# onglet). Aucune correction n'est absorbée en réconciliation.

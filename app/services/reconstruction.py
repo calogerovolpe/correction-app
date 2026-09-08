@@ -30,7 +30,7 @@ Sémantique :
 import json
 import re
 
-from app.models import CorrectionFusionnee
+from app.models import Correction
 from app.services.texte_riche import (
     ParagrapheRiche,
     RunFormat,
@@ -43,13 +43,13 @@ from app.services.texte_riche import (
 
 
 def etat_initial(
-    fusion: list[CorrectionFusionnee], paragraphes: list[ParagrapheRiche]
+    corrections: list[Correction], paragraphes: list[ParagrapheRiche]
 ) -> dict:
     """État courant initial : corrections Forme appliquées par défaut."""
     etat: dict = {
         "paragraphes": [p.model_copy(deep=True) for p in paragraphes],
         "corrections": [
-            {"fusion": f, "etat": "active", "motif": None} for f in fusion
+            {"correction": c, "etat": "active", "motif": None} for c in corrections
         ],
         "choix": {},
         "modifies": [],
@@ -57,7 +57,7 @@ def etat_initial(
     for pid in {p.id for p in etat["paragraphes"]}:
         entrees_pid = [
             e for e in etat["corrections"]
-            if e["fusion"].correction.paragraphe_id == pid
+            if e["correction"].paragraphe_id == pid
         ]
         _appliquer_formes(etat, entrees_pid, _paragraphe(etat, pid))
     return etat
@@ -66,17 +66,17 @@ def etat_initial(
 def _appliquer_formes(etat: dict, entrees_pid: list[dict], paragraphe: ParagrapheRiche) -> None:
     """Applique les corrections Forme actives (par offsets décroissants), puis
     remappe TOUTES les corrections du paragraphe sur le texte courant."""
-    formes = [e for e in entrees_pid if e["fusion"].correction.phase == "forme"]
+    formes = [e for e in entrees_pid if e["correction"].phase == "forme"]
     if not formes:
         return
     resolues: list[dict] = []
     for entree in sorted(
-        formes, key=lambda e: (e["fusion"].correction.debut, e["fusion"].correction.fin)
+        formes, key=lambda e: (e["correction"].debut, e["correction"].fin)
     ):
-        c = entree["fusion"].correction
+        c = entree["correction"]
         if any(
             c.debut < f and c.fin > d
-            for d, f in ((r["fusion"].correction.debut, r["fusion"].correction.fin) for r in resolues)
+            for d, f in ((r["correction"].debut, r["correction"].fin) for r in resolues)
         ):
             entree["etat"] = "obsolete"
             entree["motif"] = "Chevauche une autre correction Forme — non appliquée."
@@ -85,12 +85,12 @@ def _appliquer_formes(etat: dict, entrees_pid: list[dict], paragraphe: Paragraph
     if not resolues:
         return
     splices: list[tuple[int, int, int]] = []
-    for entree in sorted(resolues, key=lambda e: e["fusion"].correction.debut, reverse=True):
-        c = entree["fusion"].correction
+    for entree in sorted(resolues, key=lambda e: e["correction"].debut, reverse=True):
+        c = entree["correction"]
         paragraphe.runs = _remplacer_runs(paragraphe.runs, c.debut, c.fin, c.correction)
         splices.append((c.debut, c.fin, len(c.correction)))
     for entree in entrees_pid:
-        c = entree["fusion"].correction
+        c = entree["correction"]
         nouveau_debut, nouveau_fin = _recalculer(splices, c.debut, c.fin)
         if (nouveau_debut, nouveau_fin) != (c.debut, c.fin):
             _maj_correction(entree, debut=nouveau_debut, fin=nouveau_fin)
@@ -145,12 +145,12 @@ def basculer_choix(etat: dict, correction_id: str, decision: str) -> bool:
     Retourne False si la correction n'existe pas ou n'est pas une Forme active."""
     entree = next(
         (e for e in etat["corrections"]
-         if e["fusion"].correction.id == correction_id and e["etat"] == "active"),
+         if e["correction"].id == correction_id and e["etat"] == "active"),
         None,
     )
     if entree is None:
         return False
-    c = entree["fusion"].correction
+    c = entree["correction"]
     if c.phase != "forme":
         return False
     ins = c.original if decision == "original" else c.correction
@@ -168,16 +168,16 @@ def basculer_choix(etat: dict, correction_id: str, decision: str) -> bool:
 
 
 def remplacer_corrections_paragraphe(
-    etat: dict, paragraphe_id: str, nouvelles: list[CorrectionFusionnee]
+    etat: dict, paragraphe_id: str, nouvelles: list[Correction]
 ) -> None:
     """Réévaluation : remplace toutes les corrections du paragraphe par les
     nouvelles (offsets donnés dans le texte courant), puis applique les
     nouvelles Formes par défaut (même mécanique que l'état initial)."""
     etat["corrections"] = [
         e for e in etat["corrections"]
-        if e["fusion"].correction.paragraphe_id != paragraphe_id
+        if e["correction"].paragraphe_id != paragraphe_id
     ]
-    entrees = [{"fusion": f, "etat": "active", "motif": None} for f in nouvelles]
+    entrees = [{"correction": c, "etat": "active", "motif": None} for c in nouvelles]
     etat["corrections"].extend(entrees)
     _appliquer_formes(etat, entrees, _paragraphe(etat, paragraphe_id))
 
@@ -198,7 +198,7 @@ def vers_json(etat: dict) -> str:
         {
             "paragraphes": [p.model_dump() for p in etat["paragraphes"]],
             "corrections": [
-                {"fusion": e["fusion"].model_dump(), "etat": e["etat"], "motif": e["motif"]}
+                {"correction": e["correction"].model_dump(), "etat": e["etat"], "motif": e["motif"]}
                 for e in etat["corrections"]
             ],
             "choix": etat.get("choix", {}),
@@ -214,7 +214,7 @@ def depuis_json(brut: str) -> dict:
         "paragraphes": [ParagrapheRiche.model_validate(p) for p in donnees["paragraphes"]],
         "corrections": [
             {
-                "fusion": CorrectionFusionnee.model_validate(e["fusion"]),
+                "correction": Correction.model_validate(e["correction"]),
                 "etat": e.get("etat", "active"),
                 "motif": e.get("motif"),
             }
@@ -236,11 +236,7 @@ def _paragraphe(etat: dict, paragraphe_id: str) -> ParagrapheRiche:
 
 
 def _maj_correction(entree: dict, **champs) -> None:
-    fusion = entree["fusion"]
-    entree["fusion"] = CorrectionFusionnee(
-        correction=fusion.correction.model_copy(update=champs),
-        embellissement_migre=fusion.embellissement_migre,
-    )
+    entree["correction"] = entree["correction"].model_copy(update=champs)
 
 
 def _fusionner_runs(runs: list[RunFormat]) -> list[RunFormat]:
@@ -299,7 +295,7 @@ def _remapper_apres_splice(
     """Remappage déterministe des corrections d'un paragraphe après une splice."""
     delta = longueur - (fin - debut)
     for entree in entrees:
-        c = entree["fusion"].correction
+        c = entree["correction"]
         if c.paragraphe_id != paragraphe_id or entree["etat"] != "active":
             continue
         if id_exempt is not None and c.id == id_exempt:

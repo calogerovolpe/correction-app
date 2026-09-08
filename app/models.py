@@ -43,19 +43,6 @@ class Correction(BaseModel):
     variantes: list[str] = []
 
 
-class EmbellissementMigre(BaseModel):
-    """Suggestion d'Embellissement migrée dans le tooltip d'une correction Style (v6 §8.4)."""
-    suggestion: str
-    variantes: list[str]
-    explication: str
-
-
-class CorrectionFusionnee(BaseModel):
-    """Résultat de la déduplication : une correction hôte + l'embellissement éventuellement migré."""
-    correction: Correction
-    embellissement_migre: EmbellissementMigre | None = None
-
-
 class AlerteDetectee(BaseModel):
     """Incohérence narrative détectée par la Phase 2 (v6 §6.7)."""
     model_config = ConfigDict(extra="forbid")

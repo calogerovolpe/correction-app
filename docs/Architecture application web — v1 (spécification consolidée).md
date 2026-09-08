@@ -57,7 +57,7 @@ app/
 ├── services/
 │   ├── normalisation.py  # Pur : BOM/CRLF, paragraphes p-N base 1, titres, catégories, taille
 │   ├── chaine.py         # Pur : machine d'états N+1, préconditions du remplacement
-│   ├── reconciliation.py # Pur : nettoyage fences, validation Pydantic, offsets, déduplication
+│   ├── reconciliation.py # Pur : nettoyage fences, validation Pydantic, offsets, renumérotation ids
 │   ├── alertes.py        # Numérotation stable, choix d'auteur, double barrière (J3)
 │   ├── analyse.py        # Orchestrateur des jobs (§7), fabrique _client_llm injectable
 │   └── rendu.py          # Pur : fusion des chevauchements, blocs g-XXXX, segments annotés
@@ -90,7 +90,7 @@ Une soumission crée une ligne `analyses` (statut `en_attente`) puis lance `anal
 | `journaux` | Historiques (J3) | Categories : ecriture, evolution, intrigue ; `entity_name` NULL = journal global |
 | `alertes` | Incohérences détectées (J3) | `numero_projet` stable (UNIQUE, MAX+1 à l'insertion) ; niveaux avertissement/information/confirmation ; statut active/validee ; colonne `cible` (double barrière) |
 | `analyses` | Support des jobs | Statuts CHECK ; `options_json` (catégorie, phases, remplacement, température) ; `decision` + `message` (machine d'états) ; `erreur` ; horodatages |
-| `corrections` | Historique de relecture | Dernier jeu de corrections fusionnées par analyse (`data_json`) |
+| `corrections` | Historique de relecture | Corrections de la dernière analyse **stockées PAR PHASE** (R1-b) : `data_json` = dict `{"forme": […], "style": […], "technique": […]}` (valeurs = `Correction`) |
 | `documents` | État courant de l'atelier E5 (J2.5) | Texte affiché (runs riches), corrections remappées + état actif/obsolète, choix Forme, paragraphes modifiés |
 
 **Trigger `trg_projet_actif_restrict`** : impossible de supprimer le projet actif (équivalent `ON DELETE RESTRICT`). Cascades `ON DELETE CASCADE` sur toutes les tables filles.
@@ -131,11 +131,11 @@ Validation Pydantic `extra='forbid'` : tout champ inconnu rejette l'entrée. La 
 3. Sinon, occurrence **unique** de `original` (retrouvée de façon certaine) ;
 4. Sinon : correction **écartée** et consignée en log (jamais d'arrêt).
 
-### 4.4 Déduplication Style / Embellissement
+### 4.4 Déduplication = règle d'affichage *(révisée le 2026-09-09, jalon R1-b)*
 
-* « Même fragment » = même `paragraphe_id` ET offsets **strictement identiques**.
-* Recouvrement exact : la correction **Style est prioritaire** ; la suggestion d'Embellissement migre en variantes dans une section « Embellissement — suggestions » du tooltip Style.
-* Chevauchement partiel (intervalles différents mais recouvrants) : **coexistence** en bloc multi-phases.
+* AUCUNE correction n'est absorbée en réconciliation : l'ancienne règle « Style prioritaire, Embellissement migré dans le tooltip du Style » (et la fonction `dedupliquer()`) sont **supprimées**.
+* Recouvrement exact **ou partiel** Style/Embellissement : les **deux coexistent** — superposés dans la vue « Tout » (onglets hybrides, §8.3), isolés dans leurs onglets de phase.
+* La « déduplication » est donc une règle d'AFFICHAGE (`rendu.py`), jamais une mutation de données ; seuls les ids sont réassignés (`renumeroter`, suite globale unique et déterministe — jalon A).
 
 ### 4.5 Validation des sorties LLM et panne
 
@@ -204,7 +204,7 @@ Le manuscrit, le codex et les exclusions sont **encadrés de balises explicites*
 3. **Chaîne N+1** (§5.2) → catégorie définitive, `decision` + `message` persistés ;
 4. **Fail-fast** : ping parallèle (`max_tokens=5`, `retries_ping` nouvelles tentatives) des modèles des phases **actives seulement** ; modèle non configuré ou indisponible → `rejetee` (zéro token d'analyse) ;
 5. **Phases actives en parallèle** (`asyncio.gather`) — prompt, complétion, extraction, réconciliation par correction ;
-6. **Déduplication** Style prioritaire (§4.4) ;
+6. **Renumérotation** des ids en suite globale unique et déterministe (`renumeroter`, jalon A) — plus aucune absorption à l'écriture (§4.4, R1-b) ;
 7. **Écritures** : en J2+, métadonnées seules (`corrections`, statut final). En J3 : backup natif + transaction pour les chapitres officiels (§9) ;
 8. Statut `terminee` ; le document annoté est servi par la route E5 depuis l'historique.
 
@@ -342,7 +342,7 @@ Navigation clavier : `←`/`→` entre corrections visibles (centrage + `outline
 
 27. **Validation du texte affiché** : « Valider la version actuelle » enregistre EXACTEMENT le texte affiché à l'écran au moment du clic, corrigé ou non, avec fenêtre de confirmation ; réservé aux Chapitres (Passage/Extrait → « Soumettre un autre texte » avec les dernières configurations pré-cochées).
 28. **État courant matérialisé** (`documents`) : le texte de travail EST l'écran ; les corrections Forme sont appliquées par défaut, refusables à tout moment ; toute modification est une splice avec remappage déterministe des corrections (jamais de recherche floue).
-29. **Onglets hybrides** *(révisée le 2026-09-09, jalon R1-a — anciennement « Couches superposables »)* : la vue « Tout » CONSERVE la superposition des couches (Forme = rouge barré/inséré, Style = soulignement pointillé bleu, Technique = fond jaune) — jamais de bloc fusionné qui avale une correction ; une barre d'onglets ajoute une **projection par phase** (chaque phase isolée sur son onglet, calculée côté serveur, zéro token en plus) ; les pastilles-filtres cumulables disparaissent. (La suite — stockage par phase, fin de `CorrectionFusionnee` — est le jalon R1-b.)
+29. **Onglets hybrides** *(révisée le 2026-09-09, jalon R1-a — anciennement « Couches superposables »)* : la vue « Tout » CONSERVE la superposition des couches (Forme = rouge barré/inséré, Style = soulignement pointillé bleu, Technique = fond jaune) — jamais de bloc fusionné qui avale une correction ; une barre d'onglets ajoute une **projection par phase** (chaque phase isolée sur son onglet, calculée côté serveur, zéro token en plus) ; les pastilles-filtres cumulables disparaissent. (Stockage par phase et fin de `CorrectionFusionnee` : livrés au jalon R1-b — la déduplication est devenue une règle d'affichage, §4.4.)
 30. **Embellissement à la demande** : plus une phase de soumission ; sélection + clic droit → l'IA réécrit en tenant compte du contexte, puis les corrections du paragraphe sont réévaluées avec l'embellissement (jauge de créativité de E3 supprimée, température par défaut 0.8).
 31. **Alternatives à la demande** : sélection + clic droit → synonymes/champ lexical cohérents avec le contexte ; le flux de bulles au clic gauche sur un mot corrigé est supprimé.
 32. **Backup natif à la validation** : un backup SQLite (`Connection.backup()`) est créé avant toute écriture dans `chapitres`, avec rotation sur `APP_BACKUPS_MAX`.

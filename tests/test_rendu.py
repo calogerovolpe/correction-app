@@ -1,7 +1,7 @@
 """Tests du rendu annoté en couches (J2.5) : segments, chevauchements superposés,
 Forme refusée, corrections obsolètes, groupes g-XXXX, compteur de masqués."""
 
-from app.models import Correction, CorrectionFusionnee
+from app.models import Correction
 from app.services import reconstruction, rendu
 from app.services.reconciliation import renumeroter
 from app.services.texte_riche import ParagrapheRiche, RunFormat
@@ -22,14 +22,13 @@ def _p(texte=TEXTE, pid="p-1", italique_de=None):
     return ParagrapheRiche(id=pid, runs=runs)
 
 
-def _fusion(cid, phase, debut, fin, original, correction):
-    c = Correction(
+def _corr(cid, phase, debut, fin, original, correction):
+    return Correction(
         id=cid, phase=phase, type="test", paragraphe_id="p-1",
         debut=debut, fin=fin, contexte_avant="", original=original,
         correction=correction, explication="Explication de test.", regle="Règle test",
         variantes=[],
     )
-    return CorrectionFusionnee(correction=c)
 
 
 def _doc(fusions, paragraphe=None):
@@ -40,7 +39,7 @@ def _doc(fusions, paragraphe=None):
 
 
 def test_correction_forme_segments_barré_et_inséré():
-    doc = _doc([_fusion("c-1", "forme", 16, 22, "veille", "veillent")])
+    doc = _doc([_corr("c-1", "forme", 16, 22, "veille", "veillent")])
     assert doc["nb_masques"] == 0
     segments = doc["paragraphes"][0]["segments"]
     assert [s["type"] for s in segments] == ["texte", "forme", "texte"]
@@ -52,8 +51,8 @@ def test_correction_forme_segments_barré_et_inséré():
 
 def test_forme_et_style_sur_le_meme_fragment_sempilent():
     doc = _doc([
-        _fusion("c-1", "forme", 16, 22, "veille", "veillent"),
-        _fusion("c-2", "style", 16, 22, "veille", "veillaient"),
+        _corr("c-1", "forme", 16, 22, "veille", "veillent"),
+        _corr("c-2", "style", 16, 22, "veille", "veillaient"),
     ])
     segments = doc["paragraphes"][0]["segments"]
     forme = segments[1]
@@ -68,7 +67,7 @@ def test_forme_et_style_sur_le_meme_fragment_sempilent():
 
 
 def test_technique_fond_jaune_sur_texte_simple():
-    doc = _doc([_fusion("c-3", "technique", 40, 50, "silencieux", "silencieux")])
+    doc = _doc([_corr("c-3", "technique", 40, 50, "silencieux", "silencieux")])
     segments = doc["paragraphes"][0]["segments"]
     # aucun paragraphe vide : la technique marque le texte courant en jaune
     assert segments[0]["type"] == "texte"
@@ -78,7 +77,7 @@ def test_technique_fond_jaune_sur_texte_simple():
 
 def test_forme_refusee_rend_le_texte_neutral_marque():
     etat = reconstruction.etat_initial(
-        [_fusion("c-1", "forme", 16, 22, "veille", "veillent")], [_p()]
+        [_corr("c-1", "forme", 16, 22, "veille", "veillent")], [_p()]
     )
     reconstruction.basculer_choix(etat, "c-1", "original")
     doc = rendu.preparer_document(
@@ -94,7 +93,7 @@ def test_forme_refusee_rend_le_texte_neutral_marque():
 
 def test_correction_obsolete_ne_s_affiche_pas_dans_le_texte():
     etat = reconstruction.etat_initial(
-        [_fusion("c-1", "forme", 16, 22, "veille", "veillent")], [_p()]
+        [_corr("c-1", "forme", 16, 22, "veille", "veillent")], [_p()]
     )
     reconstruction.appliquer_modification(etat, "p-1", 16, 22, "monte la garde")
     doc = rendu.preparer_document(
@@ -109,7 +108,7 @@ def test_correction_obsolete_ne_s_affiche_pas_dans_le_texte():
 
 def test_formatage_preserve_sur_les_segments():
     p = _p(italique_de=16)  # « veille » en italique
-    doc = _doc([_fusion("c-1", "forme", 16, 22, "veille", "veillent")], p)
+    doc = _doc([_corr("c-1", "forme", 16, 22, "veille", "veillent")], p)
     segments = doc["paragraphes"][0]["segments"]
     assert segments[1]["italique"] is True  # la correction hérite du formatage
 
@@ -132,10 +131,10 @@ def test_ids_dupliques_entre_phases_groupes_et_barre_distincts():
     (analyse.py appelle renumeroter), le rendu produit 2 groupes distincts et
     2 entrées de barre latérale distinctes — avant le correctif, le dict
     `groupes` (clé = id) collait les deux corrections sur un même data-groupe."""
-    forme = _fusion("c-0001", "forme", 16, 22, "veille", "veillent")
-    style = _fusion("c-0001", "style", 16, 22, "veille", "veillaient")
+    forme = _corr("c-0001", "forme", 16, 22, "veille", "veillent")
+    style = _corr("c-0001", "style", 16, 22, "veille", "veillaient")
     fusion = renumeroter([forme, style])
-    assert len({f.correction.id for f in fusion}) == 2  # ids réassignés uniques
+    assert len({c.id for c in fusion}) == 2  # ids réassignés uniques
     doc = _doc(fusion)
     infos = doc["corrections_barre"]
     assert len(infos) == 2
@@ -152,8 +151,8 @@ def test_ids_dupliques_entre_phases_groupes_et_barre_distincts():
 def _etat_deux_phases():
     etat = reconstruction.etat_initial(
         [
-            _fusion("c-1", "forme", 16, 22, "veille", "veillent"),
-            _fusion("c-2", "style", 40, 50, "silencieux", "silencieux"),
+            _corr("c-1", "forme", 16, 22, "veille", "veillent"),
+            _corr("c-2", "style", 40, 50, "silencieux", "silencieux"),
         ],
         [_p()],
     )
