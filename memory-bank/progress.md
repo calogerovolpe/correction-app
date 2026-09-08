@@ -16,6 +16,7 @@
 | Memory Bank — source de vérité unique | ✅ Terminé | `cce00cc` |
 | **J2.5 — Atelier v2 (texte courant, couches, clic droit)** | ✅ **Terminé (E2E réel Mistral)** | `05bcbda` |
 | **A — Fiabilité du cœur (ids uniques, no-op, menu fiable)** | ✅ **Terminé** | `b5545f0` |
+| Memory Bank — réorganisation du plan (R1/R2 refonte rendu-état + UX1→UX4) | ✅ Terminé | `fac3463` |
 | **R1 — Onglets hybrides + stockage par phase + déduplication affichage** | ⬜ **Prochain jalon** | — |
 | UX1 — Menu contextuel riche (ex-B) | ⬜ À faire (après R1) | — |
 | UX2 — Confort d'affichage : toggle, layout, style onglets (ex-C) | ⬜ À faire (après R1) | — |
