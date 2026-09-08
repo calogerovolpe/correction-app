@@ -1,26 +1,21 @@
 # Contexte actif — où nous en sommes MAINTENANT
 
-> Fichier le plus souvent mis à jour. Dernière mise à jour : 2026-09-09 (jalon F3 livré —
-> Atelier E5 Svelte + API `/api/v1` ; prochain jalon = F4).
+> Fichier le plus souvent mis à jour. Dernière mise à jour : 2026-09-09 (audit post-F3 validé par l'auteur — roadmap maîtresse `plan-fiabilisation-post-audit.md` activée ; prochain jalon = FA1).
 
 ## Focus du moment
 
-**Refonte frontend — série F0→F5 (remplacement Jinja2 + HTMX + Alpine.js par Svelte 5 + TypeScript + Vite) — AVANT J3.**
-La roadmap détaillée est dans **`plan-refonte-frontend.md`** (même dossier) : la RELIRE EN DÉBUT DE SESSION — elle contient l'ordre des jalons F0→F5, leurs dépendances, les choix techniques, le design system et l'architecture cible. Un commit par jalon ; le suivi (statut/commit) est tenu à jour dans ce plan ET dans `progress.md`.
+**Fiabilisation post-audit de l'Atelier E5 — série FA1→FA7 — AVANT F4, F5 et J3.**
+La roadmap détaillée est dans **`plan-fiabilisation-post-audit.md`** (même dossier) : **LA RELIRE EN DÉBUT DE SESSION**.
+RÈGLE MAÎTRESSE : **1 JALON = 1 CONVERSATION DISTINCTE.**
+Ne JAMAIS enchaîner deux jalons dans la même session sans feu vert explicite de l'auteur.
 
-- **Où on en est** : la série R est LIVRÉE — R1-a ✅ (`245071b`) ; R1-b ✅ (`c911547`) ; R2
-  ✅ (`e886d3a`) ; **F0 ✅ (`4cbb55c`) — Socle** ; **F1 ✅ (`cb6abc1`) — Accueil & projets
-  E1** ; **F2 ✅ (`6cdfb22`) — Soumission E3 + suivi E4** ; **F3 ✅ (`023534a`) — Atelier E5**
-  (`GET /api/v1/analyses/{id}/atelier` + actions `choix-forme`, `editer`,
-  `appliquer-alternative`, `appliquer-embellissement`, `reevaluer`, `nouvelle-version`,
-  `valider` ; écran Svelte `#/atelier/{id}` : couches, onglets + compteurs, menu contextuel
-  riche, barre latérale, toggle « masquer », navigation clavier, édition directe + « ↻
-  Re-corriger », validation ; accent Technique AA ocre `#6e5400`) — **159 pytest + 45 Vitest
-  verts, `svelte-check` 0 erreur** ; **prochain jalon = F4 — Finitions UX & identité**.
-- **UX1→UX4 sont ABSORBÉS par F0→F5** (correspondance : UX1 → F3 ; UX2 → F4 layout + F3 toggle ; UX3 → F1 ; UX4 → F3) — ils ne seront plus exécutés séparément ; `plan-correctifs-atelier-ux.md` reste l'historique de la série R1/UX.
-- **Révision de décision actée** : décision A2 (cahier des charges) et spec §2.1 (stack frontend « décisions figées ») sont RÉVISÉES par la bascule Svelte — répercutée dans la spec + `systemPatterns.md` + `techContext.md` AU FIL des jalons ; les écrans E1 (accueil), E3 (soumission) et E4 (suivi) sont **déjà servis par le SPA Svelte** à côté des routes Jinja2 conservées ; le retrait final de Jinja2/HTMX/Alpine reste au jalon F5.
-- **Backend intact** : services purs + pipeline LLM (3 phases parallèles, fail-fast, Option B, « liste vide = jamais une panne ») inchangés ; l'API JSON `/api/v1/` réutilise les services purs existants ; **la logique de l'atelier vit dans `app/services/atelier.py`** (partagée entre les routes Jinja2 et l'API JSON — aucune duplication) ; les routes Jinja2 sont conservées jusqu'à F5.
-- R1/R2 restent CODÉS : les corrections portent leurs offsets D'ORIGINE (base), plus AUCUN remappage — le « texte courant » est une projection calculée ; le frontend Svelte consommera ces projections.
+- **Où on en est** :
+  - La série R est LIVRÉE — R1-a ✅ (`245071b`) ; R1-b ✅ (`c911547`) ; R2 ✅ (`e886d3a`).
+  - Les jalons F0 à F3 sont LIVRÉS — F0 ✅ (`4cbb55c`) ; F1 ✅ (`cb6abc1`) ; F2 ✅ (`6cdfb22`) ; F3 ✅ (`023534a`) — 159 pytest + 45 Vitest verts, `svelte-check` 0 erreur.
+  - **Audit approfondi post-F3 validé par l'auteur (2026-09-09)** : il a mis en évidence plusieurs failles bloquantes/majeures dans l'atelier (ré-ancrage destructif lors d'une réévaluation, segmentation au run entier au lieu des bornes d'annotation, toggle client inopérant par filtrage prématuré backend, collisions d'identifiants `c-r…`, neutralisation CSS des couches, perte d'onglet dans les actions).
+  - **F4 (Finitions UX) et F5 (Nettoyage & bascule) sont mis en pause** jusqu'à l'achèvement de la série corrective FA1→FA7.
+  - **Prochain jalon immédiat = FA1 — Intégrité du ré-ancrage et non-perte de texte (reconstruction).**
+
 
 ## État global
 
@@ -189,13 +184,18 @@ La roadmap détaillée est dans **`plan-refonte-frontend.md`** (même dossier) :
 
 ## Prochaines étapes (ordre)
 
-1. **F1 — Accueil & projets E1** : ✅ **LIVRÉ** (`cb6abc1`).
-2. **F2 — Soumission E3 + suivi E4** : ✅ **LIVRÉ** (`6cdfb22`).
-3. **F3 — Atelier E5** : ✅ **LIVRÉ** (`023534a`) — API atelier JSON + écran Svelte `#/atelier/{id}` (couches, onglets + compteurs, menu riche **[UX1]**, édition directe + « ↻ Re-corriger » **[UX4]**, barre latérale, toggle **[UX2]**, navigation clavier, validation), accent Technique AA ocre.
-4. **F4 — Finitions UX & identité** : cohérence visuelle ; états vides ; toasts ; accessibilité/focus/contrastes/aria (vérification AA des nouvelles couleurs) ; responsive ; layout ~1200 px **[absorbe UX2]** ; microcopy. **PROCHAIN JALON.**
-5. **F5 — Nettoyage & bascule** : retrait Jinja2/HTMX/Alpine + routes HTML inutiles ; spec + README + `systemPatterns`/`techContext` à jour ; E2E Mistral rejoué `/api/v1` ; lanceur `.bat` vérifié.
-6. **J3 — Chaîne & codex** (EN ATTENTE, après F5) : écritures narratives (transaction, `avec_codex` câblé, codex/journaux), phase 2 LLM (extraction codex, cohérence, relecture-diff), écrans E2/E6/E7 + bandeau d'alertes, RAG alias. Critère d'acceptation : Prologue → ch.1 → ch.2 → resoumission N=N sans remplacement → remplacement officiel (relecture-diff) → alerte → « Choix d'auteur » → non re-détectée.
-7. **J4 — Confort** puis **J5 — Mise en ligne** (inchangés) ; **R3 — extension des catégories** (futur : une phase = une config + un onglet + une projection, zéro changement au cœur).
+1. **Série FA1→FA7 — Fiabilisation post-audit de l'Atelier E5 (ROADMAP ACTIVE)** :
+   - **FA1 — Intégrité du ré-ancrage et non-perte de texte (reconstruction)** : ⬜ **PROCHAIN JALON IMMÉDIAT** (P0, bloquant) ;
+   - **FA2 — Identité documentaire, cycle de vie et réévaluation parallèle** : ⬜ (P0/P1) ;
+   - **FA3 — Segmentation atomique aux bornes et document complet** : ⬜ (P0, bloquant) ;
+   - **FA4 — Rendu Svelte fidèle, styles réels, formatage Word et robustesse UI** : ⬜ (P0/P1) ;
+   - **FA5 — Robustesse LLM : Custom Structured Outputs, invariants et prompts** : ⬜ (P1) ;
+   - **FA6 — Cohérence transactionnelle, concurrence et alignement d'API** : ⬜ (P1/P3) ;
+   - **FA7 — Restitution pédagogique : diff, sidebar sticky, popovers et clavier** : ⬜ (P2).
+2. **F4 — Finitions UX & identité** (MIS EN ATTENTE après FA7) : toasts, responsive, microcopy, AA complet.
+3. **F5 — Nettoyage & bascule** (MIS EN ATTENTE après F4) : retrait Jinja2/HTMX/Alpine, E2E Mistral v1, spec consolidée.
+4. **J3 — Chaîne & codex** (EN ATTENTE après F5) : écritures narratives, codex/journaux, alertes, relecture-diff.
+5. **J4 — Confort** puis **J5 — Mise en ligne** (inchangés).
 
 ## Décisions en cours / à arbitrer
 

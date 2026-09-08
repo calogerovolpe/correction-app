@@ -243,6 +243,11 @@ F0→F5 et ne seront plus exécutés séparément.**
 - UX1 et UX4 sont ABSORBÉS ; la partie « toggle » d'UX2 est en place ;
   l'accent Technique AA ocre remplace le violet obsolète (décision 40).
 
+## Prochain jalon à lancer
+
+> ⚠️ **PAUSE DE SÉCURITÉ (2026-09-09)** : suite à l'audit approfondi de l'Atelier post-F3 validé par l'auteur, **F4 et F5 sont mis en pause**. La priorité immédiate est la **série FA1→FA7** documentée dans `memory-bank/plan-fiabilisation-post-audit.md`.
+> **Le prochain jalon de travail est FA1 — Intégrité du ré-ancrage et non-perte de texte (reconstruction)**. F4 reprendra après l'achèvement de FA1→FA7.
+
 ## Jalon F4 — Finitions UX & identité
 
 1. **Cohérence visuelle** sur tous les écrans F0→F3 (thème appliqué partout).

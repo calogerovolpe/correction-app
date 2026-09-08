@@ -65,6 +65,12 @@ Navigateur :
 
 ## Pièges connus (leçons de bugs réels — NE PAS REFAIRE)
 
+- **Ré-ancrage des corrections réévaluées (`reconstruction.py`)** : ne JAMAIS convertir une sous-plage d'un patch existant en l'intervalle complet du patch mère sous prétexte qu'elle intersecte le remplacement — cela conduit à remplacer tout un paragraphe réécrit par un mot corrigé.
+- **Rendu des annotations Style/Technique (`rendu.py`)** : ne JAMAIS borner les marques sur les runs Word entiers ; les points de découpe doivent obligatoirement fusionner les bornes de runs ET les bornes de chaque annotation pour produire des segments atomiques exacts.
+- **Toggle masquage de l'atelier** : `preparer_document()` ne doit JAMAIS retirer les paragraphes sans correction de la liste envoyée au client ; tous les paragraphes projetés doivent être transmis avec leur état pour que le toggle client soit opérationnel.
+- **Compteur de réévaluation (`atelier.py`)** : ne JAMAIS régénérer des identifiants `c-r0001…` avec un compteur local réinitialisé à chaque appel ; l'unicité des IDs doit être continue à l'échelle du document.
+- **CSS scoped Svelte et couches** : attention aux resets de boutons dans les composants (`button.ins { color: inherit; background: transparent }`) qui écrasent silencieusement les classes globales des couches colorées.
+- **Persistance de l'onglet après action** : chaque route POST de mutation d'atelier doit renvoyer la projection de l'onglet courant (ou le propager), jamais forcer `tout`.
 - **FastAPI + formulaires** : valeur vide → `None` (impossible de distinguer « décoché » d'« absent ») → champ caché unique JSON `phases` écrit par le JS (`nouveau.html`).
 - **Jinja2 auto-échappe les apostrophes ET les accents dans `| tojson`** (`n'a` → `n&#39;a` ; « modifié » → `modifi\u00e9` dans le JSON) → jamais d'assertion contenant apostrophe ou accent sur du HTML rendu.
 - **Déballage `lastrowid, rowcount = await db.executer(...)`** : relire deux fois l'ordre — le bug est revenu en J2.2 (redirection `/analyses/1`) ; un commentaire de garde figure sur le site restant (`atelier.py::nouvelle-version`).
