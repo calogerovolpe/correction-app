@@ -37,10 +37,10 @@ sans régresser. Chaque jalon : pytest verts → commit « Jx — contenu — N 
 ```
 
 Deux refontes :
-- **R1 — onglets hybrides + stockage par phase** (rendu/affichage) ;
+- **R1 — onglets hybrides + stockage par phase** (rendu/affichage), DÉCOUPÉE en deux conversations : **R1-a** (UI + projection par phase, rendu seul) puis **R1-b** (stockage par phase + fin de `CorrectionFusionnee`) ;
 - **R2 — base immuable + annotations/patches** (état : fin du remappage d'offsets).
 
-Ordre imposé : **R1 avant UX1/UX2** (l'UI se construit sur les onglets) ;
+Ordre imposé : **R1-a → R1-b avant UX1/UX2** (l'UI se construit sur les onglets) ;
 **R2 avant UX4 et J3** (édition directe et validation officielle lisent l'état) ;
 **UX3 est indépendant** (intercalable à tout moment).
 
@@ -58,15 +58,16 @@ Ordre imposé : **R1 avant UX1/UX2** (l'UI se construit sur les onglets) ;
 | Ordre | Jalon | Contenu | Statut | Commit |
 |---|---|---|---|---|
 | ✅ | A | Fiabilité du cœur : ids uniques, no-op rejetés, menu contextuel fiable | ✅ | `b5545f0` |
-| 1 | **R1** | Onglets hybrides (« Tout » + 1 onglet/phase) + stockage PAR PHASE + déduplication devenue règle d'affichage | ⬜ | — |
-| 2 | **UX1** | Menu contextuel riche (clic droit sur marque, choix Forme dans le menu) | ⬜ | — |
-| 3 | **UX2** | Toggle « masquer les paragraphes sans correction », layout ~1200 px, style des onglets (WCAG AA) | ⬜ | — |
-| 4 | **UX3** | Navigation, projets : activation, navbar, suppression (indépendant, intercalable) | ⬜ | — |
-| 5 | **R2** | Base immuable + annotations (patches) : refonte `reconstruction.py`, fin du remappage | ⬜ | — |
-| 6 | **UX4** | Édition directe sans IA temps réel (« ↻ Re-corriger ») | ⬜ | — |
-| 7 | J3 | Chaîne séquentielle & Codex narratif (inchangé) | ⬜ | — |
-| 8 | J4 | Confort (backups, exports, stats, paramètres, import .docx) | ⬜ | — |
-| 9 | J5 | Mise en ligne (auth, Caddy/TLS, compose prod, doc VPS) | ⬜ | — |
+| 1 | **R1-a** | Onglets UI + projection par phase (rendu SEUL — stockage et `dedupliquer` inchangés) | ⬜ | — |
+| 2 | **R1-b** | Stockage PAR PHASE + déduplication devenue règle d'affichage + fin de `CorrectionFusionnee` | ⬜ | — |
+| 3 | **UX1** | Menu contextuel riche (clic droit sur marque, choix Forme dans le menu) | ⬜ | — |
+| 4 | **UX2** | Toggle « masquer les paragraphes sans correction », layout ~1200 px, style des onglets (WCAG AA) | ⬜ | — |
+| 5 | **UX3** | Navigation, projets : activation, navbar, suppression (indépendant, intercalable) | ⬜ | — |
+| 6 | **R2** | Base immuable + annotations (patches) : refonte `reconstruction.py`, fin du remappage | ⬜ | — |
+| 7 | **UX4** | Édition directe sans IA temps réel (« ↻ Re-corriger ») | ⬜ | — |
+| 8 | J3 | Chaîne séquentielle & Codex narratif (inchangé) | ⬜ | — |
+| 9 | J4 | Confort (backups, exports, stats, paramètres, import .docx) | ⬜ | — |
+| 10 | J5 | Mise en ligne (auth, Caddy/TLS, compose prod, doc VPS) | ⬜ | — |
 | futur | R3 | Extension des catégories de correction (trivial grâce au modèle) | ⬜ | — |
 
 ## Jalon A — Fiabilité du cœur (3 bugs) — ✅ LIVRÉ (commit `b5545f0`)
@@ -75,32 +76,116 @@ Historique complet : voir `progress.md`. Contenu : ids de correction uniques
 (`reconciliation.renumeroter()`), rejet des no-op Forme, menu contextuel fiable
 (CSS `[hidden]`, position fixed, fermeture Échap/clic extérieur).
 
-## Jalon R1 — Onglets hybrides + stockage par phase + déduplication d'affichage
+## Jalon R1-a — Onglets UI + projection par phase (rendu SEUL, stockage inchangé)
 
 > Objectif : chaque phase isolée sur son onglet ; « Tout » = vue superposée actuelle.
-> Zéro token en plus : aucun appel LLM n'est touché (les 3 passes parallèles restent).
+> Zéro token : aucun appel LLM n'est touché (les 3 passes parallèles restent).
+> ⚠️ CONVERSATION 1 sur 2 : le stockage et `dedupliquer()` ne sont PAS touchés ici (R1-b).
 
-1. **Stockage par phase** — `app/services/analyse.py` + `app/models.py` + `app/schema.sql` :
-   les corrections sont persistées comme des collections indépendantes PAR PHASE
-   (fin du JSON fusionné unique de la table `corrections`). La réassignation
-   `renumeroter()` (ids globaux uniques, jalon A) reste appliquée.
-2. **Projection par phase** — `app/services/rendu.py` : nouvelle fonction
-   `preparer_document_par_phase(phase, ...)` : une seule phase rendue sur le texte
-   courant (pas d'empilement, plus de `_couvrants` pour cette projection).
-   `preparer_document()` est CONSERVÉE pour l'onglet « Tout ».
-3. **Déduplication = règle d'affichage** — `app/services/reconciliation.py` :
-   `dedupliquer()` ne migre PLUS l'Embellissement dans le tooltip du Style ; les deux
-   coexistent (superposés dans « Tout », séparés dans leurs onglets). La règle
-   « Style prioritaire » devient une règle de RENDU.
-4. **UI onglets** — `app/templates/analyses/_atelier.html` + `app/static/app.js` +
-   `app/static/style.css` : barre d'onglets `Tout | Forme | Style | Technique`
-   (onglet « Embellissement » seulement si suggestions) avec `aria-selected` ;
-   Alpine passe de `filtres` (booléens cumulables) à `ongletActif` (exclusif) ;
-   « Tout » = vue superposée actuelle (les couches CSS restent valables pour cet onglet).
-5. **Spec** : mettre à jour `docs/Architecture application web — v1` (§7 rendu,
-   §11 décision 29 « couches superposables ») DANS LE MÊME COMMIT que le code.
-   Tests : rendu par phase (une correction n'apparaît que dans sa projection),
-   rendu « Tout » inchangé (régression), template (onglets rendus, état actif).
+1. **Projection par phase** — `app/services/rendu.py` : ajouter
+   `preparer_document_par_phase(paragraphes, entrees, phase, choix, modifies=None)` :
+   filtrer `entrees` sur `e["fusion"].correction.phase == phase` puis appeler la
+   `preparer_document()` existante (AUCUNE duplication de la logique de segments).
+   `preparer_document()` reste la projection « Tout ».
+2. **Routage de l'onglet** — `app/routes/atelier.py` :
+   - `_contexte_resultat(analyse, etat, erreur=None, onglet="tout")` : si
+     `onglet != "tout"` → `preparer_document_par_phase`, sinon `preparer_document` ;
+   - GET `page_analyse` : lire `onglet` dans la query string ;
+   - POST (`choix-forme`, `reevaluer`, `appliquer-alternative`,
+     `appliquer-embellissement`) : lire un champ `onglet: str = Form("tout")` et le
+     transmettre à `_rendre_atelier` — on reste sur l'onglet après l'action.
+3. **UI onglets** — `app/templates/analyses/_atelier.html` : remplacer la
+   `<div class="legende">` (3 pastilles) par une barre d'onglets
+   `Tout | Forme | Style | Technique` (+ onglet `Embellissement` SEULEMENT si une
+   correction `embellissement` existe dans `document.corrections_barre`) ;
+   boutons `data-action="onglet" data-onglet="..."`, état actif `aria-selected` ;
+   ajouter un champ caché `onglet` dans chaque formulaire de l'atelier.
+4. **JS + CSS** — `app/static/app.js` : clic onglet → `poster('/analyses/{id}/onglet',
+   {onglet})` (NOUVELLE route POST qui re-rend `_atelier.html`) ; retirer la logique
+   Alpine `filtres` (booléens cumulables). `app/static/style.css` : style des onglets
+   (palette WCAG AA existante) ; supprimer les règles `.filtre-*-off` devenues
+   orphelines (vérifier tout autre usage avant).
+5. **NE PAS toucher** : le stockage (`analyse.py` écriture de `corrections`,
+   `schema.sql`, `_charger_fusion`), `dedupliquer()`, `CorrectionFusionnee`,
+   `embellissement_migre`, `EmbellissementMigre` — tout cela est R1-b.
+6. **Spec + tests** : mettre à jour `docs/Architecture application web — v1`
+   (§7 rendu, §11 décision 29 « couches superposables » → « onglets hybrides »)
+   DANS LE MÊME COMMIT. Tests : `test_rendu.py` (une correction n'apparaît que dans
+   sa projection ; « Tout » inchangé — régression), test de template (barre
+   d'onglets rendue, `aria-selected`, `?onglet=forme` rend la projection Forme),
+   test de route (après `POST choix-forme` avec `onglet=forme`, on reste sur Forme).
+   Finition : pytest 100 % verts → commit `R1-a — onglets hybrides + projection
+   par phase — N tests verts` → push → MAJ `activeContext.md`/`progress.md`.
+
+### ⚠️ État du code À LA FIN de R1-a (handoff OBLIGATOIRE pour R1-b)
+
+- Stockage TOUJOURS : liste plate de `CorrectionFusionnee` dans
+  `corrections.data_json` (un JSON par analyse) — RIEN n'a changé côté stockage.
+- `dedupliquer()` migre TOUJOURS l'Embellissement dans le Style (code MORT :
+  aucune correction `embellissement` n'est produite par le pipeline — l'embellissement
+  est à la demande) — inoffensif, laissé tel quel volontairement.
+- La barre d'onglets est en place ; `onglet` circule via query string (GET) et
+  champ de formulaire (POST) ; nouvelle route POST `/analyses/{id}/onglet`.
+- `preparer_document` (Tout) et `preparer_document_par_phase` coexistent dans
+  `rendu.py` (la seconde filtre les `entrees` avant d'appeler la première).
+- `CorrectionFusionnee` / `embellissement_migre` / `EmbellissementMigre` existent
+  encore (modèles et usages intacts).
+- ❌ NE PAS « corriger » cet état intermédiaire avant R1-b : il est volontaire.
+
+## Jalon R1-b — Stockage par phase + déduplication d'affichage (fin de `CorrectionFusionnee`)
+
+> Prérequis : R1-a committé et vert (lire « État du code À LA FIN de R1-a » ci-dessus).
+> ⚠️ CONVERSATION 2 sur 2. NE touche PAS à l'UI (les onglets de R1-a restent)
+> ni au pipeline LLM (3 phases parallèles, Option B, fail-fast inchangés).
+
+1. **Modèles** — `app/models.py` : supprimer `EmbellissementMigre` et
+   `CorrectionFusionnee` (les services/rendu travaillent sur `Correction` direct).
+2. **Réconciliation** — `app/services/reconciliation.py` :
+   - `dedupliquer()` : supprimer la branche de migration Style/Embellissement — en
+     cas de recouvrement exact, les DEUX corrections coexistent (superposées dans
+     « Tout », séparées dans leurs onglets) ; si la fonction ne fait plus rien, la
+     supprimer (décision à consigner dans le commit) ;
+   - `renumeroter()` : signature `list[Correction]` → `list[Correction]`
+     (ids globaux uniques et déterministes conservés — jalon A, décision 33).
+3. **Stockage par phase** — `app/services/analyse.py` : après `renumeroter`, écrire
+   `corrections.data_json` comme un dict par phase
+   `{"forme": [...], "style": [...], "technique": [...]}` (valeurs =
+   `Correction.model_dump()`). AUCUN changement de colonne dans `schema.sql`
+   (toujours `data_json` texte) — documenter le format dans la spec (§3, §8).
+4. **Lecture + état** — `app/routes/atelier.py` : `_charger_fusion` lit le dict par
+   phase et l'aplatit en `list[Correction]` (renommée `_charger_corrections`) ;
+   `_reevaluer_corrections` produit des `Correction` (plus de `CorrectionFusionnee`).
+   `app/services/reconstruction.py` : `etat_initial(list[Correction], ...)` ;
+   renommage MÉCANIQUE ET COMPLET `entree["fusion"]` → `entree["correction"]`
+   (y compris `_maj_correction` et le round-trip `vers_json`/`depuis_json`).
+   `app/services/rendu.py` : mêmes accès renommés (`_info`, `_classe_marque`,
+   `_segments`, `_couvrants`, `_segments_texte`, `_segment_forme`).
+5. **NE PAS toucher** : l'UI (template, CSS, JS), le pipeline LLM, les règles
+   Option B / fail-fast / « liste vide = jamais une panne ».
+6. **Tests** — `test_reconciliation.py` : remplacer les tests de migration
+   (`test_recouvrement_exact_style_prioritaire_embellissement_migre`,
+   `test_renumeroter_conserve_l_embellissement_migre`) par des tests de la NOUVELLE
+   règle (recouvrement exact Style/Embellissement → les DEUX coexistent, aucune
+   absorbée) et de `renumeroter` sur `list[Correction]` ; `test_llm_client.py`
+   (flux complet sans `embellissement_migre`) ; `test_reconstruction.py`
+   (`test_aller_retour_json_est_fidele` sur le nouveau format) ; `test_rendu.py`,
+   `test_atelier.py` (fixtures en `Correction`).
+   ⚠️ RISQUE PRINCIPAL : le renommage `entree["fusion"]` → `entree["correction"]`
+   doit être COMPLET — grep `fusion` dans `app/` après l'opération, la suite entière
+   doit rester verte.
+   Finition : pytest 100 % verts → commit `R1-b — stockage par phase + déduplication
+   affichage (fin CorrectionFusionnee) — N tests verts` → push → spec (§3, §8.4,
+   §11 décision 29) dans le même commit → MAJ `activeContext.md`/`progress.md`
+   → prochain jalon = UX1.
+
+### État du code À LA FIN de R1-b (cible)
+
+- `corrections.data_json` = dict par phase ; `CorrectionFusionnee`,
+  `embellissement_migre`, `EmbellissementMigre` SUPPRIMÉS ;
+  `reconstruction`/`rendu`/`atelier` travaillent sur `Correction` direct ;
+  déduplication = règle d'affichage ; UI (onglets R1-a) inchangée.
+- Prêt pour **UX1** (menu contextuel riche).
+
 
 ## Jalon UX1 — Menu contextuel riche (ex-B)
 
@@ -111,7 +196,7 @@ Historique complet : voir `progress.md`. Contenu : ids de correction uniques
    Alternatives / Embellissement dans le même menu, selon la phase ET l'onglet actif (R1).
    Tests de rendu + tests d'état (`choix` Forme).
 
-## Jalon UX2 — Confort d'affichage (ex-C, amputé des pastilles → devenues onglets en R1)
+## Jalon UX2 — Confort d'affichage (ex-C, amputé des pastilles → devenues onglets en R1-a)
 
 8. **Affichage du texte** : version ENTIÈRE affichée par défaut + toggle utilisateur
    « Masquer les paragraphes sans correction » (décoché par défaut ; état persisté

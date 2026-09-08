@@ -45,7 +45,7 @@
   - **Déduplication = règle d'affichage** (l'Embellissement n'est plus absorbé dans le tooltip du Style) ;
   - **Base immuable + annotations/projections** (R2) : fin du remappage d'offsets dans `reconstruction.py` ;
   - **Multi-passes LLM inchangé** (3 appels parallèles) — les onglets ne changent rien aux tokens ;
-  - Ordre des jalons : R1 → UX1 → UX2 → UX3 → R2 → UX4 → J3 → J4 → J5 (détail : `plan-correctifs-atelier-ux.md`).
+  - Ordre des jalons : R1-a → R1-b → UX1 → UX2 → UX3 → R2 → UX4 → J3 → J4 → J5 (détail : `plan-correctifs-atelier-ux.md`).
 - **Correctifs UX (2026-09-09, arbitrés par l'auteur — révise J2.5)** :
   - **Toggle « Masquer les paragraphes sans correction »** dans E5 (défaut : texte entier) — **révise le refus du toggle** (décision 24) ;
   - **Suppression d'un projet** avec confirmation : suppression TOTALE en cascade (chapitres, codex, journaux, alertes, analyses…) ; projet actif protégé (trigger) ;

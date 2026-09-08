@@ -40,7 +40,8 @@ Navigateur (Jinja2 + HTMX polling + Alpine.js — vendor local ; fetch pour l'at
   3. le rendu est une **projection par phase** (onglet) + une projection « Tout » (superposition) — R1 ;
   4. ajouter une catégorie = une config de phase + un onglet + une projection, zéro changement au cœur (R3) ;
   5. les 3 appels LLM parallèles sont inchangés : les onglets n'ajoutent ni ne retirent aucun appel (zéro token).
-  Ordre imposé : R1 avant UX1/UX2 ; R2 avant UX4 et J3 (la validation officielle lit l'état courant). Détail : `plan-correctifs-atelier-ux.md` (« Architecture cible » + jalons R1/R2).
+  Ordre imposé : R1-a → R1-b avant UX1/UX2 ; R2 avant UX4 et J3 (la validation officielle lit l'état courant). Détail : `plan-correctifs-atelier-ux.md` (« Architecture cible » + jalons R1-a/R1-b/R2).
+  ⚠️ **R1-a / R1-b = DEUX CONVERSATIONS distinctes** : R1-a ne touche QUE le rendu/UI (stockage et `dedupliquer` intacts — l'état intermédiaire est VOLONTAIRE, ne pas le « corriger » avant R1-b) ; R1-b fait le stockage par phase + la fin de `CorrectionFusionnee`. Handoff : « État du code À LA FIN de R1-a » dans le plan.
 - **Chaîne N+1** : déclarative (catégorie/numéro choisis par l'auteur, J2.3) ; « dernier validé gagne » ; jamais de blocage.
 - **Réconciliation d'offsets** : ancre `contexte_avant`, rejets individuels, validation Pydantic, fences nettoyées ; **no-op Forme rejeté** (jalon A : `original == correction` en phase forme = rejet individuel — Style/Technique marquent SANS réécrire, donc `original == correction` y est légitime).
 - **IDs de correction globaux uniques** (jalon A) : les ids `c-XXXX` émis par chaque phase LLM ne sont JAMAIS utilisés tels quels — `reconciliation.renumeroter()` réassigne une suite unique et déterministe après `dedupliquer()` (appelé par `analyse.py`), sinon `rendu.py` colle deux corrections sur le même `data-groupe` (barre latérale désynchronisée, choix Forme partagés).
