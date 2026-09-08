@@ -121,7 +121,7 @@ F0→F5 et ne seront plus exécutés séparément.**
 | Jalon | Contenu | Statut | Commit |
 |---|---|---|---|
 | F0 | Socle : Vite+Svelte+TS, design tokens, layout global, routage, page d'accueil coquille, client fetch typé ; MAJ `.gitignore` (`spa/`, `node_modules/`, `dist/` gitignorés) | ✅ | `4cbb55c` |
-| F1 | Accueil & projets E1 : endpoints `/api/v1/projets`, création, activation, suppression avec confirmation + protection du projet actif, analyses récentes, états vides | ⬜ | — |
+| F1 | Accueil & projets E1 : endpoints `/api/v1/projets`, création, activation, suppression avec confirmation + protection du projet actif, analyses récentes, états vides | ✅ | `cb6abc1` |
 | F2 | Soumission E3 + suivi E4 : endpoints `/api/v1/analyses`, collage Word fidèle, catégorie, numéro N+1, matrice de phases dérogable, compteur 30 000 car., statuts explicites, polling, fail-fast visible | ⬜ | — |
 | F3 | Atelier E5 : endpoints `/api/v1/analyses/{id}`, couches superposables, onglets par phase + compteurs, menu contextuel riche **[absorbe UX1]**, édition directe sans IA temps réel + « ↻ Re-corriger » **[absorbe UX4]**, barre latérale, toggle « masquer », navigation clavier, validation du texte affiché | ⬜ | — |
 | F4 | Finitions UX & identité : cohérence visuelle, états vides, toasts, accessibilité/focus/contrastes/aria (vérification AA des nouvelles couleurs), responsive, layout ~1200 px **[absorbe UX2]**, microcopy | ⬜ | — |
@@ -153,6 +153,12 @@ F0→F5 et ne seront plus exécutés séparément.**
 - Backend intact ; `.gitignore` à jour (aucun environnement de build commité).
 
 ## Jalon F1 — Accueil & projets E1
+
+> ✅ **LIVRÉ** (commit `cb6abc1`) — endpoints `/api/v1/projets` (liste,
+> création, activation, suppression avec confirmation + protection du projet
+> actif) et `/api/v1/analyses` (10 récentes) ; accueil Svelte branché servi à
+> `/` quand le build existe (repli Jinja2 sinon) ; backend intact (128 pytest) ;
+> 19 tests Vitest verts ; `svelte-check` 0 erreur.
 
 1. **Endpoints `/api/v1/projets`** : GET liste, POST création, POST activation,
    DELETE avec suppression TOTALE en cascade + protection du projet actif

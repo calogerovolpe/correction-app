@@ -1,6 +1,6 @@
 # Progression — jalons, état, décisions
 
-> Dernière mise à jour : 2026-09-09 (jalon F0 livré — socle Svelte ; prochain jalon = F1).
+> Dernière mise à jour : 2026-09-09 (jalon F1 livré — Accueil & projets E1 ; prochain jalon = F2).
 
 ## État des jalons
 
@@ -22,8 +22,8 @@
 | **R1-b — Stockage par phase + déduplication affichage (fin `CorrectionFusionnee`)** | ✅ **Terminé (E2E réel Mistral)** | `c911547` |
 | **R2 — Base immuable + annotations (fin du remappage d'offsets)** | ✅ **Terminé (E2E réel Mistral)** | `e886d3a` |
 | **F0 — Socle** (Vite+Svelte+TS, design tokens, layout, routage, coquille accueil, client fetch, `.gitignore`) | ✅ **Terminé** | `4cbb55c` |
-| **F1 — Accueil & projets E1** (`/api/v1/projets`, création, activation, suppression + protection, analyses récentes, états vides) | ⬜ **Prochain jalon** | — |
-| **F2 — Soumission E3 + suivi E4** (`/api/v1/analyses`, collage Word, matrice dérogable, compteur 30 000, polling, fail-fast) | ⬜ À faire | — |
+| **F1 — Accueil & projets E1** (`/api/v1/projets`, création, activation, suppression + protection, analyses récentes, états vides) | ✅ **Terminé** | `cb6abc1` |
+| **F2 — Soumission E3 + suivi E4** (`/api/v1/analyses`, collage Word, matrice dérogable, compteur 30 000, polling, fail-fast) | ⬜ **Prochain jalon** | — |
 | **F3 — Atelier E5** (couches, onglets + compteurs, menu riche [UX1], édition + « ↻ Re-corriger » [UX4], toggle [UX2], validation, navigation clavier) | ⬜ À faire | — |
 | **F4 — Finitions UX & identité** (cohérence visuelle, états vides, toasts, accessibilité AA, responsive, layout ~1200 px [UX2], microcopy) | ⬜ À faire | — |
 | **F5 — Nettoyage & bascule** (retrait Jinja2/HTMX/Alpine, spec+README+patterns à jour, E2E `/api/v1`, `.bat`) | ⬜ À faire | — |
@@ -31,7 +31,7 @@
 | J4 — Confort | ⬜ À faire | — |
 | J5 — Mise en ligne | ⬜ À faire | — |
 
-**Tests : 121/121 verts** (`pytest`). E2E réel rejoué au jalon R2 : `scripts/e2e_j25.py` (isolé dans `data_e2e/`).
+**Tests : 128/128 verts** (`pytest`) + **19 tests Vitest** (frontend Svelte). E2E réel rejoué au jalon R2 : `scripts/e2e_j25.py` (isolé dans `data_e2e/`).
 
 > **Absorption UX1→UX4 (2026-09-09)** : la roadmap de refonte frontend **F0→F5** absorbe UX1→UX4 (UX1 → F3 ; UX2 → F4 layout + F3 toggle ; UX3 → F1 ; UX4 → F3) — ils ne seront plus exécutés séparément. Source de vérité : `plan-refonte-frontend.md`.
 
@@ -69,8 +69,8 @@
 > Ordre détaillé, étapes, architecture cible et design system : **`plan-refonte-frontend.md`** (roadmap maîtresse F0→F5, créée le 2026-09-09).
 > **Les jalons UX1→UX4 de `plan-correctifs-atelier-ux.md` sont ABSORBÉS par F0→F5** (UX1 → F3 ; UX2 → F4 layout + F3 toggle ; UX3 → F1 ; UX4 → F3) — ils ne seront plus exécutés séparément. R1/R2 sont LIVRÉS et ne sont plus à réaliser.
 
-1. **F1 — Accueil & projets E1** : endpoints `/api/v1/projets` (liste, création, activation, suppression avec confirmation + protection du projet actif), analyses récentes, états vides. **PROCHAIN JALON.**
-2. **F2 — Soumission E3 + suivi E4** : endpoints `/api/v1/analyses` ; collage Word fidèle ; catégorie ; numéro N+1 ; matrice de phases dérogable ; compteur 30 000 car. ; statuts explicites ; polling ; fail-fast visible ; E2E réel adapté `/api/v1`.
+1. **F1 — Accueil & projets E1** : ✅ **LIVRÉ** (`cb6abc1`).
+2. **F2 — Soumission E3 + suivi E4** : endpoints `/api/v1/analyses` ; collage Word fidèle ; catégorie ; numéro N+1 ; matrice de phases dérogable ; compteur 30 000 car. ; statuts explicites ; polling ; fail-fast visible ; E2E réel adapté `/api/v1`. **PROCHAIN JALON.**
 3. **F3 — Atelier E5** : endpoints `/api/v1/analyses/{id}` ; couches superposables ; onglets par phase + compteurs ; menu contextuel riche **[absorbe UX1]** ; édition directe sans IA temps réel + « ↻ Re-corriger » **[absorbe UX4]** ; barre latérale ; toggle « masquer » **[absorbe la partie toggle d'UX2]** ; navigation clavier ; validation du texte affiché.
 4. **F4 — Finitions UX & identité** : cohérence visuelle ; états vides ; toasts ; accessibilité/focus/contrastes/aria (vérification AA des nouvelles couleurs) ; responsive ; layout ~1200 px **[absorbe le reste d'UX2]** ; microcopy.
 5. **F5 — Nettoyage & bascule** : retrait Jinja2/HTMX/Alpine + routes HTML inutiles ; spec + README + `systemPatterns`/`techContext` à jour ; E2E Mistral rejoué `/api/v1` ; lanceur `.bat` vérifié.
@@ -82,6 +82,7 @@
 ## Problèmes connus
 
 - **121/121 tests verts** ; E2E réel Mistral OK (rejoué aux jalons R1-b et R2).
+- **Au jalon F1** : 128/128 pytest + 19 Vitest verts (frontend Svelte).
 - **Bugs constatés par l'auteur (correctifs — roadmap `plan-correctifs-atelier-ux.md`)** : ~~barre latérale désynchronisée (ids non uniques entre phases)~~ ✅ jalon A ; ~~corrections no-op (« cous » → « cous »)~~ ✅ jalon A ; ~~menu contextuel non fiable (`hidden` neutralisé, popover hors écran)~~ ✅ jalon A ; pas de menu contextuel sur une marque (jalon B) ; numéro attendu erroné pour un nouveau projet (jalon D).
 - **Limite connue** : `_reevaluer_corrections` régénère des ids `c-r0001…` avec compteur remis à zéro par appel — deux réévaluations de paragraphes différents dans une même session peuvent théoriquement entrer en collision (même classe de bug que le jalon A, cas rare non constaté ; piste : séquence `c-r` continue à l'échelle du document).
 - Dette : `atelier.py` ~400 lignes — fractionnement fin planifié pendant J3 si croissance (règle 300 lignes).
@@ -101,3 +102,4 @@
 - **2026-09-09 (R1-b)** : **stockage par phase + déduplication d'affichage LIVRÉS** (`c911547`, 114 tests verts + E2E réel Mistral rejoué) — fin de `CorrectionFusionnee`/`EmbellissementMigre` (code mort), `dedupliquer()` supprimée (recouvrement exact Style/Embellissement → les DEUX coexistent), `renumeroter()` sur `list[Correction]`, `corrections.data_json` en dict par phase, renommage complet `entree["fusion"]` → `entree["correction"]` ; spec §3/§4.4/§7.1/§11 décision 29 dans le même commit. **Le handoff R1-a est CONSOMMÉ ; prochain jalon = UX1.**
 - **2026-09-08 (R2)** : **base immuable + annotations LIVRÉES** (`e886d3a`, 121 tests verts + E2E réel Mistral rejoué OK) — fin du « texte mutable + remappage d'offsets » : état `documents` = base (texte normalisé immuable) + corrections en coordonnées de la base (jamais décalées) + choix/refus + patches manuels ; « texte courant » = projection calculée ; refuser une Forme = un filtre ; réévaluation ré-ancrée sur la base (Forme appliquées → patches) ; migration des états antérieurs à la volée (choix préservés par id, modifs manuelles abandonnées — décision) ; spec §4.1/§8.2/§8.3/§11 décisions 28 (révisée) et 39 dans le même commit. **R2 livré en avance (décision de l'auteur) ; prochain jalon = UX1.**
 - **2026-09-09 (F0)** : **socle frontend Svelte livré** (`4cbb55c`, 121 pytest + 7 Vitest verts, `svelte-check` 0 erreur) — `frontend/` (Vite + Svelte 5 + TypeScript) versionné avec `package-lock.json` ; design tokens (thème + couches de correction réelles) ; layout global + routage hash ; page d'accueil coquille servable (build → `app/static/spa/`, gitignoré) ; client fetch typé `/api/v1/` (prêt F1) ; `.gitignore` étendu (`frontend/node_modules/`, `frontend/dist/`, `app/static/spa/`). **Backend intact (121 pytest) ; l'application tourne toujours en Jinja2/HTMX/Alpine ; prochain jalon = F1.**
+- **2026-09-09 (F1)** : **Accueil & projets E1 LIVRÉS** (`cb6abc1`, 128 pytest + 19 Vitest verts, `svelte-check` 0 erreur) — `app/routes/api.py` (routeur `/api/v1`, aucune logique métier dupliquée) : `GET/POST /api/v1/projets` (création, premier projet actif), `POST /api/v1/projets/{id}/activer` (UPSERT, un seul actif), `DELETE /api/v1/projets/{id}` (cascade totale ; projet actif → 409, trigger SQL garantie ultime), `GET /api/v1/analyses` (10 récentes, extrait 60 car.) ; **accueil Svelte branché** (`Accueil.svelte` : liste, création, activation, suppression avec confirmation via `Modale.svelte`, analyses récentes cliquables, états vides) servi à `/` quand le build existe (repli Jinja2 sinon — `web.py`) ; `vite.config.ts` `base '/static/spa/'` ; composants `Bouton`/`Badge`/`Modale` + module `lib/api/projets.ts` ; **tests E1 Jinja2 migrés vers l'API + Vitest** (l'accueil n'est plus rendu par Jinja2) ; spec §2.1/§2.2/§8.2 dans le même commit. **Backend métier intact (pipeline, fail-fast, Option B, base immuable) ; prochain jalon = F2.**

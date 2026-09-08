@@ -4,21 +4,21 @@
 
 ## Stack
 
-> **Refonte frontend EN COURS — F0 livré** (`4cbb55c`) : Svelte 5 + TypeScript +
-> Vite → `app/static/spa/` (gitignoré), API JSON `/api/v1/` (réutilise les services
-> purs existants), routes Jinja2 conservées jusqu'à F5. Source de vérité :
-> `plan-refonte-frontend.md`. ⚠️ Au code, l'application tourne TOUJOURS en
-> Jinja2/HTMX/Alpine — le socle `frontend/` (F0) est versionné et compilé dans
-> `app/static/spa/`, mais PAS encore branché comme écran principal.
+> **Refonte frontend EN COURS — F1 livré** (`cb6abc1`) : Svelte 5 + TypeScript +
+> Vite → `app/static/spa/` (gitignoré), API JSON `/api/v1/` (`app/routes/api.py` :
+> projets E1 + analyses récentes — réutilise les services purs existants), routes
+> Jinja2 conservées jusqu'à F5. Source de vérité : `plan-refonte-frontend.md`.
+> ⚠️ **L'accueil `/` est désormais servi par le SPA compilé** (repli Jinja2 si le
+> build est absent) ; E3/E4/E5 tournent encore en Jinja2/HTMX/Alpine (jusqu'à F3/F5).
 | Couche | Choix |
 |---|---|
 | Backend | Python 3.11+ (3.14.3 en pratique), FastAPI, Uvicorn, Pydantic v2, pydantic-settings (préfixe `APP_`, lit `.env`), httpx, python-multipart |
 | Frontend | Jinja2 (autoescape) + HTMX (polling) + Alpine.js — servis depuis `app/static/vendor/`, aucun CDN, aucun build Node |
-| Frontend (refonte F0→F5) | **Svelte 5 + TypeScript + Vite** — `frontend/` versionné (F0 ✅ `4cbb55c`), build → `app/static/spa/` (gitignoré), non branché jusqu'à F5 ; tests Vitest (`npm test`) |
+| Frontend (refonte F0→F5) | **Svelte 5 + TypeScript + Vite** — `frontend/` versionné (F0 ✅ `4cbb55c`, F1 ✅ `cb6abc1`), build → `app/static/spa/` (gitignoré) ; **accueil E1 branché depuis F1** ; tests Vitest (`npm test`) |
 | Base de données | SQLite WAL, `busy_timeout=15000`, accès `asyncio.to_thread`, verrou `threading.Lock` (`app/db.py`) |
 | LLM | **Mistral API uniquement**, `mistral-small-latest` ; client maison compatible OpenAI (`app/llm/client.py`) |
 | Conteneurisation | Dockerfile + docker-compose.yml (parité dev/prod) |
-| Tests | pytest — **121 tests** (unitaires métier pur + intégration TestClient + MockLLM) + E2E réel Mistral (`scripts/e2e_j25.py`, isolé `data_e2e/`) |
+| Tests | pytest — **128 tests** (unitaires métier pur + intégration TestClient + MockLLM) + **19 Vitest** (frontend Svelte) + E2E réel Mistral (`scripts/e2e_j25.py`, isolé `data_e2e/`) |
 
 ## Setup de développement
 

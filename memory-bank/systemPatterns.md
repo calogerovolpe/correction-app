@@ -4,12 +4,13 @@
 
 ## Vue d'ensemble (flux de données)
 
-> **Refonte frontend EN COURS — F0 livré** (`4cbb55c`) : Svelte 5 + TypeScript +
-> Vite → `app/static/spa/`, API JSON `/api/v1/`, routes Jinja2 conservées jusqu'à
-> F5. Source de vérité : `plan-refonte-frontend.md`. Le flux ci-dessous décrit
-> l'état ACTUEL (Jinja2/HTMX/Alpine toujours actifs) — la coquille `frontend/`
-> (F0) est compilée dans `app/static/spa/` mais non branchée ; AUCUN état non
-> encore réalisé n'est décrit comme acquis.
+> **Refonte frontend EN COURS — F1 livré** (`cb6abc1`) : Svelte 5 + TypeScript +
+> Vite → `app/static/spa/`, API JSON `/api/v1/` (`app/routes/api.py`), routes
+> Jinja2 conservées jusqu'à F5. Source de vérité : `plan-refonte-frontend.md`.
+> **L'accueil `/` est servi par le SPA compilé depuis F1** (repli Jinja2 si build
+> absent) ; les écrans E3/E4/E5 tournent encore en Jinja2/HTMX/Alpine (jusqu'à
+> F3/F5). Le flux ci-dessous décrit l'état des écrans Jinja2 — en plus, le SPA
+> Svelte consomme l'API JSON `/api/v1` (routeur `app/routes/api.py` → `db.py`).
 ```
 Navigateur (Jinja2 + HTMX polling + Alpine.js — vendor local ; fetch pour l'atelier)
   → routes FastAPI : web.py (écrans E1/E3/E4) + atelier.py (E5 : état courant,

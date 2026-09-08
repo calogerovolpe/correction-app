@@ -1,13 +1,13 @@
 # Contexte actif — où nous en sommes MAINTENANT
 
-> Fichier le plus souvent mis à jour. Dernière mise à jour : 2026-09-09 (jalon F0 livré — socle Svelte ; prochain jalon = F1).
+> Fichier le plus souvent mis à jour. Dernière mise à jour : 2026-09-09 (jalon F1 livré — Accueil & projets E1 ; prochain jalon = F2).
 
 ## Focus du moment
 
 **Refonte frontend — série F0→F5 (remplacement Jinja2 + HTMX + Alpine.js par Svelte 5 + TypeScript + Vite) — AVANT J3.**
 La roadmap détaillée est dans **`plan-refonte-frontend.md`** (même dossier) : la RELIRE EN DÉBUT DE SESSION — elle contient l'ordre des jalons F0→F5, leurs dépendances, les choix techniques, le design system et l'architecture cible. Un commit par jalon ; le suivi (statut/commit) est tenu à jour dans ce plan ET dans `progress.md`.
 
-- **Où on en est** : la série R est LIVRÉE — R1-a ✅ (`245071b`) ; R1-b ✅ (`c911547`) ; R2 ✅ (`e886d3a`) ; **F0 ✅ (`4cbb55c`) — Socle Svelte 5 + TS + Vite (design tokens, layout, routage, coquille servable, client fetch typé, `.gitignore` à jour)** — **121 pytest + 7 Vitest verts** ; **prochain jalon = F1 — Accueil & projets E1** (`/api/v1/projets`).
+- **Où on en est** : la série R est LIVRÉE — R1-a ✅ (`245071b`) ; R1-b ✅ (`c911547`) ; R2 ✅ (`e886d3a`) ; **F0 ✅ (`4cbb55c`) — Socle Svelte 5 + TS + Vite** ; **F1 ✅ (`cb6abc1`) — Accueil & projets E1** (`/api/v1/projets` : liste, création, activation, suppression avec confirmation + protection du projet actif ; analyses récentes ; états vides — **accueil Svelte branché**) — **128 pytest + 19 Vitest verts** ; **prochain jalon = F2 — Soumission E3 + suivi E4** (`/api/v1/analyses`).
 - **UX1→UX4 sont ABSORBÉS par F0→F5** (correspondance : UX1 → F3 ; UX2 → F4 layout + F3 toggle ; UX3 → F1 ; UX4 → F3) — ils ne seront plus exécutés séparément ; `plan-correctifs-atelier-ux.md` reste l'historique de la série R1/UX.
 - **Révision de décision actée** : décision A2 (cahier des charges) et spec §2.1 (stack frontend « décisions figées ») sont RÉVISÉES par la bascule Svelte — la révision n'est PAS encore codée : l'application tourne TOUJOURS en Jinja2/HTMX/Alpine ; la transition sera répercutée dans la spec + `systemPatterns.md` + `techContext.md` au fil des jalons (F0 amorce, F5 bascule finale).
 - **Backend intact** : services purs + pipeline LLM (3 phases parallèles, fail-fast, Option B, « liste vide = jamais une panne ») inchangés ; l'API JSON `/api/v1/` réutilise les services purs existants ; les routes Jinja2 sont conservées jusqu'à F5.
@@ -16,9 +16,35 @@ La roadmap détaillée est dans **`plan-refonte-frontend.md`** (même dossier) :
 ## État global
 
 - Jalons terminés : **J2.5 — Atelier v2**, **A — Fiabilité du cœur**, **R1-a — Onglets hybrides**, **R1-b — Stockage par phase**, **R2 — Base immuable + annotations**.
-- Tests : **121/121 verts** (`pytest`).
+- Tests : **128/128 verts** (`pytest`) + **19 tests Vitest** (frontend Svelte).
 - **E2E réel Mistral OK** de bout en bout (`scripts/e2e_j25.py`, environnement isolé `data_e2e/`) : analyse 3 phases → nouvelle version (texte courant repris) → validation (chapitre officiel corrigé, hash, chaîne N+1, backup natif créé). — **rejoué au jalon R2**.
 - Application validée de bout en bout avec Mistral Small.
+
+## Changements récents (F1 — Accueil & projets E1, commit `cb6abc1`)
+
+- **API JSON `/api/v1/`** (`app/routes/api.py`, routeur dédié, « aucune logique
+  métier dupliquée ») : `GET`/`POST /api/v1/projets` (création ; le premier
+  projet d'un espace vierge devient actif), `POST /api/v1/projets/{id}/activer`
+  (UPSERT `parametres.projet_actif` — un seul projet actif), `DELETE
+  /api/v1/projets/{id}` (suppression TOTALE en cascade ; projet actif → **409**,
+  le trigger SQL `trg_projet_actif_restrict` reste la garantie ultime),
+  `GET /api/v1/analyses` (10 plus récentes, extrait 60 caractères).
+- **Écran accueil Svelte branché** (`routes/Accueil.svelte`) : liste des
+  manuscrits (badge de chaîne + « actif », chapitre courant), création,
+  **activation**, **suppression avec confirmation** (composant `Modale.svelte`),
+  **analyses récentes cliquables** (liens vers l'atelier Jinja2), **états
+  vides** en microcopy française. La route Jinja2 `GET /` (`web.py`) sert le
+  SPA compilé (`app/static/spa/`) quand il existe, **repli Jinja2** sinon.
+- **Socle UI** : composants `Bouton` (primaire/secondaire/danger), `Badge`
+  (chaîne + statuts d'analyse), `Modale` (confirmation) ;
+  module typé `lib/api/projets.ts` ; type `Projet` enrichi (`chain_status`,
+  `current_chapter_num`, `last_chapter_title`).
+- **Vitest** : 19 tests verts (client, module API, écran accueil — fetch
+  mocké) ; `svelte-check` 0 erreur ; build Vite → `app/static/spa/`
+  (config `base: '/static/spa/'`).
+- **Backend métier intact** : 128/128 pytest (121 antérieurs + F1) ; les
+  routes Jinja2 E3/E4/E5 et le template `index.html` (repli) sont conservés
+  jusqu'à F5. Spécification §2.1/§2.2/§8.2 mise à jour dans le même commit.
 
 ## Changements récents (F0 — Socle Svelte 5 + TypeScript + Vite, commit `4cbb55c`)
 
@@ -108,8 +134,8 @@ La roadmap détaillée est dans **`plan-refonte-frontend.md`** (même dossier) :
 
 ## Prochaines étapes (ordre)
 
-1. **F1 — Accueil & projets E1** : endpoints `/api/v1/projets` (liste, création, activation, suppression avec confirmation + protection du projet actif), analyses récentes, états vides. **PROCHAIN JALON.**
-2. **F2 — Soumission E3 + suivi E4** : endpoints `/api/v1/analyses` ; collage Word fidèle ; catégorie ; numéro N+1 ; matrice de phases dérogable ; compteur 30 000 car. ; statuts explicites ; polling ; fail-fast visible ; E2E réel adapté `/api/v1`.
+1. **F1 — Accueil & projets E1** : ✅ **LIVRÉ** (`cb6abc1`).
+2. **F2 — Soumission E3 + suivi E4** : endpoints `/api/v1/analyses` ; collage Word fidèle ; catégorie ; numéro N+1 ; matrice de phases dérogable ; compteur 30 000 car. ; statuts explicites ; polling ; fail-fast visible ; E2E réel adapté `/api/v1`. **PROCHAIN JALON.**
 3. **F3 — Atelier E5** : endpoints `/api/v1/analyses/{id}` ; couches superposables ; onglets par phase + compteurs ; menu contextuel riche **[absorbe UX1]** ; édition directe sans IA temps réel + « ↻ Re-corriger » **[absorbe UX4]** ; barre latérale ; toggle « masquer » **[part d'UX2]** ; navigation clavier ; validation du texte affiché ; nouvel accent Technique AA (fin du violet obsolète).
 4. **F4 — Finitions UX & identité** : cohérence visuelle ; états vides ; toasts ; accessibilité/focus/contrastes/aria (vérification AA des nouvelles couleurs) ; responsive ; layout ~1200 px **[absorbe UX2]** ; microcopy.
 5. **F5 — Nettoyage & bascule** : retrait Jinja2/HTMX/Alpine + routes HTML inutiles ; spec + README + `systemPatterns`/`techContext` à jour ; E2E Mistral rejoué `/api/v1` ; lanceur `.bat` vérifié.
