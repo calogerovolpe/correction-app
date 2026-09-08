@@ -1,33 +1,37 @@
-"""Reconstruction de l'état courant du texte — atelier E5 (jalon J2.5, spec §8).
+"""Reconstruction de l'état courant du texte — atelier E5 (spec §8, jalons J2.5→R2).
 
 Règle de mission : la version validée ou soumise est EXACTEMENT le texte
-affiché à l'écran au moment du clic. L'état courant est donc matérialisé
-(persistance : table `documents`) :
-- `paragraphes` : le texte COURANT (runs riches ; évolue à chaque modification) ;
-- `corrections` : les corrections, TOUJOURS exprimées dans les coordonnées du
-  texte courant (remappées après chaque modification). Chaque entrée porte
-  `etat` ('active' | 'obsolete') et `motif` ;
+affiché à l'écran au moment du clic. Depuis le jalon R2, l'état est un modèle
+« base immuable + annotations » (persistance : table `documents`) :
+
+- `base` : le texte normalisé D'ORIGINE (runs riches), JAMAIS muté — les
+  corrections et modifications manuelles y sont exprimées en coordonnées de la
+  BASE (jamais décalées) ;
+- `corrections` : les corrections, toutes en coordonnées de la base. Chaque
+  entrée porte `etat` ('active' | 'obsolete') et `motif` ;
 - `choix` : refus explicites de corrections Forme ({id: "original"}) ;
+- `patches` : les modifications MANUELLES (alternative / embellissement),
+  remplacements `{paragraphe_id, debut, fin, texte}` en coordonnées de la base ;
 - `modifies` : identifiants des paragraphes modifiés à la main (le bouton
   « Réévaluer » leur est proposé).
 
-Sémantique :
-- les corrections Forme sont APPLIQUÉES PAR DÉFAUT (l'écran montre l'original
-  barré + la correction insérée) ; refuser = restituer l'original à sa place ;
-- toute modification est une splice de runs : le fragment courant [debut, fin)
-  est remplacé en préservant le formatage (gras/italique/souligné du premier
-  run remplacé), puis les corrections du paragraphe sont remappées de façon
-  DÉTERMINISTE (jamais de recherche floue) :
-    * entièrement après la zone → décalées de `delta` ;
-    * intersectant la zone → couvrent le texte de remplacement tout entier
-      (Style/Technique) ou deviennent obsolètes (Forme : le fragment qu'elle
-      décrit n'existe plus — le paragraphe est à réévaluer) ;
-    * entièrement avant → inchangées ;
-- les corrections Forme qui se chevauchent entre elles : la première garde la
-  main, les suivantes sont obsolètes (« chevauche une autre correction »).
+« Texte courant » = PROJECTION calculée : base + patches manuels + corrections
+Forme acceptées (triés, appliqués une seule fois), chaque fragment étant soit
+du texte de base, soit un remplacement. Refuser une Forme = la retirer du
+filtre (aucun remappage). Style/Technique = marquage sur la base, jamais de
+réécriture. Les corrections ne sont plus jamais « décalées » : elles portent
+leurs offsets d'origine (base), et le rendu les projette sur le texte courant.
+
+Les corrections Forme qui se chevauchent entre elles : la première garde la
+main, les suivantes sont obsolètes (« chevauche une autre correction »).
+Ajouter une modification manuelle rend obsolètes les Forme actives
+intersectées ; une modification qui recouvrirait un patch manuel existant est
+REFUSÉE (`ZoneDejaModifiee`) — réévaluez le paragraphe ou choisissez un autre
+passage.
 """
 
 import json
+import logging
 import re
 
 from app.models import Correction
@@ -38,6 +42,15 @@ from app.services.texte_riche import (
     extraire_texte_brut_paragraphe,
 )
 
+JOURNAL = logging.getLogger("correction.reconstruction")
+
+MODELE_ETAT = 2
+
+
+class ZoneDejaModifiee(Exception):
+    """La sélection demandée ne peut pas être ancrée proprement sur la base
+    immuable (elle recouvre partiellement une zone déjà modifiée à la main)."""
+
 
 # --- Fabrique de l'état ------------------------------------------------------
 
@@ -45,30 +58,33 @@ from app.services.texte_riche import (
 def etat_initial(
     corrections: list[Correction], paragraphes: list[ParagrapheRiche]
 ) -> dict:
-    """État courant initial : corrections Forme appliquées par défaut."""
+    """État courant initial (jalon R2) : la base immuable D'ORIGINE est
+    conservée telle quelle — aucune Forme n'est spliée dans le texte ; elle
+    sont appliquées par la PROJECTION. Les Forme qui se chevauchent sont
+    d'abord marquées obsolètes (règle héritée de J2.5, en coordonnées base)."""
     etat: dict = {
-        "paragraphes": [p.model_copy(deep=True) for p in paragraphes],
+        "modele": MODELE_ETAT,
+        "base": [p.model_copy(deep=True) for p in paragraphes],
         "corrections": [
             {"correction": c, "etat": "active", "motif": None} for c in corrections
         ],
         "choix": {},
+        "patches": [],
         "modifies": [],
     }
-    for pid in {p.id for p in etat["paragraphes"]}:
-        entrees_pid = [
-            e for e in etat["corrections"]
-            if e["correction"].paragraphe_id == pid
-        ]
-        _appliquer_formes(etat, entrees_pid, _paragraphe(etat, pid))
+    for pid in {p.id for p in etat["base"]}:
+        _resoudre_chevauchements_formes(etat, pid)
     return etat
 
 
-def _appliquer_formes(etat: dict, entrees_pid: list[dict], paragraphe: ParagrapheRiche) -> None:
-    """Applique les corrections Forme actives (par offsets décroissants), puis
-    remappe TOUTES les corrections du paragraphe sur le texte courant."""
-    formes = [e for e in entrees_pid if e["correction"].phase == "forme"]
-    if not formes:
-        return
+def _resoudre_chevauchements_formes(etat: dict, paragraphe_id: str) -> None:
+    """Les corrections Forme actives qui se chevauchent : la première garde la
+    main, les suivantes sont obsolètes (coordonnées BASE — jamais décalées)."""
+    formes = [
+        e for e in etat["corrections"]
+        if e["correction"].paragraphe_id == paragraphe_id
+        and e["correction"].phase == "forme" and e["etat"] == "active"
+    ]
     resolues: list[dict] = []
     for entree in sorted(
         formes, key=lambda e: (e["correction"].debut, e["correction"].fin)
@@ -82,18 +98,201 @@ def _appliquer_formes(etat: dict, entrees_pid: list[dict], paragraphe: Paragraph
             entree["motif"] = "Chevauche une autre correction Forme — non appliquée."
         else:
             resolues.append(entree)
-    if not resolues:
-        return
-    splices: list[tuple[int, int, int]] = []
-    for entree in sorted(resolues, key=lambda e: e["correction"].debut, reverse=True):
+
+
+# --- Projection du texte courant --------------------------------------------
+
+
+def _fragments(etat: dict, paragraphe_id: str) -> list[dict]:
+    """Fragments de projection d'un paragraphe : le texte courant s'obtient en
+    concaténant les fragments (dans l'ordre). Chaque fragment est soit du TEXTE
+    DE BASE (`texte` None, porté [debut, fin) en coordonnées base), soit un
+    REMPLACEMENT (`texte` donné). Les fragments se recouvrent sans gap et le
+    recouvrement éventuel est résolu de façon déterministe : les Forme passent
+    APRÈS les patches manuels (donc gagnent en cas de chevauchement — cas des
+    corrections de réévaluation ancrées sur une zone manuelle)."""
+    paragraphe = _paragraphe(etat, paragraphe_id)
+    longueur = len(extraire_texte_brut_paragraphe(paragraphe))
+    remplacements: list[tuple[int, int, str]] = []
+    for patch in etat.get("patches", []):
+        if patch["paragraphe_id"] == paragraphe_id:
+            remplacements.append((patch["debut"], patch["fin"], patch["texte"]))
+    for entree in etat["corrections"]:
         c = entree["correction"]
-        paragraphe.runs = _remplacer_runs(paragraphe.runs, c.debut, c.fin, c.correction)
-        splices.append((c.debut, c.fin, len(c.correction)))
-    for entree in entrees_pid:
+        if (
+            c.paragraphe_id == paragraphe_id
+            and entree["etat"] == "active"
+            and c.phase == "forme"
+            and etat.get("choix", {}).get(c.id) != "original"
+        ):
+            remplacements.append((c.debut, c.fin, c.correction))
+    remplacements.sort(key=lambda r: (r[0], r[1]))
+
+    fragments: list[dict] = [{"debut": 0, "fin": longueur, "texte": None}]
+    for debut, fin, texte in remplacements:
+        if fin <= debut:
+            continue
+        nouveaux: list[dict] = []
+        for frag in fragments:
+            if frag["fin"] <= debut or frag["debut"] >= fin:
+                nouveaux.append(frag)
+                continue
+            if frag["debut"] < debut:
+                nouveaux.append(dict(frag, fin=debut))
+            nouveaux.append({
+                "debut": max(frag["debut"], debut),
+                "fin": min(frag["fin"], fin),
+                "texte": texte,
+            })
+            if frag["fin"] > fin:
+                nouveaux.append(dict(frag, debut=fin))
+        fragments = nouveaux
+
+    position = 0
+    for frag in fragments:
+        longueur_frag = (
+            len(frag["texte"])
+            if frag["texte"] is not None
+            else frag["fin"] - frag["debut"]
+        )
+        frag["proj_debut"] = position
+        frag["proj_fin"] = position + longueur_frag
+        position += longueur_frag
+    return fragments
+
+
+def _projeter_intervalle(fragments: list[dict], a: int, b: int) -> tuple[int, int]:
+    """Position courante (texte projeté) d'un intervalle de la BASE [a, b) :
+    s'il intersecte un remplacement → il couvre la plage projetée de ce
+    remplacement ; sinon → décalé uniquement (sémantique de J2.5, sans jamais
+    muter les offsets)."""
+    for frag in fragments:
+        if frag["texte"] is not None and a < frag["fin"] and b > frag["debut"]:
+            return frag["proj_debut"], frag["proj_fin"]
+    decal = 0
+    for frag in fragments:
+        if frag["texte"] is not None and frag["fin"] <= a:
+            decal += len(frag["texte"]) - (frag["fin"] - frag["debut"])
+    return a + decal, b + decal
+
+
+def _convertir_vers_base(
+    fragments: list[dict], debut_courant: int, fin_courant: int
+) -> tuple[int, int]:
+    """Retourne la zone de BASE couverte par un intervalle du texte COURANT
+    [debut_courant, fin_courant). Idéale quand la sélection ne fait que
+    traverser des fragments de base et/ou des remplacements ENTIERS ; toute
+    sélection qui coupe un remplacement (zone déjà modifiée à la main) est
+    refusée — impossible à ré-ancrer proprement sur la base."""
+    if fin_courant <= debut_courant:
+        return debut_courant, debut_courant
+    base_debut: int | None = None
+    base_fin: int | None = None
+    for frag in fragments:
+        pd, pf = frag["proj_debut"], frag["proj_fin"]
+        if pf <= debut_courant or pd >= fin_courant:
+            continue
+        if frag["texte"] is None:
+            d = frag["debut"] + max(0, debut_courant - pd)
+            f = frag["fin"] - max(0, pf - fin_courant)
+        else:
+            if debut_courant < pd or pf < fin_courant:
+                raise ZoneDejaModifiee(
+                    "La sélection coupe une zone déjà modifiée par un "
+                    "embellissement/une alternative — réévaluez le paragraphe "
+                    "ou choisissez un autre passage."
+                )
+            d, f = frag["debut"], frag["fin"]
+        if base_debut is None:
+            base_debut, base_fin = d, f
+        else:
+            if d > base_fin:
+                raise ZoneDejaModifiee(
+                    "La sélection traverse une zone déjà modifiée — réévaluez "
+                    "le paragraphe ou choisissez un autre passage."
+                )
+            base_fin = max(base_fin, f)
+    if base_debut is None:
+        raise ZoneDejaModifiee("La sélection ne correspond à aucun texte.")
+    return base_debut, base_fin
+
+
+def _runs_projetes(paragraphe: ParagrapheRiche, fragments: list[dict]) -> list[RunFormat]:
+    """Reconstruit le texte courant EN RUNS (formatage Word préservé) : les
+    fragments de base sont découpés depuis les runs de la base, les
+    remplacements héritent du formatage du premier run couvert (règle J2.5)."""
+    runs: list[RunFormat] = []
+    for frag in fragments:
+        if frag["texte"] is None:
+            _, milieu, _ = decouper_runs_par_intervalle(
+                paragraphe.runs, frag["debut"], frag["fin"]
+            )
+            runs.extend(milieu)
+        else:
+            _, morceaux, _ = decouper_runs_par_intervalle(
+                paragraphe.runs, frag["debut"], frag["fin"]
+            )
+            premier = morceaux[0] if morceaux else None
+            runs.append(RunFormat(
+                texte=frag["texte"],
+                gras=premier.gras if premier else False,
+                italique=premier.italique if premier else False,
+                souligne=premier.souligne if premier else False,
+            ))
+    return _fusionner_runs(runs)
+
+
+def projeter_paragraphe(etat: dict, paragraphe_id: str) -> tuple[ParagrapheRiche, list[dict]]:
+    """Projection d'UN paragraphe : (texte courant en runs, entrees de
+    correction du paragraphe exprimées en coordonnées du texte courant)."""
+    paragraphe = _paragraphe(etat, paragraphe_id)
+    fragments = _fragments(etat, paragraphe_id)
+    entrees: list[dict] = []
+    for entree in etat["corrections"]:
         c = entree["correction"]
-        nouveau_debut, nouveau_fin = _recalculer(splices, c.debut, c.fin)
-        if (nouveau_debut, nouveau_fin) != (c.debut, c.fin):
-            _maj_correction(entree, debut=nouveau_debut, fin=nouveau_fin)
+        if c.paragraphe_id != paragraphe_id:
+            continue
+        debut, fin = _projeter_intervalle(fragments, c.debut, c.fin)
+        entrees.append({
+            "correction": c.model_copy(update={"debut": debut, "fin": fin}),
+            "etat": entree["etat"],
+            "motif": entree["motif"],
+        })
+    return (
+        ParagrapheRiche(id=paragraphe.id, runs=_runs_projetes(paragraphe, fragments)),
+        entrees,
+    )
+
+
+def projeter_paragraphes(etat: dict) -> tuple[list[ParagrapheRiche], list[dict]]:
+    """Projection de TOUS les paragraphes depuis la base immuable. Retourne
+    (list[ParagrapheRiche], list[dict]) : les paragraphes du texte COURANT et
+    toutes les entrées de correction exprimées en coordonnées du texte courant
+    (la liste complète, servie à la barre latérale)."""
+    projetes: list[ParagrapheRiche] = []
+    entrees_projetees: list[dict] = []
+    for paragraphe in etat["base"]:
+        courant, entrees = projeter_paragraphe(etat, paragraphe.id)
+        projetes.append(courant)
+        entrees_projetees.extend(entrees)
+    return projetes, entrees_projetees
+
+
+def texte_paragraphe(etat: dict, paragraphe_id: str) -> str:
+    """Texte COURANT (projeté) d'un paragraphe — what you see is what you get."""
+    paragraphe = _paragraphe(etat, paragraphe_id)
+    base_texte = extraire_texte_brut_paragraphe(paragraphe)
+    morceaux: list[str] = []
+    for frag in _fragments(etat, paragraphe_id):
+        if frag["texte"] is None:
+            morceaux.append(base_texte[frag["debut"]:frag["fin"]])
+        else:
+            morceaux.append(frag["texte"])
+    return "".join(morceaux)
+
+
+def textes_plats(etat: dict) -> list[str]:
+    return [texte_paragraphe(etat, p.id) for p in etat["base"]]
 
 
 # --- Modifications interactives ----------------------------------------------
@@ -127,22 +326,48 @@ def localiser(
 def appliquer_modification(
     etat: dict, paragraphe_id: str, debut: int, fin: int, texte_ins: str
 ) -> None:
-    """Splice d'une modification manuelle (alternative / embellissement) +
-    remappage : les Formes intersectées deviennent obsolètes, Style/Technique
-    couvrent le texte de remplacement, les suivantes sont décalées."""
-    paragraphe = _paragraphe(etat, paragraphe_id)
-    paragraphe.runs = _remplacer_runs(paragraphe.runs, debut, fin, texte_ins)
-    _remapper_apres_splice(
-        etat["corrections"], paragraphe_id, debut, fin, len(texte_ins),
-        forme_devient_obsolete=True,
-    )
+    """Splice d'une modification manuelle (alternative / embellissement) sur la
+    BASE IMMUABLE : la sélection est donnée en coordonnées du texte COURANT,
+    convertie en coordonnées BASE puis enregistrée comme PATCH indépendant —
+    AUCUNE correction n'est décalée. Les Forme actives intersectées deviennent
+    obsolètes (à réévaluer) ; Style/Technique restent ancrés sur la base (le
+    rendu les projette sur la zone modifiée). Une sélection qui recouvre déjà
+    un patch manuel est refusée (`ZoneDejaModifiee`)."""
+    fragments = _fragments(etat, paragraphe_id)
+    base_debut, base_fin = _convertir_vers_base(fragments, debut, fin)
+    for patch in etat.get("patches", []):
+        if (
+            patch["paragraphe_id"] == paragraphe_id
+            and base_debut < patch["fin"] and base_fin > patch["debut"]
+        ):
+            raise ZoneDejaModifiee(
+                "La sélection recouvre une zone déjà modifiée — réévaluez le "
+                "paragraphe ou choisissez un autre passage."
+            )
+    etat.setdefault("patches", []).append({
+        "paragraphe_id": paragraphe_id,
+        "debut": base_debut,
+        "fin": base_fin,
+        "texte": texte_ins,
+    })
+    for entree in etat["corrections"]:
+        c = entree["correction"]
+        if (
+            c.paragraphe_id == paragraphe_id
+            and entree["etat"] == "active"
+            and c.phase == "forme"
+            and base_debut < c.fin and base_fin > c.debut
+        ):
+            entree["etat"] = "obsolete"
+            entree["motif"] = "Fragment modifié manuellement — réévaluez le paragraphe."
     if paragraphe_id not in etat.setdefault("modifies", []):
         etat["modifies"].append(paragraphe_id)
 
 
 def basculer_choix(etat: dict, correction_id: str, decision: str) -> bool:
-    """Refuse ('original') ou ré-applique ('corrige') une correction Forme.
-    Retourne False si la correction n'existe pas ou n'est pas une Forme active."""
+    """Refuse ('original') ou ré-applique ('corrige') une correction Forme —
+    un simple FILTRE : aucun remappage, la projection se recalcule. Retourne
+    False si la correction n'existe pas ou n'est pas une Forme active."""
     entree = next(
         (e for e in etat["corrections"]
          if e["correction"].id == correction_id and e["etat"] == "active"),
@@ -153,17 +378,12 @@ def basculer_choix(etat: dict, correction_id: str, decision: str) -> bool:
     c = entree["correction"]
     if c.phase != "forme":
         return False
-    ins = c.original if decision == "original" else c.correction
-    paragraphe = _paragraphe(etat, c.paragraphe_id)
-    paragraphe.runs = _remplacer_runs(paragraphe.runs, c.debut, c.fin, ins)
-    _remapper_apres_splice(
-        etat["corrections"], c.paragraphe_id, c.debut, c.fin, len(ins),
-        forme_devient_obsolete=False, id_exempt=c.id,
-    )
     if decision == "original":
         etat.setdefault("choix", {})[c.id] = "original"
-    else:
+    elif decision == "corrige":
         etat.get("choix", {}).pop(c.id, None)
+    else:
+        return False
     return True
 
 
@@ -171,37 +391,66 @@ def remplacer_corrections_paragraphe(
     etat: dict, paragraphe_id: str, nouvelles: list[Correction]
 ) -> None:
     """Réévaluation : remplace toutes les corrections du paragraphe par les
-    nouvelles (offsets donnés dans le texte courant), puis applique les
-    nouvelles Formes par défaut (même mécanique que l'état initial)."""
+    nouvelles (données en coordonnées du texte COURANT). Chaque correction est
+    RÉ-ANCRÉE sur la base (jamais décalée ensuite) ; une correction non
+    ancrable (zone manuelle coupée) est écartée avec un log."""
+    # Les Forme APPLIQUÉES (actives, non refusées) deviennent des PATCHES
+    # indépendants : la projection garde leur texte après la réévaluation
+    # (l'ancien modèle gardait leur splice dans le texte courant — le workflow
+    # est conservé, seule la représentation change).
+    for entree in list(etat["corrections"]):
+        c = entree["correction"]
+        if (
+            c.paragraphe_id == paragraphe_id
+            and entree["etat"] == "active"
+            and c.phase == "forme"
+            and etat.get("choix", {}).get(c.id) != "original"
+        ):
+            etat.setdefault("patches", []).append({
+                "paragraphe_id": paragraphe_id,
+                "debut": c.debut,
+                "fin": c.fin,
+                "texte": c.correction,
+            })
+    # la projection COURANTE est figée AVANT le retrait : les nouvelles
+    # corrections sont exprimées en coordonnées de ce texte courant
+    fragments = _fragments(etat, paragraphe_id)
     etat["corrections"] = [
         e for e in etat["corrections"]
         if e["correction"].paragraphe_id != paragraphe_id
     ]
-    entrees = [{"correction": c, "etat": "active", "motif": None} for c in nouvelles]
+    ancrees: list[Correction] = []
+    for c in nouvelles:
+        try:
+            base_debut, base_fin = _convertir_vers_base(
+                fragments, c.debut, c.fin
+            )
+        except ZoneDejaModifiee:
+            JOURNAL.warning(
+                "Correction %s écartée après réévaluation (%s) : zone non ancrable sur la base",
+                c.id, paragraphe_id,
+            )
+            continue
+        ancrees.append(c.model_copy(update={"debut": base_debut, "fin": base_fin}))
+    entrees = [{"correction": c, "etat": "active", "motif": None} for c in ancrees]
     etat["corrections"].extend(entrees)
-    _appliquer_formes(etat, entrees, _paragraphe(etat, paragraphe_id))
+    _resoudre_chevauchements_formes(etat, paragraphe_id)
 
 
 # --- Extractions --------------------------------------------------------------
 
 
-def texte_paragraphe(etat: dict, paragraphe_id: str) -> str:
-    return extraire_texte_brut_paragraphe(_paragraphe(etat, paragraphe_id))
-
-
-def textes_plats(etat: dict) -> list[str]:
-    return [extraire_texte_brut_paragraphe(p) for p in etat["paragraphes"]]
-
-
 def vers_json(etat: dict) -> str:
     return json.dumps(
         {
-            "paragraphes": [p.model_dump() for p in etat["paragraphes"]],
+            "modele": MODELE_ETAT,
+            "base": [p.model_dump() for p in etat["base"]],
             "corrections": [
                 {"correction": e["correction"].model_dump(), "etat": e["etat"], "motif": e["motif"]}
                 for e in etat["corrections"]
             ],
             "choix": etat.get("choix", {}),
+            "patches": etat.get("patches", []),
             "modifies": etat.get("modifies", []),
         },
         ensure_ascii=False,
@@ -211,7 +460,8 @@ def vers_json(etat: dict) -> str:
 def depuis_json(brut: str) -> dict:
     donnees = json.loads(brut)
     return {
-        "paragraphes": [ParagrapheRiche.model_validate(p) for p in donnees["paragraphes"]],
+        "modele": MODELE_ETAT,
+        "base": [ParagrapheRiche.model_validate(p) for p in donnees["base"]],
         "corrections": [
             {
                 "correction": Correction.model_validate(e["correction"]),
@@ -221,22 +471,61 @@ def depuis_json(brut: str) -> dict:
             for e in donnees["corrections"]
         ],
         "choix": donnees.get("choix", {}),
+        "patches": donnees.get("patches", []),
         "modifies": donnees.get("modifies", []),
     }
+
+
+def est_ancien_format(donnees: dict) -> bool:
+    """Un état antérieur au jalon R2 (texte courant muté dans `paragraphes`,
+    corrections remappées) — à migrer via `migrer_ancien_format`."""
+    return donnees.get("modele") != MODELE_ETAT or "base" not in donnees
+
+
+def migrer_ancien_format(
+    donnees_ancien: dict,
+    base: list[ParagrapheRiche],
+    corrections: list[Correction],
+) -> dict:
+    """Migration R2 d'un état `documents` antérieur : la BASE est reconstruite
+    depuis le texte normalisé d'origine et les corrections depuis
+    `corrections.data_json` (coordonnées base) ; les CHOIX/refus de l'auteur
+    sont préservés par id ; les modifications manuelles (patches) de l'ancien
+    état ne sont PAS rejouables proprement — elles sont abandonnées (décision
+    de l'auteur, arbitrée au jalon R2)."""
+    par_id = {e["correction"].get("id"): e for e in donnees_ancien.get("corrections", [])}
+    ids_connus = {c.id for c in corrections}
+    etat = {
+        "modele": MODELE_ETAT,
+        "base": [p.model_copy(deep=True) for p in base],
+        "corrections": [
+            {
+                "correction": c,
+                "etat": (par_id.get(c.id) or {}).get("etat", "active"),
+                "motif": (par_id.get(c.id) or {}).get("motif"),
+            }
+            for c in corrections
+        ],
+        "choix": {
+            cid: val for cid, val in (donnees_ancien.get("choix") or {}).items()
+            if cid in ids_connus
+        },
+        "patches": [],
+        "modifies": [],
+    }
+    for pid in {p.id for p in etat["base"]}:
+        _resoudre_chevauchements_formes(etat, pid)
+    return etat
 
 
 # --- Outils internes -----------------------------------------------------------
 
 
 def _paragraphe(etat: dict, paragraphe_id: str) -> ParagrapheRiche:
-    for p in etat["paragraphes"]:
+    for p in etat["base"]:
         if p.id == paragraphe_id:
             return p
     raise ValueError(f"Paragraphe {paragraphe_id} inconnu dans l'état courant")
-
-
-def _maj_correction(entree: dict, **champs) -> None:
-    entree["correction"] = entree["correction"].model_copy(update=champs)
 
 
 def _fusionner_runs(runs: list[RunFormat]) -> list[RunFormat]:
@@ -259,70 +548,3 @@ def _fusionner_runs(runs: list[RunFormat]) -> list[RunFormat]:
         else:
             sortie.append(run)
     return sortie
-
-
-def _remplacer_runs(
-    runs: list[RunFormat], debut: int, fin: int, nouveau_texte: str
-) -> list[RunFormat]:
-    """Remplace [debut, fin) par `nouveau_texte` en préservant le formatage
-    (flags du premier run couvert)."""
-    if fin <= debut:
-        return _fusionner_runs(runs)
-    avant, couverts, apres = decouper_runs_par_intervalle(runs, debut, fin)
-    if nouveau_texte:
-        premier = couverts[0] if couverts else None
-        insere = RunFormat(
-            texte=nouveau_texte,
-            gras=premier.gras if premier else False,
-            italique=premier.italique if premier else False,
-            souligne=premier.souligne if premier else False,
-        )
-        runs_nouveaux = avant + [insere] + apres
-    else:
-        runs_nouveaux = avant + apres
-    return _fusionner_runs(runs_nouveaux)
-
-
-def _remapper_apres_splice(
-    entrees: list[dict],
-    paragraphe_id: str,
-    debut: int,
-    fin: int,
-    longueur: int,
-    forme_devient_obsolete: bool,
-    id_exempt: str | None = None,
-) -> None:
-    """Remappage déterministe des corrections d'un paragraphe après une splice."""
-    delta = longueur - (fin - debut)
-    for entree in entrees:
-        c = entree["correction"]
-        if c.paragraphe_id != paragraphe_id or entree["etat"] != "active":
-            continue
-        if id_exempt is not None and c.id == id_exempt:
-            _maj_correction(entree, debut=debut, fin=debut + longueur)
-        elif c.fin <= debut:
-            continue  # entièrement avant : inchangée
-        elif c.debut >= fin:
-            _maj_correction(entree, debut=c.debut + delta, fin=c.fin + delta)
-        else:  # intersecte la zone
-            if forme_devient_obsolete and c.phase == "forme":
-                entree["etat"] = "obsolete"
-                entree["motif"] = (
-                    "Fragment modifié manuellement — réévaluez le paragraphe."
-                )
-            else:
-                _maj_correction(entree, debut=debut, fin=debut + longueur)
-
-
-def _recalculer(
-    splices: list[tuple[int, int, int]], a: int, b: int
-) -> tuple[int, int]:
-    """Position courante d'un intervalle d'origine [a, b) : s'il intersecte une
-    splice → il couvre le texte de remplacement ; sinon → décalé uniquement."""
-    for d, f, longueur in splices:
-        if a < f and b > d:
-            cs = d + sum(l - (f2 - d2) for d2, f2, l in splices if f2 <= d)
-            return cs, cs + longueur
-    decal = sum(l - (f - d) for d, f, l in splices if f <= a)
-    return a + decal, b + decal
-

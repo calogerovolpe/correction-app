@@ -10,11 +10,15 @@ de l'auteur, J2.5) :
 Les corrections de phases différentes couvrant un même mot s'empilent par
 classes CSS cumulées — jamais avalées par un bloc fusionné.
 
-Entrées : l'état courant de `reconstruction` (texte courant + corrections en
-coordonnées courantes + choix). Le compteur de paragraphes masqués ne compte
-que les paragraphes sans correction active ET sans modification manuelle.
+Entrées (jalon R2) : soit les paramètres historiques `(paragraphes, entrees,
+choix, modifies)` VUES DU TEXTE COURANT projeté (via
+`reconstruction.projeter_paragraphes`), soit — point d'entrée recommandé —
+`preparer_document_depuis_etat(etat, onglet)` qui projette depuis la base
+immuable + annotations puis délègue ici. Le compteur de paragraphes masqués ne
+compte que les paragraphes sans correction active ET sans modification manuelle.
 """
 
+from app.services import reconstruction
 from app.services.texte_riche import (
     ParagrapheRiche,
     RunFormat,
@@ -87,18 +91,19 @@ def preparer_document(
     }
 
 
-def preparer_document_par_phase(
-    paragraphes: list[ParagrapheRiche],
-    entrees: list[dict],
-    phase: str,
-    choix: dict,
-    modifies: list[str] | None = None,
-) -> dict:
-    """Projection d'UN onglet (jalon R1-a) : ne conserve que les corrections de
-    `phase`, puis délègue à `preparer_document` — AUCUNE logique de segments
-    dupliquée. `preparer_document()` reste la projection « Tout » (superposition)."""
-    filtrees = [e for e in entrees if e["correction"].phase == phase]
-    return preparer_document(paragraphes, filtrees, choix, modifies)
+def preparer_document_depuis_etat(etat: dict, phase: str = "tout") -> dict:
+    """Point d'entrée du rendu (jalon R2) : projette le texte COURANT depuis la
+    BASE IMMUABLE + annotations (`reconstruction.projeter_paragraphes`), puis
+    délègue à `preparer_document` — AUCUNE logique de segments dupliquée. La
+    liste des corrections projetées sert telle quelle à la barre latérale.
+    `phase` = onglet (« tout » = superposition complète). Zéro appel LLM."""
+    paragraphes, entrees = reconstruction.projeter_paragraphes(etat)
+    if phase != "tout":
+        entrees = [e for e in entrees if e["correction"].phase == phase]
+    return preparer_document(
+        paragraphes, entrees,
+        etat.get("choix", {}), etat.get("modifies", []),
+    )
 
 
 def _classe_marque(entree: dict) -> str:

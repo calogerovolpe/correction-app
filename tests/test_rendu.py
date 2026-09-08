@@ -33,9 +33,7 @@ def _corr(cid, phase, debut, fin, original, correction):
 
 def _doc(fusions, paragraphe=None):
     etat = reconstruction.etat_initial(fusions, [paragraphe or _p()])
-    return rendu.preparer_document(
-        etat["paragraphes"], etat["corrections"], etat["choix"], etat["modifies"]
-    )
+    return rendu.preparer_document_depuis_etat(etat)
 
 
 def test_correction_forme_segments_barré_et_inséré():
@@ -80,9 +78,7 @@ def test_forme_refusee_rend_le_texte_neutral_marque():
         [_corr("c-1", "forme", 16, 22, "veille", "veillent")], [_p()]
     )
     reconstruction.basculer_choix(etat, "c-1", "original")
-    doc = rendu.preparer_document(
-        etat["paragraphes"], etat["corrections"], etat["choix"], etat["modifies"]
-    )
+    doc = rendu.preparer_document_depuis_etat(etat)
     segments = doc["paragraphes"][0]["segments"]
     assert [s["type"] for s in segments] == ["texte"]
     assert segments[0]["texte"] == TEXTE  # original restauré
@@ -96,9 +92,7 @@ def test_correction_obsolete_ne_s_affiche_pas_dans_le_texte():
         [_corr("c-1", "forme", 16, 22, "veille", "veillent")], [_p()]
     )
     reconstruction.appliquer_modification(etat, "p-1", 16, 22, "monte la garde")
-    doc = rendu.preparer_document(
-        etat["paragraphes"], etat["corrections"], etat["choix"], etat["modifies"]
-    )
+    doc = rendu.preparer_document_depuis_etat(etat)
     segments = doc["paragraphes"][0]["segments"]
     courant = "".join(s.get("ins") or s.get("texte", "") for s in segments)
     assert "monte la garde" in courant
@@ -118,7 +112,7 @@ def test_compteur_de_paragraphes_masques():
     p3 = ParagrapheRiche(id="p-3", runs=[RunFormat(texte="Rien non plus.")])
     # paragraphe sans correction → masqué
     etat = reconstruction.etat_initial([], [p2, p3])
-    doc_vide = rendu.preparer_document(etat["paragraphes"], etat["corrections"], etat["choix"])
+    doc_vide = rendu.preparer_document_depuis_etat(etat)
     assert doc_vide["nb_masques"] == 2
     assert doc_vide["paragraphes"] == []
 
@@ -161,22 +155,17 @@ def _etat_deux_phases():
 
 def test_projection_par_phase_n_affiche_que_sa_phase():
     """Chaque onglet ne montre QUE les corrections de sa phase : la projection
-    filtre les `entrees` puis réutilise `preparer_document` (logique unique)."""
+    filtre les `entrees` puis réutilise `preparer_document_depuis_etat` (logique
+    unique)."""
     etat = _etat_deux_phases()
 
-    doc_forme = rendu.preparer_document_par_phase(
-        etat["paragraphes"], etat["corrections"], "forme",
-        etat["choix"], etat["modifies"],
-    )
+    doc_forme = rendu.preparer_document_depuis_etat(etat, "forme")
     segments = doc_forme["paragraphes"][0]["segments"]
     assert [s["type"] for s in segments] == ["texte", "forme", "texte"]
     assert all("mark-style" not in s["classes"] for s in segments)
     assert [i["phase"] for i in doc_forme["corrections_barre"]] == ["forme"]
 
-    doc_style = rendu.preparer_document_par_phase(
-        etat["paragraphes"], etat["corrections"], "style",
-        etat["choix"], etat["modifies"],
-    )
+    doc_style = rendu.preparer_document_depuis_etat(etat, "style")
     segments = doc_style["paragraphes"][0]["segments"]
     assert all(s["type"] == "texte" for s in segments)  # aucune Forme appliquée ici
     assert any("mark-style" in s["classes"] for s in segments)
@@ -187,9 +176,7 @@ def test_tout_reste_la_superposition_complete():
     """Régression : `preparer_document` (onglet « Tout ») reste inchangée —
     les deux phases restent superposées dans la même vue."""
     etat = _etat_deux_phases()
-    doc = rendu.preparer_document(
-        etat["paragraphes"], etat["corrections"], etat["choix"], etat["modifies"]
-    )
+    doc = rendu.preparer_document_depuis_etat(etat)
     assert [i["phase"] for i in doc["corrections_barre"]] == ["forme", "style"]
     segments = doc["paragraphes"][0]["segments"]
     assert any(s["type"] == "forme" for s in segments)
@@ -200,10 +187,7 @@ def test_projection_phase_absente_rend_le_texte_neutre():
     """Aucune correction de la phase : aucun paragraphe actif → le texte est
     masqué (comportement existant de `preparer_document` conservé)."""
     etat = _etat_deux_phases()
-    doc = rendu.preparer_document_par_phase(
-        etat["paragraphes"], etat["corrections"], "technique",
-        etat["choix"], etat["modifies"],
-    )
+    doc = rendu.preparer_document_depuis_etat(etat, "technique")
     assert doc["corrections_barre"] == []
     assert doc["paragraphes"] == []
     assert doc["nb_masques"] == 1

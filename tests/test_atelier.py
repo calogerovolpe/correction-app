@@ -383,3 +383,46 @@ def test_menu_contextuel_et_popover_masques_au_chargement(client, monkeypatch):
     )
     assert "[hidden] { display: none !important; }" in css
     assert "position: fixed" in css
+
+
+# --- Jalon R2 : migration d'un ancien document d'atelier -----------------------
+
+
+def test_migration_ancien_document_dans_l_atelier(client, monkeypatch, base_donnees):
+    """R2 : un état `documents` antérieur (format J2.5 : texte muté + corrections
+    remappées) est migré à la volée au chargement de l'atelier — les CHOIX sont
+    préservés et la base est reconstruite depuis `analyses.texte_source`."""
+    identifiant = _chapitre_termine(client, monkeypatch)
+    import sqlite3
+
+    conn = sqlite3.connect(base_donnees)
+    ancien = json.dumps({
+        "paragraphes": [{"id": "p-1", "runs": [{"texte": COURANT}]}],
+        "corrections": [
+            {
+                "correction": {
+                    "id": "c-0001", "phase": "forme", "type": "accord_sujet_verbe",
+                    "paragraphe_id": "p-1", "debut": 14, "fin": 18,
+                    "contexte_avant": "Les cavaliers ", "original": "part",
+                    "correction": "partent", "explication": "Accord.",
+                    "regle": "Accord sujet-verbe", "variantes": [],
+                },
+                "etat": "active", "motif": None,
+            }
+        ],
+        "choix": {"c-0001": "original"},  # l'auteur avait refusé cette Forme
+        "modifies": [],
+    }, ensure_ascii=False)
+    conn.execute(
+        "INSERT OR REPLACE INTO documents (analyse_id, document_json) VALUES (?, ?)",
+        (identifiant, ancien),
+    )
+    conn.commit()
+    conn.close()
+
+    page = client.get(f"/analyses/{identifiant}")
+    assert page.status_code == 200
+    # le refus est préservé : la Forme n'est plus appliquée (aucun bloc ins--forme)
+    assert "ins--forme" not in page.text
+    assert "refusee" in page.text
+    assert '"decision": "original"' in page.text

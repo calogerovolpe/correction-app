@@ -1,7 +1,9 @@
 """Écran E5 — atelier de relecture et workflow de fin de chapitre (jalon J2.5).
 
-Modèle d'interaction (décisions de l'auteur, J2.5) :
-- l'état courant du texte est matérialisé (`documents`, service `reconstruction`) ;
+Modèle d'interaction (décisions de l'auteur, J2.5 + R2) :
+- l'état courant du texte est matérialisé (`documents`, service `reconstruction`) :
+  depuis R2, une BASE IMMUABLE + des annotations (corrections ancrées base,
+  patches manuels) — le « texte affiché » est la PROJECTION calculée ;
   « Valider la version actuelle » enregistre EXACTEMENT le texte affiché à
   l'écran, qu'il soit corrigé ou non ;
 - les corrections peuvent se chevaucher visuellement (couches : Forme rouge,
@@ -67,7 +69,16 @@ async def _charger_etat(analyse) -> dict:
         "SELECT document_json FROM documents WHERE analyse_id = ?", (analyse["id"],)
     )
     if lignes:
-        return reconstruction.depuis_json(lignes[0]["document_json"])
+        donnees = json.loads(lignes[0]["document_json"])
+        if not reconstruction.est_ancien_format(donnees):
+            return reconstruction.depuis_json(lignes[0]["document_json"])
+        # Migration R2 : base + corrections reconstruites depuis les sources
+        # (texte normalisé + data_json), choix préservés par id, modifications
+        # manuelles abandonnées (décision arbitrée au jalon R2).
+        base = service_texte_riche.parser_document_riche(analyse["texte_source"])
+        return reconstruction.migrer_ancien_format(
+            donnees, base, await _charger_corrections(analyse["id"])
+        )
     paragraphes = service_texte_riche.parser_document_riche(analyse["texte_source"])
     etat = reconstruction.etat_initial(await _charger_corrections(analyse["id"]), paragraphes)
     await db.executer(
@@ -96,16 +107,7 @@ def _onglet_valide(onglet: str | None) -> str:
 
 def _contexte_resultat(analyse, etat, erreur=None, onglet="tout") -> dict:
     onglet = _onglet_valide(onglet)
-    if onglet == "tout":
-        document = service_rendu.preparer_document(
-            etat["paragraphes"], etat["corrections"],
-            etat.get("choix", {}), etat.get("modifies", []),
-        )
-    else:
-        document = service_rendu.preparer_document_par_phase(
-            etat["paragraphes"], etat["corrections"], onglet,
-            etat.get("choix", {}), etat.get("modifies", []),
-        )
+    document = service_rendu.preparer_document_depuis_etat(etat, onglet)
     actives = [e for e in etat["corrections"] if e["etat"] == "active"]
     return {
         "analyse": analyse,
@@ -172,7 +174,7 @@ async def choix_forme(
     onglet: str = Form("tout"),
 ):
     """Accepte ('corrige', défaut) ou refuse ('original') une correction Forme :
-    le texte courant est immédiatement reconstruit (splice + remappage)."""
+    un simple FILTRE (jalon R2) — aucun remappage, la projection se recalcule."""
     analyse = await _analyse(identifiant)
     if not analyse or analyse["statut"] != "terminee":
         return HTMLResponse("Analyse introuvable ou non terminée.", status_code=404)
@@ -212,7 +214,12 @@ async def appliquer_alternative(
             onglet=onglet,
         )
     debut, fin = localisation
-    reconstruction.appliquer_modification(etat, paragraphe_id, debut, fin, texte)
+    try:
+        reconstruction.appliquer_modification(etat, paragraphe_id, debut, fin, texte)
+    except reconstruction.ZoneDejaModifiee as erreur:
+        return _rendre_atelier(
+            request, analyse, etat, str(erreur), onglet=onglet
+        )
     await _sauver_etat(identifiant, etat)
     return _rendre_atelier(request, analyse, etat, onglet=onglet)
 
@@ -305,7 +312,12 @@ async def appliquer_embellissement(
             onglet=onglet,
         )
     debut, fin = localisation
-    reconstruction.appliquer_modification(etat, paragraphe_id, debut, fin, texte)
+    try:
+        reconstruction.appliquer_modification(etat, paragraphe_id, debut, fin, texte)
+    except reconstruction.ZoneDejaModifiee as erreur:
+        return _rendre_atelier(
+            request, analyse, etat, str(erreur), onglet=onglet
+        )
     try:
         nouvelles = await _reevaluer_corrections(analyse, etat, paragraphe_id)
     except Exception as erreur:  # noqa: BLE001 — aucun état partiel
@@ -387,7 +399,8 @@ async def relancer_nouvelle_version(identifiant: int):
     if not analyse or analyse["statut"] != "terminee":
         return HTMLResponse("Analyse introuvable ou non terminée.", status_code=404)
     etat = await _charger_etat(analyse)
-    nouveau_texte = service_texte_riche.serialiser_document_riche(etat["paragraphes"])
+    paragraphes_courants, _ = reconstruction.projeter_paragraphes(etat)
+    nouveau_texte = service_texte_riche.serialiser_document_riche(paragraphes_courants)
     # ATTENTION (piège J2.1) : db.executer retourne (lastrowid, rowcount) —
     # c'est bien lastrowid qu'il faut récupérer, sinon redirection vers /analyses/1.
     nouvel_id, _ = await db.executer(
