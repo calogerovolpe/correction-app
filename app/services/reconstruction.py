@@ -364,6 +364,41 @@ def appliquer_modification(
         etat["modifies"].append(paragraphe_id)
 
 
+def remplacer_texte_paragraphe(etat: dict, paragraphe_id: str, nouveau_texte: str) -> bool:
+    """Édition DIRECTE (jalon F3, décision 38) : remplace l'INTÉGRALITÉ du texte
+    courant du paragraphe par `nouveau_texte` — un PATCH unique couvrant toute la
+    base du paragraphe (jamais de splice + remappage des offsets). Tous les
+    patches et corrections antérieurs du paragraphe sont retirés : ils se
+    rapportaient à un texte qui n'existe plus (l'auteur a réécrit le paragraphe).
+    Le paragraphe est marqué modifié à la main. Retourne False si rien ne change."""
+    if nouveau_texte == texte_paragraphe(etat, paragraphe_id):
+        return False
+    paragraphe = _paragraphe(etat, paragraphe_id)
+    ids_corrections = {
+        e["correction"].id
+        for e in etat["corrections"]
+        if e["correction"].paragraphe_id == paragraphe_id
+    }
+    for cid in ids_corrections:
+        etat.get("choix", {}).pop(cid, None)
+    etat["patches"] = [
+        p for p in etat.get("patches", []) if p["paragraphe_id"] != paragraphe_id
+    ]
+    etat["corrections"] = [
+        e for e in etat["corrections"]
+        if e["correction"].paragraphe_id != paragraphe_id
+    ]
+    etat.setdefault("patches", []).append({
+        "paragraphe_id": paragraphe_id,
+        "debut": 0,
+        "fin": len(extraire_texte_brut_paragraphe(paragraphe)),
+        "texte": nouveau_texte,
+    })
+    if paragraphe_id not in etat.setdefault("modifies", []):
+        etat["modifies"].append(paragraphe_id)
+    return True
+
+
 def basculer_choix(etat: dict, correction_id: str, decision: str) -> bool:
     """Refuse ('original') ou ré-applique ('corrige') une correction Forme —
     un simple FILTRE : aucun remappage, la projection se recalcule. Retourne

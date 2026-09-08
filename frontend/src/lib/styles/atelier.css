@@ -1,0 +1,82 @@
+/* frontend/src/lib/styles/atelier.css
+   Couches de correction (jalon F3) — couleurs RÉELLEMENT affichées (source de
+   vérité : app/static/style.css, design system Svelte) :
+   - Forme : rouge (original barré + correction insérée) ;
+   - Style : soulignement pointillé bleu ;
+   - Technique : fond jaune #fff9c4 (ne jamais changer) — accent ocre #6e5400 ;
+   - Embellissement : vert ;
+   - une Forme refusée : marquée `refusee` (non appliquée). */
+.document-annote {
+  font-family: var(--police-manuscrit);
+  font-size: 1.05rem;
+  line-height: 1.8;
+}
+
+.paragraphe {
+  white-space: pre-wrap;
+  margin: 0;
+  padding: 0.5rem 0;
+}
+
+.del {
+  text-decoration: line-through;
+  color: var(--encre-douce);
+}
+
+.ins {
+  font-weight: 600;
+  text-decoration: none;
+  border-radius: 3px;
+  padding: 0 2px;
+}
+
+.ins--forme {
+  color: var(--corr-forme-texte);
+  background: var(--corr-forme-fond);
+}
+
+.ins--style {
+  color: var(--corr-style-texte);
+  background: var(--corr-style-fond);
+}
+
+.ins--technique {
+  color: var(--corr-technique);
+  background: var(--corr-technique-fond);
+}
+
+.ins--embellissement {
+  color: var(--corr-embellissement-texte);
+  background: var(--corr-embellissement-fond);
+}
+
+.mark-style {
+  border-bottom: 2px dotted var(--corr-style-texte);
+  padding: 0 1px;
+}
+
+.mark-technique {
+  background: var(--corr-technique-fond);
+  border-radius: 2px;
+}
+
+.refusee {
+  text-decoration: underline dotted #9e9e9e;
+  color: var(--encre-douce);
+}
+
+.seg-texte {
+  cursor: default;
+}
+
+/* Une marque (correction cliquable) est un élément interactif : pointeur +
+   focus visible (accessibilité / navigation clavier). */
+[data-groupe] {
+  cursor: pointer;
+}
+
+[data-groupe]:focus,
+.document-annote [data-groupe]:focus-visible {
+  outline: 2px solid var(--encre);
+  outline-offset: 2px;
+}

@@ -19,14 +19,16 @@ Comportement métier (spec §8.2-E1/E3/E4, §11 décisions 16 et 37) :
 
 import asyncio
 import json
+from typing import Annotated, Literal, Union
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from app import db
 from app.config import settings
 from app.routes.web import (
     _TACHES,
+    _analyse,
     _dernieres_options,
     _normaliser_prefil,
     _nouvel_id,
@@ -34,6 +36,8 @@ from app.routes.web import (
     _projet_actif_id,
 )
 from app.services import analyse as service_analyse
+from app.services import atelier as service_atelier
+from app.services.atelier import ErreurAtelier
 from app.services.chaine import numero_attendu
 
 router = APIRouter(prefix="/api/v1")
@@ -384,3 +388,303 @@ async def statut_analyse(analyse_id: int) -> AnalyseSuivi:
         else None
     )
     return _serialiser_suivi(analyse, resultat)
+
+
+# --- F3 : Atelier E5 (API JSON) ------------------------------------------------
+# La logique métier est partagée avec `app/services/atelier.py` (aucune
+# duplication) ; ces routes déléguent puis sérialisent le document annoté.
+
+
+class SegmentTexte(BaseModel):
+    type: Literal["texte"]
+    texte: str
+    gras: bool = False
+    italique: bool = False
+    souligne: bool = False
+    classes: str = ""
+    groupe: str | None = None
+
+
+class SegmentForme(BaseModel):
+    """Segment de correction Forme : original barré (`del`) + correction insérée
+    (`ins`). `del` étant un mot-clé Python, le champ est `del_` avec un alias
+    sérialisation `del` (contrat JSON à l'identique de `rendu.py`)."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    type: Literal["forme"]
+    groupe: str
+    del_: str = Field(alias="del", serialization_alias="del")
+    ins: str
+    gras: bool = False
+    italique: bool = False
+    souligne: bool = False
+    classes: str = ""
+
+
+SegmentAnnote = Annotated[Union[SegmentTexte, SegmentForme], Field(discriminator="type")]
+
+
+class ParagrapheAnnote(BaseModel):
+    id: str
+    edite: bool = False
+    segments: list[SegmentAnnote]
+
+
+class CorrectionBarre(BaseModel):
+    """Entrée de la barre latérale (détails d'une correction cliquée)."""
+
+    id: str
+    groupe: str
+    phase: str
+    type: str
+    paragraphe_id: str
+    debut: int
+    fin: int
+    original: str
+    correction: str
+    explication: str
+    regle: str = ""
+    titre: str
+    etat: str
+    motif: str | None = None
+    decision: str | None = None
+
+
+class DocumentAnnote(BaseModel):
+    paragraphes: list[ParagrapheAnnote]
+    nb_masques: int
+    corrections_barre: list[CorrectionBarre]
+
+
+class EtatAtelier(BaseModel):
+    """Contrat GET /api/v1/analyses/{id}/atelier (F3) : le document annoté et
+    les métadonnées dont le frontend Svelte a besoin pour E5."""
+
+    id: int
+    statut: str
+    categorie: str | None = None
+    onglet: str
+    est_chapitre: bool
+    a_embellissement: bool
+    nb_corrections: int
+    compteurs: dict[str, int]
+    document: DocumentAnnote
+
+
+class DecisionForme(BaseModel):
+    correction_id: str
+    decision: Literal["corrige", "original"]
+
+
+class ModificationSelection(BaseModel):
+    paragraphe_id: str
+    fragment: str
+    texte: str
+    contexte: str = ""
+
+
+class EditionParagraphe(BaseModel):
+    paragraphe_id: str
+    # `texte` optionnel : requis pour l'édition directe, ignoré pour la
+    # réévaluation d'un paragraphe (cible identifiée par `paragraphe_id` seul).
+    texte: str = ""
+
+
+class DemandeSuggestion(BaseModel):
+    fragment: str
+    paragraphe_texte: str
+    contexte: str = ""
+
+
+async def _etat_atelier_payload(analyse, etat, onglet: str = "tout") -> EtatAtelier:
+    """Sérialise le document annoté (service partagé) en contrat JSON F3."""
+    contexte = service_atelier.contexte_resultat(analyse, etat, onglet=onglet)
+    return EtatAtelier(
+        id=analyse["id"],
+        statut=analyse["statut"],
+        categorie=analyse.get("categorie"),
+        onglet=contexte["onglet"],
+        est_chapitre=contexte["est_chapitre"],
+        a_embellissement=contexte["a_embellissement"],
+        nb_corrections=contexte["nb_corrections"],
+        compteurs=contexte["compteurs"],
+        document=DocumentAnnote.model_validate(contexte["document"]),
+    )
+
+
+async def _demander_atelier(analyse_id: int, onglet: str = "tout") -> EtatAtelier:
+    """Charge l'analyse terminée + son état atelier, ou lève le statut adapté."""
+    lignes = await db.interroger("SELECT * FROM analyses WHERE id = ?", (analyse_id,))
+    if not lignes:
+        raise HTTPException(status_code=404, detail="Analyse introuvable.")
+    analyse = lignes[0]
+    if analyse["statut"] != "terminee":
+        raise HTTPException(status_code=400, detail="Analyse non terminée.")
+    etat = await service_atelier.charger_etat(analyse)
+    return await _etat_atelier_payload(analyse, etat, onglet)
+
+
+@router.get("/analyses/{analyse_id}/atelier", response_model=EtatAtelier)
+async def etat_atelier(analyse_id: int, onglet: str = "tout") -> EtatAtelier:
+    """Document annoté de l'atelier E5 (F3) : base immuable + annotations
+    projetées selon l'onglet (tout | forme | style | technique | embellissement).
+    Lecture pure — ne déclenche JAMAIS l'analyse (jamais de statut fantôme)."""
+    return await _demander_atelier(analyse_id, onglet)
+
+
+@router.post("/analyses/{analyse_id}/choix-forme", response_model=EtatAtelier)
+async def api_choix_forme(analyse_id: int, payload: DecisionForme) -> EtatAtelier:
+    """Accepte ('corrige') ou refuse ('original') une correction Forme : un
+    simple FILTRE (R2) — la projection se recalcule, aucun remappage."""
+    lignes = await db.interroger("SELECT * FROM analyses WHERE id = ?", (analyse_id,))
+    if not lignes:
+        raise HTTPException(status_code=404, detail="Analyse introuvable.")
+    analyse = lignes[0]
+    if analyse["statut"] != "terminee":
+        raise HTTPException(status_code=400, detail="Analyse non terminée.")
+    etat = await service_atelier.charger_etat(analyse)
+    try:
+        await service_atelier.choisir_forme(analyse, etat, payload.correction_id, payload.decision)
+    except ErreurAtelier as erreur:
+        raise HTTPException(status_code=erreur.statut, detail=str(erreur)) from erreur
+    return await _etat_atelier_payload(analyse, etat)
+
+
+@router.post("/analyses/{analyse_id}/appliquer-alternative", response_model=EtatAtelier)
+async def api_appliquer_alternative(
+    analyse_id: int, payload: ModificationSelection
+) -> EtatAtelier:
+    """Applique l'alternative choisie par l'auteur (clic droit sur sélection)."""
+    lignes = await db.interroger("SELECT * FROM analyses WHERE id = ?", (analyse_id,))
+    if not lignes:
+        raise HTTPException(status_code=404, detail="Analyse introuvable.")
+    analyse = lignes[0]
+    if analyse["statut"] != "terminee":
+        raise HTTPException(status_code=400, detail="Analyse non terminée.")
+    etat = await service_atelier.charger_etat(analyse)
+    try:
+        await service_atelier.appliquer_alternative(
+            analyse, etat, payload.paragraphe_id, payload.fragment, payload.texte, payload.contexte
+        )
+    except ErreurAtelier as erreur:
+        raise HTTPException(status_code=erreur.statut, detail=str(erreur)) from erreur
+    return await _etat_atelier_payload(analyse, etat)
+
+
+@router.post("/analyses/{analyse_id}/editer", response_model=EtatAtelier)
+async def api_editer_paragraphe(analyse_id: int, payload: EditionParagraphe) -> EtatAtelier:
+    """Édition DIRECTE sans IA temps réel (UX4, décision 38) : remplace le texte
+    courant affiché du paragraphe (patch ancré base) ; « ↻ Re-corriger » relance
+    le pipeline ensuite."""
+    lignes = await db.interroger("SELECT * FROM analyses WHERE id = ?", (analyse_id,))
+    if not lignes:
+        raise HTTPException(status_code=404, detail="Analyse introuvable.")
+    analyse = lignes[0]
+    if analyse["statut"] != "terminee":
+        raise HTTPException(status_code=400, detail="Analyse non terminée.")
+    etat = await service_atelier.charger_etat(analyse)
+    try:
+        await service_atelier.editer_paragraphe(analyse, etat, payload.paragraphe_id, payload.texte)
+    except ErreurAtelier as erreur:
+        raise HTTPException(status_code=erreur.statut, detail=str(erreur)) from erreur
+    return await _etat_atelier_payload(analyse, etat)
+
+
+@router.post("/analyses/{analyse_id}/reevaluer", response_model=EtatAtelier)
+async def api_reevaluer(
+    analyse_id: int, payload: EditionParagraphe
+) -> EtatAtelier:
+    """Réévaluation manuelle des corrections d'un paragraphe (bouton « ↻ »)."""
+    les_lignes = await db.interroger("SELECT * FROM analyses WHERE id = ?", (analyse_id,))
+    if not les_lignes:
+        raise HTTPException(status_code=404, detail="Analyse introuvable.")
+    analyse = les_lignes[0]
+    if analyse["statut"] != "terminee":
+        raise HTTPException(status_code=400, detail="Analyse non terminée.")
+    paragraphe_id = payload.paragraphe_id
+    etat = await service_atelier.charger_etat(analyse)
+    try:
+        await service_atelier.reevaluer(analyse, etat, paragraphe_id)
+    except ErreurAtelier as erreur:
+        raise HTTPException(status_code=erreur.statut, detail=str(erreur)) from erreur
+    return await _etat_atelier_payload(analyse, etat)
+
+
+@router.post("/analyses/{analyse_id}/nouvelle-version")
+async def api_nouvelle_version(analyse_id: int) -> dict:
+    """Soumet une NOUVELLE analyse dont le texte source est EXACTEMENT le texte
+    courant (le texte affiché, avec les choix et modifications de l'auteur). Le
+    job asynchrone est lancé ; le frontend navigue vers le suivi du nouvel id."""
+    lignes = await db.interroger("SELECT * FROM analyses WHERE id = ?", (analyse_id,))
+    if not lignes:
+        raise HTTPException(status_code=404, detail="Analyse introuvable.")
+    analyse = lignes[0]
+    if analyse["statut"] != "terminee":
+        raise HTTPException(status_code=400, detail="Analyse non terminée.")
+    try:
+        nouvel_id = await service_atelier.nouvelle_version(analyse)
+    except Exception as erreur:  # noqa: BLE001 — jamais de statut fantôme
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erreur lors de la nouvelle version : {erreur}",
+        ) from erreur
+    return {"nouvel_id": nouvel_id}
+
+
+@router.post("/analyses/{analyse_id}/valider")
+async def api_valider(analyse_id: int) -> dict:
+    """Valide officiellement le chapitre : enregistre dans `chapitres` le TEXTE
+    AFFICHÉ au moment du clic (qu'il soit corrigé ou non), avec son hash
+    SHA-256, après un backup natif SQLite ; « dernier validé gagne » fait
+    avancer la chaîne N+1. Réservé aux Chapitres (Passage/Extrait : 400)."""
+    lignes = await db.interroger("SELECT * FROM analyses WHERE id = ?", (analyse_id,))
+    if not lignes:
+        raise HTTPException(status_code=404, detail="Analyse introuvable.")
+    analyse = lignes[0]
+    try:
+        resum = await service_atelier.valider(analyse)
+    except ErreurAtelier as erreur:
+        raise HTTPException(status_code=erreur.statut, detail=str(erreur)) from erreur
+    return {"ok": True, **resum}
+
+
+@router.post("/embellir")
+async def api_embellir_json(demande: DemandeSuggestion) -> dict:
+    """Propose une réécriture embellie du passage sélectionné (contexte pris en
+    compte). Aucun état modifié : l'auteur voit puis applique ou annule."""
+    return await service_atelier.suggerer_embellissement(
+        demande.fragment, demande.paragraphe_texte, demande.contexte
+    )
+
+
+@router.post("/alternatives")
+async def api_alternatives_json(demande: DemandeSuggestion) -> dict:
+    """Propose des alternatives (synonymes, champ lexical) cohérentes avec le
+    contexte du passage sélectionné (clic droit). Aucun état modifié."""
+    return await service_atelier.suggerer_alternatives(
+        demande.fragment, demande.paragraphe_texte
+    )
+
+
+@router.post("/analyses/{analyse_id}/appliquer-embellissement", response_model=EtatAtelier)
+async def api_appliquer_embellissement(
+    analyse_id: int, payload: ModificationSelection
+) -> EtatAtelier:
+    """Applique l'embellissement choisi, PUIS réévalue les corrections du
+    paragraphe. Zéro surprise : si la réévaluation échoue, RIEN n'est appliqué
+    (aucun état partiel)."""
+    lignes = await db.interroger("SELECT * FROM analyses WHERE id = ?", (analyse_id,))
+    if not lignes:
+        raise HTTPException(status_code=404, detail="Analyse introuvable.")
+    analyse = lignes[0]
+    if analyse["statut"] != "terminee":
+        raise HTTPException(status_code=400, detail="Analyse non terminée.")
+    etat = await service_atelier.charger_etat(analyse)
+    try:
+        await service_atelier.appliquer_embellissement(
+            analyse, etat, payload.paragraphe_id, payload.fragment, payload.texte, payload.contexte
+        )
+    except ErreurAtelier as erreur:
+        raise HTTPException(status_code=erreur.statut, detail=str(erreur)) from erreur
+    return await _etat_atelier_payload(analyse, etat)

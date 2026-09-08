@@ -327,3 +327,46 @@ def test_migration_ancien_format_conserve_les_etats_obsoletes():
     etats = {e["correction"].id: e["etat"] for e in etat["corrections"]}
     assert etats == {"c-0001": "active", "c-0002": "obsolete"}
     assert _courant(etat) == "Les cavaliers partent à l'aube vers la cité."
+
+
+# --- Jalon F3 : édition directe (remplacer_texte_paragraphe) ------------------
+
+
+def test_edition_directe_remplace_le_paragraphe_par_un_patch_entier():
+    etat = reconstruction.etat_initial(
+        [
+            _corr("c-1", "forme", 14, 18, "part", "partent"),
+            _corr("c-2", "style", 36, 40, "cité", "cité"),
+        ],
+        [_p()],
+    )
+    nouveau = "Les cavaliers partent doucement vers la ville."
+    assert reconstruction.remplacer_texte_paragraphe(etat, "p-1", nouveau) is True
+    # Un patch unique couvrant TOUTE la base (jamais de splice + remappage)
+    patch = next(p for p in etat["patches"] if p["paragraphe_id"] == "p-1")
+    assert patch["debut"] == 0
+    assert patch["fin"] == len(TEXTE)
+    # Les corrections et choix antérieurs du paragraphe sont retirés
+    assert etat["corrections"] == []
+    assert etat["choix"] == {}
+    # Le texte courant = le texte édité ; le paragraphe est marqué modifié
+    assert _courant(etat) == nouveau
+    assert "p-1" in etat["modifies"]
+
+
+def test_edition_directe_noop_sans_changement():
+    etat = reconstruction.etat_initial([], [_p()])
+    assert reconstruction.remplacer_texte_paragraphe(etat, "p-1", TEXTE) is False
+    assert etat["patches"] == []
+
+
+def test_edition_directe_reinitialise_un_paragraphe_deja_modifie():
+    etat = reconstruction.etat_initial(
+        [_corr("c-1", "forme", 14, 18, "part", "partent")], [_p()]
+    )
+    reconstruction.appliquer_modification(etat, "p-1", 0, 3, "Nos")
+    assert _courant(etat) == "Nos cavaliers partent à l'aube vers la cité."
+    assert reconstruction.remplacer_texte_paragraphe(etat, "p-1", "Tout est neuf.") is True
+    assert _courant(etat) == "Tout est neuf."
+    assert len(etat["patches"]) == 1
+    assert etat["corrections"] == []

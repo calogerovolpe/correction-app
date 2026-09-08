@@ -80,3 +80,110 @@ export interface ErreurApi {
   detail?: string;
   message?: string;
 }
+
+// --- F3 : Atelier E5 ----------------------------------------------------------
+// Contrat JSON GET /api/v1/analyses/{id}/atelier : le document annoté (couches,
+// onglets par phase, barre latérale) et les métadonnées nécessaires à E5.
+
+export type OngletAtelier = 'tout' | 'forme' | 'style' | 'technique' | 'embellissement';
+
+export interface SegmentTexte {
+  type: 'texte';
+  texte: string;
+  gras: boolean;
+  italique: boolean;
+  souligne: boolean;
+  classes: string;
+  groupe: string | null;
+}
+
+export interface SegmentForme {
+  type: 'forme';
+  groupe: string;
+  del: string;
+  ins: string;
+  gras: boolean;
+  italique: boolean;
+  souligne: boolean;
+  classes: string;
+}
+
+export type SegmentAnnote = SegmentTexte | SegmentForme;
+
+export interface ParagrapheAnnote {
+  id: string;
+  edite: boolean;
+  segments: SegmentAnnote[];
+}
+
+export interface CorrectionBarre {
+  id: string;
+  groupe: string;
+  phase: string;
+  type: string;
+  paragraphe_id: string;
+  debut: number;
+  fin: number;
+  original: string;
+  correction: string;
+  explication: string;
+  regle: string;
+  titre: string;
+  etat: string;
+  motif: string | null;
+  decision?: string | null;
+}
+
+export interface DocumentAnnote {
+  paragraphes: ParagrapheAnnote[];
+  nb_masques: number;
+  corrections_barre: CorrectionBarre[];
+}
+
+export interface EtatAtelier {
+  id: number;
+  statut: string;
+  categorie: string | null;
+  onglet: OngletAtelier;
+  est_chapitre: boolean;
+  a_embellissement: boolean;
+  nb_corrections: number;
+  compteurs: Record<string, number>;
+  document: DocumentAnnote;
+}
+
+export interface DecisionForme {
+  correction_id: string;
+  decision: 'corrige' | 'original';
+}
+
+export interface ModificationSelection {
+  paragraphe_id: string;
+  fragment: string;
+  texte: string;
+  contexte?: string;
+}
+
+export interface DemandeSuggestion {
+  fragment: string;
+  paragraphe_texte: string;
+  contexte?: string;
+}
+
+export interface ReponseSuggestion {
+  texte?: string;
+  explication?: string;
+  alternatives?: string[];
+  erreur?: string;
+}
+
+export interface ReponseNouvelleVersion {
+  nouvel_id: number;
+}
+
+export interface ReponseValidation {
+  ok: boolean;
+  numero: number;
+  titre: string;
+  hash: string;
+}

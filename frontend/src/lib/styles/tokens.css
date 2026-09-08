@@ -23,8 +23,10 @@
   --corr-style-texte: #1565c0;
   --corr-style-fond: #e3f2fd;
   /* Technique : fond jaune du marquage (ne jamais changer) + texte sombre
-     (contraste AA ≈ 15:1). L'ancien accent violet --corr-technique: #6a1b9a
-     est OBSOLÈTE — remplacé par un accent accessible au jalon F3. */
+     (contraste AA ≈ 15:1). L'ancien accent violet `#6a1b9a` est OBSOLÈTE —
+     remplacé au jalon F3 par un accent ocre `#6e5400` (contraste AA ≈ 8:1 sur
+     fond clair), cohérent avec le jaune du marquage. */
+  --corr-technique: #6e5400;
   --corr-technique-fond: #fff9c4;
   --corr-technique-texte: #212121;
   --corr-embellissement-texte: #2e7d32;

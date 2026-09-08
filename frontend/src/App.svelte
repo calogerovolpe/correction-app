@@ -1,6 +1,7 @@
 <script lang="ts">
   import NavBar from './lib/composants/NavBar.svelte';
   import Accueil from './routes/Accueil.svelte';
+  import Atelier from './routes/Atelier.svelte';
   import Soumission from './routes/Soumission.svelte';
   import Suivi from './routes/Suivi.svelte';
   import { routeCourante } from './lib/router';
@@ -8,6 +9,15 @@
   /** Extraît l'identifiant de suivi d'une route hash `#/analyses/{id}`. */
   function idSuivi(chemin: string): number | null {
     const prefixe = '/analyses/';
+    if (!chemin.startsWith(prefixe)) return null;
+    const reste = chemin.slice(prefixe.length);
+    if (!/^\d+$/.test(reste)) return null;
+    return Number(reste);
+  }
+
+  /** Extraît l'identifiant d'atelier d'une route hash `#/atelier/{id}`. */
+  function idAtelier(chemin: string): number | null {
+    const prefixe = '/atelier/';
     if (!chemin.startsWith(prefixe)) return null;
     const reste = chemin.slice(prefixe.length);
     if (!/^\d+$/.test(reste)) return null;
@@ -22,6 +32,8 @@
       <Accueil />
     {:else if $routeCourante === '/soumission'}
       <Soumission />
+    {:else if idAtelier($routeCourante) !== null}
+      <Atelier analyseId={idAtelier($routeCourante)!} />
     {:else if idSuivi($routeCourante) !== null}
       <Suivi analyseId={idSuivi($routeCourante)!} />
     {:else}

@@ -43,7 +43,7 @@ footer { border-top: 1px solid var(--bordure); color: var(--texte-secondaire); f
 :root {
   --corr-forme: #c62828;           --fond-forme: #fdecea;
   --corr-style: #1565c0;           --fond-style: #e3f2fd;
-  --corr-technique: #6a1b9a;       --fond-technique: #f3e5f5;
+  --corr-technique: #6e5400;       --fond-technique: #fff9c4;   /* accent AA (F3) — violet #6a1b9a obsolète */
   --corr-embellissement: #2e7d32; --fond-embellissement: #e8f5e9;
   --texte-barre: #757575;
 }

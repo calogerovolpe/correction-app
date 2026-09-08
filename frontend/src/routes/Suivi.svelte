@@ -131,7 +131,7 @@
         <p class="suivi__resultat-aide">
           Le document annoté s'ouvre dans l'atelier de relecture.
         </p>
-        <a class="lien-resultat" href="/analyses/{analyse.id}">Ouvrir le résultat</a>
+        <a class="lien-resultat" href="#/atelier/{analyse.id}">Ouvrir le résultat</a>
       </Carte>
     {:else}
       <Bandeau variante={analyse.statut === 'rejetee' ? 'avertissement' : 'erreur'}>

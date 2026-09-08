@@ -34,7 +34,7 @@
 |---|---|
 | Backend | Python 3.11+ (3.14 en pratique), FastAPI, Uvicorn, Pydantic v2 |
 | Frontend (actuel) | Jinja2 (autoescape activé) + HTMX (polling) + Alpine.js (état d'affichage) — conservés jusqu'à la bascule (F5) |
-| Frontend (refonte F0→F5) | **Svelte 5 + TypeScript + Vite** — `frontend/` versionné, compilé vers `app/static/spa/` (gitignoré) ; **l'accueil E1 est servi par le SPA depuis F1**, **E3 (soumission) et E4 (suivi) depuis F2**, alimentés par l'API JSON `/api/v1/` (`app/routes/api.py`) : `GET/POST /api/v1/projets`, `POST /api/v1/projets/{id}/activer`, `DELETE /api/v1/projets/{id}`, `GET /api/v1/analyses` (récentes), `GET /api/v1/soumission` (préparation E3), `POST /api/v1/analyses`, `GET /api/v1/analyses/{id}` (suivi) |
+| Frontend (refonte F0→F5) | **Svelte 5 + TypeScript + Vite** — `frontend/` versionné, compilé vers `app/static/spa/` (gitignoré) ; **l'accueil E1 est servi par le SPA depuis F1**, **E3 (soumission) et E4 (suivi) depuis F2**, **E5 (atelier) depuis F3** ; alimentés par l'API JSON `/api/v1/` (`app/routes/api.py`, logique métier partagée avec `app/services/atelier.py` — aucune duplication) : projets E1, analyses récentes, `GET /api/v1/soumission`, `POST /api/v1/analyses`, `GET /api/v1/analyses/{id}` (suivi), **atelier E5** (`GET /api/v1/analyses/{id}/atelier?onglet=` + `POST …/choix-forme`, `…/editer`, `…/appliquer-alternative`, `…/appliquer-embellissement`, `…/reevaluer`, `…/nouvelle-version`, `…/valider`) et suggestions à la demande (`POST /api/v1/embellir`, `POST /api/v1/alternatives`) |
 | Base de données | SQLite : WAL, `busy_timeout=15000`, accès via `asyncio.to_thread`, verrou `threading.Lock` |
 | LLM | Client maison compatible OpenAI (`app/llm/client.py`) → API Mistral `/v1/chat/completions` |
 | Configuration | `pydantic-settings`, préfixe `APP_`, fichier `.env` (clé API, modèles, timeouts, garde-fous) |
@@ -61,10 +61,13 @@ app/
 │   ├── reconciliation.py # Pur : nettoyage fences, validation Pydantic, offsets, renumérotation ids
 │   ├── alertes.py        # Numérotation stable, choix d'auteur, double barrière (J3)
 │   ├── analyse.py        # Orchestrateur des jobs (§7), fabrique _client_llm injectable
+│   ├── atelier.py        # Orchestration E5 partagée (J2.5→F3) : état `documents`,
+│   │                     #  choix Forme, patches, embellissement, workflow (aucune logique HTML)
 │   └── rendu.py          # Pur : fusion des chevauchements, blocs g-XXXX, segments annotés
-├── routes/web.py    # Écrans E1, E3, E4, E5 + polling HTMX
-│   ├── routes/api.py# API JSON /api/v1 (F1-F2) : projets E1, analyses récentes,
-│   │                #  soumission E3 + suivi E4 (/api/v1/soumission, /analyses)
+├── routes/web.py    # Écrans E1, E3, E4 + polling HTMX
+│   ├── routes/atelier.py# Écran E5 Jinja2 — délègue à app/services/atelier.py (retrait F5)
+│   ├── routes/api.py# API JSON /api/v1 (F1-F3) : projets E1, soumission E3 + suivi E4,
+│   │                #  atelier E5 complet (/api/v1/analyses/{id}/atelier + actions, §2.1)
 ├── templates/       # base.html, index.html, analyses/{nouveau,suivi,fragment_statut,
 │                    #  erreur,resultat,_cas}.html
 └── static/          # style.css (palette WCAG AA), app.js (navigation clavier),
@@ -265,7 +268,7 @@ Navigation clavier : `←`/`→` entre corrections visibles (centrage + `outline
 | **E2 — Timeline de chaîne** | ⬜ J3 | Chapitres officiels (Prologue=0, 1..N), numéro attendu en évidence, reclassés grisés « hors chaîne » |
 | **E3 — Soumission** | ✅ Livré (Jinja2 + écran Svelte depuis F2) | Éditeur Word-fidèle (gras/italique/souligné + nettoyage strict au collage), compteur live `max_caracteres` (30 000, source unique `GET /api/v1/soumission`) ; catégorie Chapitre/Passage/Extrait + numéro **N+1 pré-rempli** (indicateur « attendu par la suite ») ; matrice des 3 phases pré-cochées **dérogable** (Chapitre = F+S+T, Passage/Extrait = F+S ; mémoire « dernières options » J2.5) ; **refus explicites (400)** — texte vide, dépassement (aucune troncature silencieuse), aucun projet actif, aucune phase cochée ; la soumission passe par `POST /api/v1/analyses` (JSON, même moteur de jobs que le POST Jinja2, spec §2.3) |
 | **E4 — Suivi de job** | ✅ Livré (Jinja2 + écran Svelte depuis F2) | Polling toutes les 2 s, étape courante ; **depuis F2 dans le SPA Svelte** : `GET /api/v1/analyses/{id}` (statuts explicites `en_attente → en_cours → terminee | echec | rejetee` en badges colorés), fail-fast visible (gabarits §7.2/§7.3 verbatim dans `erreur`), **jamais de statut fantôme** (statut inconnu = erreur, pas de spinner infini, arrêt du polling à l'état final) ; `terminee` → synthèse `resultat` (nb de corrections par phase) + lien « Ouvrir le résultat » vers l'atelier E5 |
-| **E5 — Résultat (Atelier interactif — refondu J2.5, onglets R1-a)** | ✅ Livré | Document annoté **en couches superposables** (Forme = rouge barré/inséré, Style = soulignement pointillé bleu, Technique = fond jaune, également dans la barre latérale), affiché via une barre d'**onglets hybrides** `Tout | Forme | Style | Technique` (+ `Embellissement` si des corrections existent — « Tout » = superposition, un onglet = projection de la phase, zéro appel LLM en plus) ; **état courant matérialisé** (`documents`, refondu R2) : **base immuable + annotations** — le texte affiché EST la version de travail, calculée par projection (base + Forme acceptées + patches manuels) ; corrections Forme appliquées par défaut, refusables depuis la barre latérale (un simple filtre, aucun remappage d'offsets) ; **sélection + clic droit** → « Embellir la sélection » (réévaluation du paragraphe) et « Trouver une alternative » (synonyme/champ lexical cohérent avec le contexte) ; boutons de workflow : « Soumettre une nouvelle version », « Valider la version actuelle » (Chapitres, confirmation, **texte affiché** enregistré) ou « Soumettre un autre texte » (Passage/Extrait, E3 pré-cochée avec les dernières configurations) ; navigation clavier |
+| **E5 — Atelier de relecture** | ✅ Livré (écran Svelte depuis F3) | Document annoté **en couches superposables** (Forme rouge barré/inséré, Style soulignement pointillé bleu, Technique fond jaune `#fff9c4`, Embellissement vert) ; barre d'**onglets hybrides + compteurs** `Tout | Forme | Style | Technique` (+ Embellissement si des corrections existent) — « Tout » = superposition, un onglet = projection de la phase (zéro appel LLM) ; **base immuable + annotations (R2)** : le texte affiché EST la projection calculée ; corrections Forme appliquées par défaut, refusables (simple filtre, aucun remappage) ; **édition directe sans IA temps réel** + « ↻ Re-corriger » (décision 38) ; **menu contextuel riche** au clic droit sur une marque OU une sélection (décision 36 : « Appliquer / Garder l'original » pour une Forme ; « Embellir / Trouver une alternative » sur une sélection) ; **barre latérale** (détail de la correction active + liste, lecture seule) ; **toggle « Masquer les paragraphes sans correction »** (décision 35, défaut : texte entier) ; navigation clavier ←/→ ; **validation du texte affiché** (Chapitres) / « Re-corriger » / « Soumettre un autre texte » (Passage/Extrait) ; **accent Technique AA** ocre `#6e5400` (F3, fin du violet obsolète — décision 40). Données : `GET /api/v1/analyses/{id}/atelier?onglet=` (lecture pure) + `POST` actions (`choix-forme`, `editer`, `appliquer-alternative`, `appliquer-embellissement`, `reevaluer`), `POST …/nouvelle-version`, `POST …/valider` ; suggestions `POST /api/v1/embellir`, `POST /api/v1/alternatives` — logique partagée via `app/services/atelier.py` ; le rendu Jinja2 `_atelier.html` reste en place jusqu'à F5 |
 | **E6 — Codex** | ⬜ J3 | Fiches par catégorie, alias, éditeur manuel |
 | **E7 — Journaux** | ⬜ J3 | Journaux ecriture/evolution/intrigue, lecture seule |
 | **E8 — Paramètres** | ⬜ J4 | Modèles/températures/garde-fous, test de connexion |
@@ -304,6 +307,17 @@ Navigation clavier : `←`/`→` entre corrections visibles (centrage + `outline
 | J3 — Chaîne & codex | ⏳ prochain | — | Voir §9 + critère d'acceptation ci-dessous |
 | J4 — Confort | ⬜ | — | E8, E9, exports, import .docx |
 | J5 — Mise en ligne | ⬜ | — | Docker prod, Caddy TLS, auth simple, Tailscale documenté |
+
+**Série F0→F5 — refonte frontend Svelte (absorbe UX1→UX4 ; source : `memory-bank/plan-refonte-frontend.md`)** :
+
+| Jalon | Statut | Contenu livré |
+|---|---|---|
+| F0 — Socle | ✅ (`4cbb55c`) | Vite + Svelte 5 + TS, design tokens, layout/routage, client fetch `/api/v1/` |
+| F1 — Accueil & projets E1 | ✅ (`cb6abc1`) | `/api/v1/projets`, accueil Svelte servi à `/` |
+| F2 — Soumission E3 + suivi E4 | ✅ (`6cdfb22`) | `/api/v1/analyses`, écrans Svelte `#/soumission`, `#/analyses/{id}` |
+| F3 — Atelier E5 | ✅ (commit F3) | Atelier Svelte `#/atelier/{id}` + API atelier JSON (§2.1/§8.2) ; accent Technique AA ocre (décision 40) |
+| F4 — Finitions UX | ⬜ | Cohérence visuelle, états vides, toasts, accessibilité AA (`svelte-check` 0 warning cible), responsive ~1200 px, microcopy |
+| F5 — Bascule | ⬜ | Retrait Jinja2/HTMX/Alpine, E2E réel `/api/v1`, spec/README/patterns à jour, `.bat` vérifié |
 
 **Critère d'acceptation J3** (scénario réel complet) : Prologue → ch.1 → ch.2 → resoumission N=N sans remplacement (→ Extrait, codex intact) → remplacement officiel (relecture-diff, codex mis à jour, évolutions historisées) → alerte détectée → « Choix d'auteur » → **non re-détectée à la resoumission**.
 
@@ -361,6 +375,7 @@ Navigation clavier : `←`/`→` entre corrections visibles (centrage + `outline
 37. **Suppression d'un projet** : confirmation obligatoire ; suppression totale en cascade ; le projet actif reste protégé (trigger `trg_projet_actif_restrict`).
 38. **Édition directe sans IA temps réel** : texte éditable dans l'atelier + « ↻ Re-corriger » explicite ; correction hors-ligne locale = candidat J4.
 39. **Base immuable + annotations (jalon R2, arbitré le 2026-09-08)** : l'état `documents` (format `modele: 2`) stocke la BASE (texte normalisé d'origine), les corrections en coordonnées de la base, les choix/refus et les patches manuels ; « texte courant » = projection calculée ; à la réévaluation, les Forme appliquées deviennent des patches (le texte corrigé reste affiché) ; migration des états antérieurs au chargement de l'atelier (choix/refus préservés par id, modifications manuelles abandonnées — ne sont pas rejouables proprement depuis la base).
+40. **Accent Technique AA + atelier via API (jalon F3, arbitré le 2026-09-09)** : l'ancien accent violet `#6a1b9a` (fond technique `#f3e5f5`) est **OBSOLÈTE** — l'accent Technique devient ocre `#6e5400` (contraste AA ≈ 8:1 sur fond clair, cohérent avec le jaune du marquage), **le fond jaune `#fff9c4` du marquage ne change jamais** (vérification AA formelle au jalon F4) ; l'atelier E5 est servi par le SPA Svelte (route `#/atelier/{id}`) contre l'API JSON `/api/v1` dont la logique vit dans `app/services/atelier.py` (partagée avec les routes Jinja2, conservées jusqu'à F5 — aucune duplication) ; l'édition directe d'un paragraphe est un patch ancré base via `reconstruction.remplacer_texte_paragraphe` (le paragraphe est marqué modifié, ses corrections/patches antérieurs retirés — il a été réécrit par l'auteur).
 
 **Historique documentaire** : v3 → v4 (forçages /passage-/extrait, fail-fast, Artifacts) → v5 (reclassement Extrait, Option B, priorité Style, sessions/chaînes v5) → v6 (résolution des conflits v5, /maj remplacement officiel, Lecture Embellissement) → **présente spec web v1** (consolidation application). La v6 reste la référence de la fonction OpenWebUI si elle est un jour développée.
 
