@@ -1,6 +1,6 @@
 # Contexte actif — où nous en sommes MAINTENANT
 
-> Fichier le plus souvent mis à jour. Dernière mise à jour : 2026-09-09 (audit post-F3 validé par l'auteur — roadmap maîtresse `plan-fiabilisation-post-audit.md` activée ; prochain jalon = FA1).
+> Fichier le plus souvent mis à jour. Dernière mise à jour : 2026-09-09 (jalon FA1 LIVRÉ — prochain jalon = FA2).
 
 ## Focus du moment
 
@@ -8,19 +8,29 @@
 La roadmap détaillée est dans **`plan-fiabilisation-post-audit.md`** (même dossier) : **LA RELIRE EN DÉBUT DE SESSION**.
 RÈGLE MAÎTRESSE : **1 JALON = 1 CONVERSATION DISTINCTE.**
 Ne JAMAIS enchaîner deux jalons dans la même session sans feu vert explicite de l'auteur.
+**NOUVELLE RÈGLE (2026-09-09)** : à la fin de CHAQUE action, communiquer les commits GitHub réalisés (hash, intitulé) et confirmer le push — `systemPatterns.md` règle n° 9.
 
 - **Où on en est** :
   - La série R est LIVRÉE — R1-a ✅ (`245071b`) ; R1-b ✅ (`c911547`) ; R2 ✅ (`e886d3a`).
-  - Les jalons F0 à F3 sont LIVRÉS — F0 ✅ (`4cbb55c`) ; F1 ✅ (`cb6abc1`) ; F2 ✅ (`6cdfb22`) ; F3 ✅ (`023534a`) — 159 pytest + 45 Vitest verts, `svelte-check` 0 erreur.
-  - **Audit approfondi post-F3 validé par l'auteur (2026-09-09)** : il a mis en évidence plusieurs failles bloquantes/majeures dans l'atelier (ré-ancrage destructif lors d'une réévaluation, segmentation au run entier au lieu des bornes d'annotation, toggle client inopérant par filtrage prématuré backend, collisions d'identifiants `c-r…`, neutralisation CSS des couches, perte d'onglet dans les actions).
-  - **F4 (Finitions UX) et F5 (Nettoyage & bascule) sont mis en pause** jusqu'à l'achèvement de la série corrective FA1→FA7.
-  - **Prochain jalon immédiat = FA1 — Intégrité du ré-ancrage et non-perte de texte (reconstruction).**
+  - Les jalons F0 à F3 sont LIVRÉS — F0 ✅ (`4cbb55c`) ; F1 ✅ (`cb6abc1`) ; F2 ✅ (`6cdfb22`) ; F3 ✅ (`023534a`).
+  - **FA1 — Intégrité du ré-ancrage et non-perte de texte est LIVRÉ** ✅ (`76a0057`) — 162 pytest + 45 Vitest verts, `svelte-check` 0 erreur, **E2E réel Mistral rejoué OK** (`data_e2e/` réinitialisé : chapitre validé corrigé, chaîne `ok`, 1 backup).
+  - **F4 (Finitions UX) et F5 (Nettoyage & bascule) restent en pause** jusqu'à l'achèvement de la série corrective FA1→FA7.
+  - **Prochain jalon immédiat = FA2 — Identité documentaire, cycle de vie et réévaluation parallèle.**
 
+## Changements récents (FA1 — Intégrité du ré-ancrage et non-perte de texte, commit `76a0057`)
+
+- **Correctif du bug P0 de l'audit post-F3** (réévaluation après édition directe = le paragraphe réécrit entier remplacé par le seul mot corrigé) :
+  - **Rebase du paragraphe édité** (`reconstruction.remplacer_texte_paragraphe`) : le texte saisi devient la NOUVELLE BASE de référence du paragraphe dans `etat["base"]` (runs unique, formatage du premier run conservé) — **fin du patch plein-paragraphe** ; les corrections/patches antérieurs du paragraphe sont retirés (déjà le cas) et les corrections futures s'ancrent naturellement, sans écrasement.
+  - **Ré-ancrage STRICT des réévaluations** (`_convertir_vers_base(…, strict=True)` appelé par `remplacer_corrections_paragraphe`) : un remplacement (patch manuel ou Forme figée) n'est ancrable que couvert EXACTEMENT ; une correction qui en coupe une sous-plage est ÉCARTÉE avec un log (`ZoneDejaModifiee`), jamais substituée à la zone mère. Une correction couvrant un patch ENTIÈRE le remplace toujours proprement (comportement conservé et testé).
+  - **Sélection utilisateur inchangée** (`appliquer_modification`, `strict=False`) : une sélection contenue dans un remplacement reste ancrée sur la zone de base entière (les Forme intersectées deviennent obsolètes — aucun écrasement).
+- **Tests** : +3 pytest (rebase du paragraphe édité ; réévaluation après édition directe sans perte ; réévaluation sur patch partiel sans destruction) + 1 test d'intégration API (`test_editer_puis_reevaluer_sans_perte_de_texte` — workflow complet `/editer` puis `/reevaluer`). 2 tests F3 adaptés au modèle rebase. **162 verts** (159 + 3).
+- **Spec** : §11 **décision 41** (rebase + strict) — même commit.
+- **E2E réel Mistral rejoué OK** (`data_e2e/` réinitialisé) : analyse 3 phases (12 corrections) → nouvelle version → validation officielle (chapitre corrigé enregistré, chaîne N+1 `ok`, 1 backup créé).
 
 ## État global
 
-- Jalons terminés : **J2.5 — Atelier v2**, **A — Fiabilité du cœur**, **R1-a — Onglets hybrides**, **R1-b — Stockage par phase**, **R2 — Base immuable + annotations**, **F0 — Socle**, **F1 — Accueil & projets E1**, **F2 — Soumission E3 + suivi E4**, **F3 — Atelier E5**.
-- Tests : **159/159 verts** (`pytest`) + **45 tests Vitest** (frontend Svelte) ; `svelte-check` 0 erreur / 0 warning.
+- Jalons terminés : **J2.5 — Atelier v2**, **A — Fiabilité du cœur**, **R1-a — Onglets hybrides**, **R1-b — Stockage par phase**, **R2 — Base immuable + annotations**, **F0 — Socle**, **F1 — Accueil & projets E1**, **F2 — Soumission E3 + suivi E4**, **F3 — Atelier E5**, **FA1 — Intégrité du ré-ancrage**.
+- Tests : **162/162 verts** (`pytest`) + **45 tests Vitest** (frontend Svelte) ; `svelte-check` 0 erreur / 0 warning.
 - **E2E réel Mistral OK** de bout en bout (`scripts/e2e_j25.py`, environnement isolé `data_e2e/`) : **soumission + suivi via `/api/v1/` (F2)**, puis analyse 3 phases → nouvelle version (texte courant repris) → validation (chapitre officiel corrigé, hash, chaîne N+1, backup natif créé). — **rejoué au jalon F2**.
 - Application validée de bout en bout avec Mistral Small.
 
@@ -185,8 +195,8 @@ Ne JAMAIS enchaîner deux jalons dans la même session sans feu vert explicite d
 ## Prochaines étapes (ordre)
 
 1. **Série FA1→FA7 — Fiabilisation post-audit de l'Atelier E5 (ROADMAP ACTIVE)** :
-   - **FA1 — Intégrité du ré-ancrage et non-perte de texte (reconstruction)** : ⬜ **PROCHAIN JALON IMMÉDIAT** (P0, bloquant) ;
-   - **FA2 — Identité documentaire, cycle de vie et réévaluation parallèle** : ⬜ (P0/P1) ;
+   - **FA1 — Intégrité du ré-ancrage et non-perte de texte (reconstruction)** : ✅ **LIVRÉ** (`76a0057`) ;
+   - **FA2 — Identité documentaire, cycle de vie et réévaluation parallèle** : ⬜ **PROCHAIN JALON IMMÉDIAT** (P0/P1) ;
    - **FA3 — Segmentation atomique aux bornes et document complet** : ⬜ (P0, bloquant) ;
    - **FA4 — Rendu Svelte fidèle, styles réels, formatage Word et robustesse UI** : ⬜ (P0/P1) ;
    - **FA5 — Robustesse LLM : Custom Structured Outputs, invariants et prompts** : ⬜ (P1) ;

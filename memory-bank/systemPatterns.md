@@ -45,6 +45,7 @@ Navigateur :
 6. **Échecs LLM** : JSON individuel invalide → rejet individuel sans arrêt ; racine non parsable/non conforme → `PannePhase` → Option B (job `echec`, aucun résultat partiel) ; **une liste valide vide n'est JAMAIS une panne**.
 7. **Rendu** : échappement par Jinja2 autoescape ; identifiants de blocs `g-XXXX` calculés par `rendu.py`, jamais demandés aux LLM.
 8. **Dimensionnement** : cible < 300 lignes/fichier ; alerte à 500 → fractionner au jalon suivant, par responsabilité métier/écran (jamais arbitrairement).
+9. **Communication des commits GitHub (OBLIGATOIRE, règle de l'auteur — 2026-09-09)** : à la fin de CHAQUE action, jalon ou session, communiquer EXPLICITEMENT à l'auteur la liste des commits réalisés sur GitHub (hash, intitulé exact, branche) ET confirmer le `git push` effectif (état `origin/master` à jour). Ne jamais terminer une session sans cette communication.
 
 ## Patterns métier clés
 
@@ -65,7 +66,7 @@ Navigateur :
 
 ## Pièges connus (leçons de bugs réels — NE PAS REFAIRE)
 
-- **Ré-ancrage des corrections réévaluées (`reconstruction.py`)** : ne JAMAIS convertir une sous-plage d'un patch existant en l'intervalle complet du patch mère sous prétexte qu'elle intersecte le remplacement — cela conduit à remplacer tout un paragraphe réécrit par un mot corrigé.
+- **Ré-ancrage des corrections réévaluées (`reconstruction.py`, durci au jalon FA1)** : ne JAMAIS convertir une sous-plage d'un remplacement (patch manuel ou Forme figée) en l'intervalle complet de la zone mère — la correction de réévaluation est ré-ancrée en mode `strict=True` (couverture EXACTE exigée, sinon `ZoneDejaModifiee` → correction écartée avec log). L'édition directe d'un paragraphe complet REBASE le paragraphe (le texte saisi devient la NOUVELLE base de `etat["base"]` — fin du patch plein-paragraphe qui remplaçait le paragraphe réécrit par le seul mot corrigé). La sélection UTILISATEUR (`appliquer_modification`) conserve l'ancrage « contenu → zone base entière du remplacement ».
 - **Rendu des annotations Style/Technique (`rendu.py`)** : ne JAMAIS borner les marques sur les runs Word entiers ; les points de découpe doivent obligatoirement fusionner les bornes de runs ET les bornes de chaque annotation pour produire des segments atomiques exacts.
 - **Toggle masquage de l'atelier** : `preparer_document()` ne doit JAMAIS retirer les paragraphes sans correction de la liste envoyée au client ; tous les paragraphes projetés doivent être transmis avec leur état pour que le toggle client soit opérationnel.
 - **Compteur de réévaluation (`atelier.py`)** : ne JAMAIS régénérer des identifiants `c-r0001…` avec un compteur local réinitialisé à chaque appel ; l'unicité des IDs doit être continue à l'échelle du document.

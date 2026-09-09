@@ -27,7 +27,7 @@ La série **FA1→FA7** corrige ces failles dans un ordre strict de dépendance 
 
 | Ordre | Jalon | Intitulé | Priorité | Risque | Statut | Commit |
 |---|---|---|---|---|---|---|
-| 1 | **FA1** | Intégrité du ré-ancrage et non-perte de texte (reconstruction) | P0 (Bloquant) | Élevé | ⬜ À faire | — |
+| 1 | **FA1** | Intégrité du ré-ancrage et non-perte de texte (reconstruction) | P0 (Bloquant) | Élevé | ✅ **Livré** | *(voir `progress.md`)* |
 | 2 | **FA2** | Identité documentaire, cycle de vie et réévaluation parallèle | P0/P1 (Majeur) | Moyen | ⬜ À faire | — |
 | 3 | **FA3** | Segmentation atomique aux bornes et document complet (rendu) | P0 (Bloquant) | Moyen | ⬜ À faire | — |
 | 4 | **FA4** | Rendu Svelte fidèle, styles réels, formatage Word et robustesse UI | P0/P1 (Majeur) | Moyen | ⬜ À faire | — |
@@ -354,6 +354,7 @@ Après l'achèvement de FA1→FA7, reprendre les jalons tels que spécifiés dan
 
 ## 4. Règles d'or pour chaque session
 
+0. **Communication des commits GitHub (OBLIGATOIRE, règle de l'auteur — 2026-09-09)** : à la fin de CHAQUE action, jalon ou session, communiquer EXPLICITEMENT les commits réalisés sur GitHub (hash, intitulé, branche) et confirmer le `git push` effectif. Règle reprise dans `systemPatterns.md` (règle d'architecture n° 9).
 1. **Lire obligatoirement en ouverture** : `activeContext.md`, `systemPatterns.md` et la section du jalon dans ce plan.
 2. **Ne jamais modifier de code hors du périmètre du jalon en cours.**
 3. **Écrire ou adapter les tests de régression avant ou pendant l'implémentation.**
