@@ -30,7 +30,7 @@ La série **FA1→FA7** corrige ces failles dans un ordre strict de dépendance 
 | 1 | **FA1** | Intégrité du ré-ancrage et non-perte de texte (reconstruction) | P0 (Bloquant) | Élevé | ✅ **Livré** | *(voir `progress.md`)* |
 | 2 | **FA2** | Identité documentaire, cycle de vie et réévaluation parallèle | P0/P1 (Majeur) | Moyen | ✅ **Livré** (+ bouton « Ouvrir » et purge analyses #7–#16, demandes de l'auteur) | *(voir `progress.md`)* |
 | 3 | **FA3** | Segmentation atomique aux bornes et document complet (rendu) | P0 (Bloquant) | Moyen | ✅ **Livré** (+ correctifs « Chargement atelier » bloqué et Erreur 500 analyses anciennes, incidents rapportés par l'auteur) | *(voir `progress.md`)* |
-| 4 | **FA4** | Rendu Svelte fidèle, styles réels, formatage Word et robustesse UI | P0/P1 (Majeur) | Moyen | ⬜ À faire | — |
+| 4 | **FA4** | Rendu Svelte fidèle, styles réels, formatage Word et robustesse UI | P0/P1 (Majeur) | Moyen | ✅ **Livré** | `00d5575` |
 | 5 | **FA5** | Robustesse LLM : Custom Structured Outputs, invariants et prompts | P1 (Majeur) | Moyen | ⬜ À faire | — |
 | 6 | **FA6** | Cohérence transactionnelle, concurrence et alignement d'API | P1/P3 (Moyen) | Moyen | ⬜ À faire | — |
 | 7 | **FA7** | Restitution pédagogique : diff, sidebar sticky, popovers et clavier | P2 (UX/a11y) | Faible | ⬜ À faire | — |
@@ -171,7 +171,7 @@ La série **FA1→FA7** corrige ces failles dans un ordre strict de dépendance 
 ## 1. Contexte et objectif
 
 L'audit senior full-stack / LLM / UI-UX réalisé après le jalon F3 (`023534a`) a mis en évidence que l'architecture « base immuable + annotations » est saine, mais que plusieurs **failles critiques et régressions réelles** menacent l'intégrité des
-### Jalon FA4 — Rendu Svelte fidèle, styles réels, formatage Word et robustesse UI
+### Jalon FA4 — Rendu Svelte fidèle, styles réels, formatage Word et robustesse UI — ✅ LIVRÉ (`00d5575`)
 
 - **Objectif** : Corriger l'affichage dans `DocumentAnnote.svelte`, `Atelier.svelte` et `atelier.css` : restaurer les vraies couleurs des couches, afficher le formatage Word, fiabiliser le toggle, stabiliser les clés Svelte et sécuriser les états asynchrones.
 - **Dépendances** : FA3 terminé.

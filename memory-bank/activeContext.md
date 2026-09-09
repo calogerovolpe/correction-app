@@ -1,6 +1,6 @@
 # Contexte actif — où nous en sommes MAINTENANT
 
-> Fichier le plus souvent mis à jour. Dernière mise à jour : 2026-09-09 (jalon FA3 LIVRÉ — prochain jalon = FA4).
+> Fichier le plus souvent mis à jour. Dernière mise à jour : 2026-09-09 (jalon FA4 LIVRÉ — prochain jalon = FA5).
 
 ## Focus du moment
 
@@ -16,8 +16,18 @@ Ne JAMAIS enchaîner deux jalons dans la même session sans feu vert explicite d
   - **FA1 — Intégrité du ré-ancrage et non-perte de texte est LIVRÉ** ✅ (`76a0057`) — 162 pytest + 45 Vitest verts, `svelte-check` 0 erreur, **E2E réel Mistral rejoué OK** (`data_e2e/` réinitialisé : chapitre validé corrigé, chaîne `ok`, 1 backup).
   - **FA2 — Identité documentaire, cycle de vie, réévaluation parallèle + bouton « Ouvrir » est LIVRÉ** ✅ (`7405310`) — 170 pytest + 47 Vitest verts, `svelte-check` 0 erreur, **E2E réel Mistral rejoué OK** ; **purge des analyses de test #7 à #16 de `data/database.sqlite3`** (backup de sécurité `data/database.avant-purge-fa2.sqlite3` ; analyses 1–6 conservées).
   - **FA3 — Segmentation atomique aux bornes, document complet + atelier résilient est LIVRÉ** ✅ (`c8da894`) — 176 pytest + 48 Vitest verts, `svelte-check` 0 erreur, **E2E réel Mistral rejoué OK** ; corrige AUSSI les deux incidents rapportés par l'auteur (« Chargement de l'atelier » bloqué + Erreur serveur 500 sur les analyses anciennes).
+  - **FA4 — Rendu Svelte fidèle, styles réels, formatage Word et robustesse UI est LIVRÉ** ✅ (`00d5575`) — 177 pytest + 53 Vitest verts, `svelte-check` 0 erreur, SPA recompilé : formatage Word rendu (`<strong>`/`<em>`/`<u>` sémantiques), couleurs réelles des couches restaurées (reset `:where` à spécificité zéro), onglet actif conservé après action (`onglet` en query des POST `/api/v1`), réconciliation de la correction active + jeton anti-course.
   - **F4 (Finitions UX) et F5 (Nettoyage & bascule) restent en pause** jusqu'à l'achèvement de la série corrective FA1→FA7.
-  - **Prochain jalon immédiat = FA4 — Rendu Svelte fidèle, styles réels, formatage Word et robustesse UI.**
+  - **Prochain jalon immédiat = FA5 — Robustesse LLM : Custom Structured Outputs, invariants et prompts.**
+
+## Changements récents (FA4 — Rendu fidèle, couleurs réelles, onglet stable)
+
+- **Formatage Word RENDU** (`DocumentAnnote.svelte`) : les attributs `gras`/`italique`/`souligne` transmis par le rendu backend (découpe atomique FA3) sont restitués en balisage sémantique emboîté `<strong>`/`<em>`/`<u>` via le snippet `contenuEnrichi` — pour les segments texte ET les blocs Forme (del/ins héritent du formatage du premier run couvert). Le texte reste échappé par le binding Svelte.
+- **Couleurs RÉELLES des couches restaurées** : le reset scoped `color: inherit; background: transparent` du composant (spécificité `button.ins.svelte-x` > classes globales) écrasait silencieusement les couches — il est remplacé par un reset à SPÉCIFICITÉ ZÉRO dans `atelier.css` (`:where(button.ins, button.seg-texte)`) : `.ins--forme` (`#c62828`/`#fdecea`), `.mark-style` (pointillé bleu `#1565c0`), `.mark-technique` (fond `#fff9c4`) + ocre AA `#6e5400`, `.ins--embellissement` (`#2e7d32`), `.refusee` — les classes du design system redeviennent maîtresses.
+- **Onglet actif STABLE après action** : les routes POST de mutation `/api/v1/analyses/{id}/choix-forme|editer|reevaluer|appliquer-alternative|appliquer-embellissement` acceptent `onglet` (query, défaut « tout ») et renvoient la projection de CET onglet ; `Atelier.svelte` transmet l'onglet courant sur toutes les mutations — fin du saut intempestif vers « tout » après un choix Forme.
+- **Réconciliation de la barre latérale + jeton anti-course** (`Atelier.svelte`) : `reconcilierCorrectionActive(cibleId?)` retrouve l'id ciblé, sinon la correction courante si elle subsiste, sinon la première active (plus de détail fantôme après mutation/réévaluation) ; `jetonChargement` ignore les réponses périmées de clics d'onglets rapides.
+- **Clavier** : le parcours fléché ←/→ ne cible plus que les `button[data-groupe]` — les `<del>` non focusables n'interrompent plus la chaîne de focus.
+- Tests : +1 pytest (`test_fa4_choix_forme_conserve_l_onglet_demande`), +4 Vitest (formatage Word visible, onglet stable après choix Forme, réconciliation id régénéré, toggle masquer complet).
 
 ## Changements récents (FA3 — Segmentation atomique, document complet, atelier résilient)
 
