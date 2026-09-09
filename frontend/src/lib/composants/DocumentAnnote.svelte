@@ -31,13 +31,15 @@
     onAnnulerEdition,
   }: Props = $props();
 
-  /** Navigation clavier ←/→ entre les marques [data-groupe] VISIBLES. */
+  /** Navigation clavier ←/→ entre les marques INTERACTIVES (boutons
+   *  [data-groupe]) VISIBLES. FA4 : les <del> (non focusables, sans action)
+   *  sont exclus du parcours fléché — la chaîne de focus reste fluide. */
   function naviguerClavier(evenement: KeyboardEvent): void {
     if (evenement.key !== 'ArrowRight' && evenement.key !== 'ArrowLeft') return;
     const conteneur = document.getElementById('document-annote');
     if (!conteneur) return;
     const cibles = Array.from(
-      conteneur.querySelectorAll<HTMLElement>('[data-groupe]'),
+      conteneur.querySelectorAll<HTMLElement>('button[data-groupe]'),
     ).filter((el) => el.offsetParent !== null);
     if (cibles.length === 0) return;
     const actif = document.activeElement as HTMLElement | null;
@@ -104,14 +106,16 @@ function segmentTexte(s: SegmentAnnote): SegmentTexte {
 
 {#snippet segmenter(s: SegmentAnnote)}
   {#if s.type === 'forme'}
-    <del class="del {s.classes}" data-groupe={s.groupe}>{s.del}</del>
+    <del class="del {s.classes}" data-groupe={s.groupe}>
+      {@render contenuEnrichi(s.del, s.gras, s.italique, s.souligne)}
+    </del>
     <button
       type="button"
       class="ins ins--forme {s.classes}"
       data-groupe={s.groupe}
       onclick={() => onSelectionnerGroupe(s.groupe)}
     >
-      {s.ins}
+      {@render contenuEnrichi(s.ins, s.gras, s.italique, s.souligne)}
     </button>
   {:else if segmentTexte(s).groupe}
     <button
@@ -120,25 +124,61 @@ function segmentTexte(s: SegmentAnnote): SegmentTexte {
       data-groupe={segmentTexte(s).groupe}
       onclick={() => onSelectionnerGroupe(segmentTexte(s).groupe!)}
     >
-      {segmentTexte(s).texte}
+      {@render contenuEnrichi(
+        segmentTexte(s).texte,
+        segmentTexte(s).gras,
+        segmentTexte(s).italique,
+        segmentTexte(s).souligne,
+      )}
     </button>
   {:else}
-    <span class="seg-texte {segmentTexte(s).classes}">{segmentTexte(s).texte}</span>
+    <span class="seg-texte {segmentTexte(s).classes}">
+      {@render contenuEnrichi(
+        segmentTexte(s).texte,
+        segmentTexte(s).gras,
+        segmentTexte(s).italique,
+        segmentTexte(s).souligne,
+      )}
+    </span>
+  {/if}
+{/snippet}
+
+<!-- FA4 — fidélité du formatage Word : le gras, l'italique et le souligné de
+     l'auteur (attributs `gras` / `italique` / `souligne` transmis par le rendu)
+     sont restitués en balisage SÉMANTIQUE <strong> / <em> / <u> (combinaisons
+     emboîtées). Le texte reste échappé par le binding Svelte ({texte}). -->
+{#snippet contenuEnrichi(
+    texte: string,
+    gras: boolean,
+    italique: boolean,
+    souligne: boolean,
+  )}
+  {#if gras}
+    {#if italique}
+      {#if souligne}<strong><em><u>{texte}</u></em></strong>
+      {:else}<strong><em>{texte}</em></strong>{/if}
+    {:else if souligne}
+      <strong><u>{texte}</u></strong>
+    {:else}
+      <strong>{texte}</strong>
+    {/if}
+  {:else if italique}
+    {#if souligne}<em><u>{texte}</u></em>
+    {:else}<em>{texte}</em>{/if}
+  {:else if souligne}
+    <u>{texte}</u>
+  {:else}
+    {texte}
   {/if}
 {/snippet}
 
 <style>
-  /* Les marques cliquables sont de vrais <button> (a11y) : reset complet pour
-     qu'ils se fondent dans le texte manuscrit. */
-  button.ins,
-  button.seg-texte {
-    border: none;
-    padding: 0 2px;
-    font: inherit;
-    color: inherit;
-    cursor: pointer;
-    background: transparent;
-  }
+  /* FA4 — le reset « color: inherit; background: transparent » qui écrasait
+     les couleurs réelles des couches (spécificité scoped > classes globales)
+     a été RETIRÉ : le reset neutre des marques-boutons vit désormais dans
+     atelier.css en spécificité ZÉRO (`:where(button.ins, button.seg-texte)`),
+     laissant `.ins--forme`, `.mark-technique`, `.mark-style`, `.refusee`… 
+     maîtres des couleurs du design system. */
   .actions-paragraphe {
     display: inline-flex;
     gap: 0.5rem;

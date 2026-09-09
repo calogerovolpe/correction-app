@@ -25,22 +25,31 @@ export function etatAtelier(
   });
 }
 
-/** Accepte ('corrige') ou refuse ('original') une correction Forme (filtre). */
+/** Accepte ('corrige') ou refuse ('original') une correction Forme (filtre).
+ *  FA4 : `onglet` (optionnel) demande la projection de l'onglet courant — la
+ *  réponse ne fait plus sauter l'atelier vers « tout ». */
 export function choisirForme(
   analyseId: number,
   payload: DecisionForme,
+  onglet?: OngletAtelier,
 ): Promise<EtatAtelier> {
-  return api.envoyer<EtatAtelier>(`/analyses/${analyseId}/choix-forme`, payload);
+  return api.envoyer<EtatAtelier>(
+    `/analyses/${analyseId}/choix-forme`,
+    payload,
+    { onglet: onglet ?? undefined },
+  );
 }
 
 /** Applique l'alternative choisie par l'auteur (clic droit sur sélection). */
 export function appliquerAlternative(
   analyseId: number,
   payload: ModificationSelection,
+  onglet?: OngletAtelier,
 ): Promise<EtatAtelier> {
   return api.envoyer<EtatAtelier>(
     `/analyses/${analyseId}/appliquer-alternative`,
     payload,
+    { onglet: onglet ?? undefined },
   );
 }
 
@@ -50,21 +59,26 @@ export function editerParagraphe(
   analyseId: number,
   paragrapheId: string,
   texte: string,
+  onglet?: OngletAtelier,
 ): Promise<EtatAtelier> {
-  return api.envoyer<EtatAtelier>(`/analyses/${analyseId}/editer`, {
-    paragraphe_id: paragrapheId,
-    texte,
-  });
+  return api.envoyer<EtatAtelier>(
+    `/analyses/${analyseId}/editer`,
+    { paragraphe_id: paragrapheId, texte },
+    { onglet: onglet ?? undefined },
+  );
 }
 
 /** Réévaluation manuelle des corrections d'un paragraphe (bouton « ↻ »). */
 export function reevaluerParagraphe(
   analyseId: number,
   paragrapheId: string,
+  onglet?: OngletAtelier,
 ): Promise<EtatAtelier> {
-  return api.envoyer<EtatAtelier>(`/analyses/${analyseId}/reevaluer`, {
-    paragraphe_id: paragrapheId,
-  });
+  return api.envoyer<EtatAtelier>(
+    `/analyses/${analyseId}/reevaluer`,
+    { paragraphe_id: paragrapheId },
+    { onglet: onglet ?? undefined },
+  );
 }
 
 /** Applique l'embellissement choisi, PUIS réévalue les corrections du paragraphe
@@ -72,10 +86,12 @@ export function reevaluerParagraphe(
 export function appliquerEmbellissement(
   analyseId: number,
   payload: ModificationSelection,
+  onglet?: OngletAtelier,
 ): Promise<EtatAtelier> {
   return api.envoyer<EtatAtelier>(
     `/analyses/${analyseId}/appliquer-embellissement`,
     payload,
+    { onglet: onglet ?? undefined },
   );
 }
 

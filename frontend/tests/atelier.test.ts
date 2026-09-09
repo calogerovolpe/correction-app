@@ -214,4 +214,158 @@ describe('Atelier E5 (F3)', () => {
     expect(conteneur.textContent).toContain('. Le sable se hissait');
     expect(conteneur.querySelector('.mark-style')).toBeTruthy();
   });
+
+  it('rend le formatage Word du manuscrit (gras, italique, souligné) — FA4', async () => {
+    // Les attributs `gras` / `italique` / `souligne` transmis par le rendu
+    // backend (rendu.py, découpe atomique FA3) doivent devenir VISUELS dans le
+    // DOM annoté : balisage sémantique <strong> / <em> / <u> emboîté.
+    const etat = etatAtelier('tout');
+    etat.document.paragraphes[0].segments = [
+      { type: 'texte', texte: 'Le héros ', gras: true, italique: false, souligne: false, classes: '', groupe: null },
+      { type: 'texte', texte: 'frémit ', gras: false, italique: true, souligne: false, classes: '', groupe: null },
+      { type: 'texte', texte: 'et se ', gras: false, italique: false, souligne: true, classes: '', groupe: null },
+      { type: 'texte', texte: 'releva.', gras: true, italique: true, souligne: true, classes: '', groupe: null },
+      { type: 'forme', groupe: 'g-0001', del: 'part', ins: 'partent', gras: true, italique: false, souligne: false, classes: '' },
+    ];
+
+    reparerFetch(() => reponseJson(etat));
+    rendre(Atelier, { analyseId: 7 });
+    await attendre();
+    await attendre();
+
+    const doc = conteneur.querySelector('#document-annote');
+    expect(doc?.querySelector('strong')?.textContent).toContain('Le héros');
+    expect(doc?.querySelector('em')?.textContent).toContain('frémit');
+    expect(doc?.querySelector('u')?.textContent).toBe('et se ');
+    // Combinaison emboîtée : gras + italique + souligné = strong > em > u
+    expect(doc?.querySelector('strong em u')?.textContent).toBe('releva.');
+    // Les segments Forme héritent aussi du formatage (del ET ins)
+    const insForme = conteneur.querySelector('button.ins--forme');
+    expect(insForme).toBeTruthy();
+    expect(insForme?.querySelector('strong')?.textContent).toBe('partent');
+    // Les couches colorées conservent leurs classes (aucun reset ne les retire)
+    expect(insForme?.classList.contains('ins--forme')).toBe(true);
+  });
+
+  it('conserve l’onglet actif après un choix Forme (pas de saut vers « tout ») — FA4', async () => {
+    // L'auteur consulte l'onglet « Forme » ; appliquer une correction Forme ne
+    // doit PAS ramener l'atelier sur l'onglet « Tout » : le POST transmet
+    // `onglet=forme` et la réponse re-projette CET onglet.
+    const fetch = reparerFetch(() => reponseJson(etatAtelier('forme')));
+    rendre(Atelier, { analyseId: 7 });
+    await attendre();
+    await attendre();
+
+    const marque = conteneur.querySelector(
+      '[data-groupe="g-0001"]',
+    ) as HTMLElement;
+    expect(marque).toBeTruthy();
+    marque.dispatchEvent(
+      new MouseEvent('contextmenu', { bubbles: true, cancelable: true }),
+    );
+    await attendre();
+
+    const boutonAppliquer = Array.from(conteneur.querySelectorAll('button')).find(
+      (b) => b.textContent?.includes('Appliquer la correction'),
+    );
+    expect(boutonAppliquer).toBeTruthy();
+    boutonAppliquer?.click();
+    await attendre();
+    await attendre();
+
+    // Le POST a bien transmis l'onglet courant
+    const appelPost = fetch.appels().find((u) => u.includes('choix-forme'));
+    expect(appelPost).toBeTruthy();
+    expect(appelPost).toContain('onglet=forme');
+    // L'onglet « Forme » reste actif (aria-selected) — pas de saut vers « Tout »
+    const ongletsActifs = Array.from(
+      conteneur.querySelectorAll('[aria-selected="true"]'),
+    );
+    expect(ongletsActifs.length).toBeGreaterThan(0);
+    expect(
+      ongletsActifs.every((o) => o.textContent?.includes('Forme')),
+    ).toBe(true);
+    // La barre latérale reste réconciliée : une ligne active est surlignée
+    expect(conteneur.querySelector('.barre-ligne--active')).toBeTruthy();
+  });
+
+  it('réconcilie la correction active après une mutation (id régénéré) — FA4', async () => {
+    // Une réévaluation peut régénérer l'id de la correction : l'ancienne
+    // référence de la barre latérale n'existe plus — la réconciliation doit
+    // retomber proprement sur la première correction active.
+    const etatApres = etatAtelier('tout');
+    etatApres.document.corrections_barre[0].id = 'c-r0002';
+    reparerFetch((url) =>
+      reponseJson(url.includes('choix-forme') ? etatApres : etatAtelier('tout')),
+    );
+    rendre(Atelier, { analyseId: 7 });
+    await attendre();
+    await attendre();
+
+    const marque = conteneur.querySelector(
+      '[data-groupe="g-0001"]',
+    ) as HTMLElement;
+    marque.dispatchEvent(
+      new MouseEvent('contextmenu', { bubbles: true, cancelable: true }),
+    );
+    await attendre();
+    const boutonAppliquer = Array.from(conteneur.querySelectorAll('button')).find(
+      (b) => b.textContent?.includes('Appliquer la correction'),
+    );
+    boutonAppliquer?.click();
+    await attendre();
+    await attendre();
+
+    // Aucun détail fantôme : la ligne active pointe bien vers une correction
+    // EXISTANTE de la nouvelle barre latérale (c-r0002)
+    const ligneActive = conteneur.querySelector('.barre-ligne--active');
+    expect(ligneActive).toBeTruthy();
+    expect(ligneActive?.textContent).toContain('Forme');
+  });
+
+  it('bascule « masquer les paragraphes sans correction » — FA4', async () => {
+    const etat = etatAtelier('tout');
+    etat.document.paragraphes.push({
+      id: 'p-2',
+      edite: false,
+      segments: [
+        {
+          type: 'texte',
+          texte: 'Paragraphe sans aucune correction.',
+          gras: false,
+          italique: false,
+          souligne: false,
+          classes: '',
+          groupe: null,
+        },
+      ],
+    });
+    etat.document.nb_masques = 1;
+    reparerFetch(() => reponseJson(etat));
+    rendre(Atelier, { analyseId: 7 });
+    await attendre();
+    await attendre();
+
+    // Par défaut : TOUT le texte est affiché (décision 35)
+    expect(conteneur.textContent).toContain('Paragraphe sans aucune correction.');
+
+    const caseMasquer = conteneur.querySelector(
+      '.toggle-masquer input',
+    ) as HTMLInputElement;
+    expect(caseMasquer).toBeTruthy();
+    caseMasquer.checked = true;
+    caseMasquer.dispatchEvent(new Event('change', { bubbles: true }));
+    await attendre();
+
+    expect(conteneur.textContent).not.toContain(
+      'Paragraphe sans aucune correction.',
+    );
+    // Les paragraphes corrigés restent affichés
+    expect(conteneur.textContent).toContain('Les cavaliers');
+
+    caseMasquer.checked = false;
+    caseMasquer.dispatchEvent(new Event('change', { bubbles: true }));
+    await attendre();
+    expect(conteneur.textContent).toContain('Paragraphe sans aucune correction.');
+  });
 });

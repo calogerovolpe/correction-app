@@ -553,9 +553,13 @@ async def etat_atelier(analyse_id: int, onglet: str = "tout") -> EtatAtelier:
 
 
 @router.post("/analyses/{analyse_id}/choix-forme", response_model=EtatAtelier)
-async def api_choix_forme(analyse_id: int, payload: DecisionForme) -> EtatAtelier:
+async def api_choix_forme(
+    analyse_id: int, payload: DecisionForme, onglet: str = "tout"
+) -> EtatAtelier:
     """Accepte ('corrige') ou refuse ('original') une correction Forme : un
-    simple FILTRE (R2) — la projection se recalcule, aucun remappage."""
+    simple FILTRE (R2) — la projection se recalcule, aucun remappage.
+    FA4 : `onglet` (query) permet de renvoyer la projection de l'onglet COURANT
+    — plus de saut intempestif vers « tout » après une action."""
     lignes = await db.interroger("SELECT * FROM analyses WHERE id = ?", (analyse_id,))
     if not lignes:
         raise HTTPException(status_code=404, detail="Analyse introuvable.")
@@ -567,14 +571,15 @@ async def api_choix_forme(analyse_id: int, payload: DecisionForme) -> EtatAtelie
         await service_atelier.choisir_forme(analyse, etat, payload.correction_id, payload.decision)
     except ErreurAtelier as erreur:
         raise HTTPException(status_code=erreur.statut, detail=str(erreur)) from erreur
-    return await _etat_atelier_payload(analyse, etat)
+    return await _etat_atelier_payload(analyse, etat, onglet)
 
 
 @router.post("/analyses/{analyse_id}/appliquer-alternative", response_model=EtatAtelier)
 async def api_appliquer_alternative(
-    analyse_id: int, payload: ModificationSelection
+    analyse_id: int, payload: ModificationSelection, onglet: str = "tout"
 ) -> EtatAtelier:
-    """Applique l'alternative choisie par l'auteur (clic droit sur sélection)."""
+    """Applique l'alternative choisie par l'auteur (clic droit sur sélection).
+    FA4 : renvoie la projection de l'onglet courant (plus de saut vers « tout »)."""
     lignes = await db.interroger("SELECT * FROM analyses WHERE id = ?", (analyse_id,))
     if not lignes:
         raise HTTPException(status_code=404, detail="Analyse introuvable.")
@@ -592,10 +597,12 @@ async def api_appliquer_alternative(
 
 
 @router.post("/analyses/{analyse_id}/editer", response_model=EtatAtelier)
-async def api_editer_paragraphe(analyse_id: int, payload: EditionParagraphe) -> EtatAtelier:
+async def api_editer_paragraphe(
+    analyse_id: int, payload: EditionParagraphe, onglet: str = "tout"
+) -> EtatAtelier:
     """Édition DIRECTE sans IA temps réel (UX4, décision 38) : remplace le texte
     courant affiché du paragraphe (patch ancré base) ; « ↻ Re-corriger » relance
-    le pipeline ensuite."""
+    le pipeline ensuite. FA4 : renvoie la projection de l'onglet courant."""
     lignes = await db.interroger("SELECT * FROM analyses WHERE id = ?", (analyse_id,))
     if not lignes:
         raise HTTPException(status_code=404, detail="Analyse introuvable.")
@@ -612,9 +619,10 @@ async def api_editer_paragraphe(analyse_id: int, payload: EditionParagraphe) -> 
 
 @router.post("/analyses/{analyse_id}/reevaluer", response_model=EtatAtelier)
 async def api_reevaluer(
-    analyse_id: int, payload: EditionParagraphe
+    analyse_id: int, payload: EditionParagraphe, onglet: str = "tout"
 ) -> EtatAtelier:
-    """Réévaluation manuelle des corrections d'un paragraphe (bouton « ↻ »)."""
+    """Réévaluation manuelle des corrections d'un paragraphe (bouton « ↻ »).
+    FA4 : renvoie la projection de l'onglet courant (plus de saut vers « tout »)."""
     les_lignes = await db.interroger("SELECT * FROM analyses WHERE id = ?", (analyse_id,))
     if not les_lignes:
         raise HTTPException(status_code=404, detail="Analyse introuvable.")
@@ -627,7 +635,7 @@ async def api_reevaluer(
         await service_atelier.reevaluer(analyse, etat, paragraphe_id)
     except ErreurAtelier as erreur:
         raise HTTPException(status_code=erreur.statut, detail=str(erreur)) from erreur
-    return await _etat_atelier_payload(analyse, etat)
+    return await _etat_atelier_payload(analyse, etat, onglet)
 
 
 @router.post("/analyses/{analyse_id}/nouvelle-version")
@@ -688,11 +696,11 @@ async def api_alternatives_json(demande: DemandeSuggestion) -> dict:
 
 @router.post("/analyses/{analyse_id}/appliquer-embellissement", response_model=EtatAtelier)
 async def api_appliquer_embellissement(
-    analyse_id: int, payload: ModificationSelection
+    analyse_id: int, payload: ModificationSelection, onglet: str = "tout"
 ) -> EtatAtelier:
     """Applique l'embellissement choisi, PUIS réévalue les corrections du
     paragraphe. Zéro surprise : si la réévaluation échoue, RIEN n'est appliqué
-    (aucun état partiel)."""
+    (aucun état partiel). FA4 : renvoie la projection de l'onglet courant."""
     lignes = await db.interroger("SELECT * FROM analyses WHERE id = ?", (analyse_id,))
     if not lignes:
         raise HTTPException(status_code=404, detail="Analyse introuvable.")
@@ -706,4 +714,4 @@ async def api_appliquer_embellissement(
         )
     except ErreurAtelier as erreur:
         raise HTTPException(status_code=erreur.statut, detail=str(erreur)) from erreur
-    return await _etat_atelier_payload(analyse, etat)
+    return await _etat_atelier_payload(analyse, etat, onglet)

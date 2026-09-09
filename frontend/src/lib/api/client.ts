@@ -72,7 +72,11 @@ async function requete<T>(chemin: string, options: OptionsRequete = {}): Promise
 
 export interface ClientApi {
   obtenir<T>(chemin: string, parametres?: OptionsRequete['parametres']): Promise<T>;
-  envoyer<T>(chemin: string, corps?: unknown): Promise<T>;
+  envoyer<T>(
+    chemin: string,
+    corps?: unknown,
+    parametres?: OptionsRequete['parametres'],
+  ): Promise<T>;
   remplacer<T>(chemin: string, corps?: unknown): Promise<T>;
   modifier<T>(chemin: string, corps?: unknown): Promise<T>;
   supprimer<T>(chemin: string): Promise<T>;
@@ -80,7 +84,8 @@ export interface ClientApi {
 
 export const api: ClientApi = {
   obtenir: (chemin, parametres) => requete(chemin, { parametres }),
-  envoyer: (chemin, corps) => requete(chemin, { methode: 'POST', corps }),
+  envoyer: (chemin, corps, parametres) =>
+    requete(chemin, { methode: 'POST', corps, parametres }),
   remplacer: (chemin, corps) => requete(chemin, { methode: 'PUT', corps }),
   modifier: (chemin, corps) => requete(chemin, { methode: 'PATCH', corps }),
   supprimer: (chemin) => requete(chemin, { methode: 'DELETE' }),

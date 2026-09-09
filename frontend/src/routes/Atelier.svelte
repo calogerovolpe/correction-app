@@ -88,6 +88,10 @@
   // l'atelier figé sur « Chargement… » quand l'identifiant change sous les pieds
   // du composant : chaque nouvelle analyse relance systématiquement le chargement.
   let analyseChargee: number | null = null;
+  // FA4 — jeton anti-course : chaque chargement s'incrémente ; une réponse qui
+  // revient après un chargement plus récent (clics rapides d'onglets) est
+  // ignorée au lieu d'écraser l'état courant avec une projection périmée.
+  let jetonChargement = 0;
   $effect(() => {
     if (analyseId !== analyseChargee) {
       analyseChargee = analyseId;
@@ -101,20 +105,23 @@
   });
 
   async function charger(ongletDemande?: OngletAtelier): Promise<void> {
+    const jeton = ++jetonChargement;
     chargement = true;
     erreur = '';
     try {
-      etat = await etatAtelier(analyseId, ongletDemande ?? onglet);
+      const nouvelEtat = await etatAtelier(analyseId, ongletDemande ?? onglet);
+      if (jeton !== jetonChargement) return; // réponse périmée — on ignore
+      etat = nouvelEtat;
       if (etat) {
         onglet = etat.onglet;
-        correctionActive =
-          etat.document.corrections_barre.find((c) => c.etat === 'active') ?? null;
+        reconcilierCorrectionActive();
       }
     } catch (e) {
+      if (jeton !== jetonChargement) return; // réponse périmée — on ignore
       erreur =
         e instanceof ErreurApiApp ? e.message : 'Impossible de charger l’atelier.';
     } finally {
-      chargement = false;
+      if (jeton === jetonChargement) chargement = false;
     }
   }
 
@@ -126,6 +133,31 @@
     if (!etat) return;
     correctionActive =
       etat.document.corrections_barre.find((c) => c.groupe === groupe) ?? null;
+  }
+
+  /** FA4 — réconciliation PROPRE de la correction active (barre latérale) :
+   *  après une mutation, la référence précédente peut être obsolète (id
+   *  régénéré par une réévaluation, décision modifiée, correction devenue
+   *  obsolète…). On retrouve l'id ciblé s'il existe toujours, sinon la
+   *  correction courante si elle subsiste, sinon la première correction
+   *  active — jamais de détail fantôme ni de liste désynchronisée. */
+  function reconcilierCorrectionActive(cibleId?: string | null): void {
+    if (!etat) {
+      correctionActive = null;
+      return;
+    }
+    const barre = etat.document.corrections_barre;
+    if (cibleId) {
+      const cible = barre.find((c) => c.id === cibleId);
+      if (cible) {
+        correctionActive = cible;
+        return;
+      }
+    }
+    const courante = correctionActive
+      ? barre.find((c) => c.id === correctionActive?.id)
+      : undefined;
+    correctionActive = courante ?? barre.find((c) => c.etat === 'active') ?? null;
   }
 
   function paragrapheCorrige(p: ParagrapheAnnote): boolean {
@@ -284,15 +316,23 @@
     actionCle: 'appliquer-forme' | 'garder-original',
   ): Promise<void> {
     if (!menu?.action || actionEnCours) return;
+    const cibleId = menu.action;
     actionEnCours = true;
     erreur = '';
     success = '';
     try {
-      etat = await choisirForme(analyseId, {
-        correction_id: menu.action,
-        decision: actionCle === 'appliquer-forme' ? 'corrige' : 'original',
-      });
+      // FA4 : l'onglet courant est transmis — la réponse re-projette CET onglet
+      // (plus de saut intempestif vers « tout » après un choix Forme).
+      etat = await choisirForme(
+        analyseId,
+        {
+          correction_id: cibleId,
+          decision: actionCle === 'appliquer-forme' ? 'corrige' : 'original',
+        },
+        onglet,
+      );
       onglet = etat.onglet;
+      reconcilierCorrectionActive(cibleId);
     } catch (e) {
       monterErreur(e);
     } finally {
@@ -361,21 +401,30 @@
     success = '';
     try {
       if (popover.type === 'embellissement') {
-        etat = await appliquerEmbellissement(analyseId, {
-          paragraphe_id: paragrapheId,
-          fragment,
-          texte,
-          contexte,
-        });
+        etat = await appliquerEmbellissement(
+          analyseId,
+          {
+            paragraphe_id: paragrapheId,
+            fragment,
+            texte,
+            contexte,
+          },
+          onglet,
+        );
       } else {
-        etat = await appliquerAlternative(analyseId, {
-          paragraphe_id: paragrapheId,
-          fragment,
-          texte,
-          contexte,
-        });
+        etat = await appliquerAlternative(
+          analyseId,
+          {
+            paragraphe_id: paragrapheId,
+            fragment,
+            texte,
+            contexte,
+          },
+          onglet,
+        );
       }
       onglet = etat.onglet;
+      reconcilierCorrectionActive();
       popover = null;
       selectionContexte = null;
     } catch (e) {
@@ -396,8 +445,9 @@
     erreur = '';
     success = '';
     try {
-      etat = await editerParagraphe(analyseId, enEditionId, texteEdition);
+      etat = await editerParagraphe(analyseId, enEditionId, texteEdition, onglet);
       onglet = etat.onglet;
+      reconcilierCorrectionActive();
       enEditionId = null;
       success = 'Paragraphe mis à jour.';
     } catch (e) {
@@ -418,8 +468,9 @@
     erreur = '';
     success = '';
     try {
-      etat = await reevaluerParagraphe(analyseId, paragrapheId);
+      etat = await reevaluerParagraphe(analyseId, paragrapheId, onglet);
       onglet = etat.onglet;
+      reconcilierCorrectionActive();
       success = 'Corrections du paragraphe réévaluées.';
     } catch (e) {
       monterErreur(e);

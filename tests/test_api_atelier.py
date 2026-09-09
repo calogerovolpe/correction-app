@@ -168,6 +168,37 @@ def test_atelier_404_et_non_terminee_400(client, monkeypatch):
 # --- Actions de l'atelier -----------------------------------------------------
 
 
+def test_fa4_choix_forme_conserve_l_onglet_demande(client, monkeypatch):
+    """FA4 : les actions POST acceptent l'onglet courant (`onglet` en query) et
+    renvoient la projection de CET onglet — fin du saut intempestif vers « tout »
+    après un choix de l'auteur."""
+    identifiant = _chapitre_termine(client, monkeypatch)
+    atelier = client.get(f"/api/v1/analyses/{identifiant}/atelier").json()
+    correction_id = atelier["document"]["corrections_barre"][0]["id"]
+
+    reponse = client.post(
+        f"/api/v1/analyses/{identifiant}/choix-forme",
+        params={"onglet": "forme"},
+        json={"correction_id": correction_id, "decision": "corrige"},
+    )
+    assert reponse.status_code == 200
+    donnees = reponse.json()
+    assert donnees["onglet"] == "forme"
+    # La projection est bien celle de l'onglet Forme : AUCUN marquage
+    # Style/Technique (un appel sans `onglet` renverrait « tout »).
+    segments = donnees["document"]["paragraphes"][0]["segments"]
+    assert not any(
+        "mark-style" in s.get("classes", "") or "mark-technique" in s.get("classes", "")
+        for s in segments
+    )
+    # Sans `onglet` : comportement par défaut conservé (« tout »).
+    par_defaut = client.post(
+        f"/api/v1/analyses/{identifiant}/editer",
+        json={"paragraphe_id": "p-1", "texte": "Les cavaliers partent à l'aube."},
+    ).json()
+    assert par_defaut["onglet"] == "tout"
+
+
 def test_choix_forme_original_filtre_la_projection(client, monkeypatch):
     identifiant = _chapitre_termine(client, monkeypatch)
     atelier = client.get(f"/api/v1/analyses/{identifiant}/atelier").json()

@@ -23,6 +23,22 @@
   color: var(--encre-douce);
 }
 
+/* FA4 — reset neutre à SPÉCIFICITÉ ZÉRO (`:where`) pour les marques-boutons :
+   il neutralise l'apparence native des <button> (bordure, fond système) sans
+   jamais écraser les classes de couche (.ins--forme, .ins--style, .ins--technique,
+   .ins--embellissement, .mark-style, .mark-technique, .refusee…) qui restent
+   maîtresses des couleurs réelles du design system. Fin du bug d'audit : le
+   reset scoped `color: inherit; background: transparent` de DocumentAnnote
+   neutralisait silencieusement les couches colorées. */
+:where(button.ins, button.seg-texte) {
+  border: none;
+  padding: 0 2px;
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+
 .ins {
   font-weight: 600;
   text-decoration: none;
