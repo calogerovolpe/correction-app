@@ -12,6 +12,10 @@ export interface Projet {
   current_chapter_num: number | null;
   last_chapter_title: string | null;
   created_at: string;
+  /** FA2 — bouton « Ouvrir » : id de la dernière analyse TERMINÉE du projet
+   *  (l'atelier E5 n'est accessible que pour une analyse terminee) ;
+   *  null → l'ouverture mène à la soumission. */
+  derniere_analyse_id: number | null;
 }
 
 export type StatutAnalyse = 'en_attente' | 'en_cours' | 'terminee' | 'echec' | 'rejetee';

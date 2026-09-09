@@ -107,6 +107,45 @@ def test_suppression_projet_inconnu(client):
     assert reponse.status_code == 404
 
 
+def test_derniere_analyse_terminee_exposee_par_projet(client):
+    """FA2 — le bouton « Ouvrir » de l'accueil a besoin de savoir où mener :
+    chaque projet expose l'id de sa dernière analyse TERMINÉE (l'atelier E5
+    n'est accessible que pour une analyse terminee)."""
+    projet = _creer(client).json()
+    pid = projet["projet_id"]
+    # Une analyse terminée, puis une analyse échouée PLUS RÉCENTE :
+    # c'est la dernière terminée qui doit être exposée (pas la plus récente).
+    asyncio.run(
+        db.executer(
+            "INSERT INTO analyses (projet_id, texte_source, statut, categorie) "
+            "VALUES (?, 'Texte.', 'terminee', 'chapitre')",
+            (pid,),
+        )
+    )
+    asyncio.run(
+        db.executer(
+            "INSERT INTO analyses (projet_id, texte_source, statut) "
+            "VALUES (?, 'Texte.', 'echec')",
+            (pid,),
+        )
+    )
+    liste = client.get("/api/v1/projets").json()["projets"]
+    cible = next(p for p in liste if p["projet_id"] == pid)
+    terminee = asyncio.run(
+        db.interroger(
+            "SELECT MAX(id) AS n FROM analyses WHERE projet_id = ? AND statut = 'terminee'",
+            (pid,),
+        )
+    )[0]["n"]
+    assert cible["derniere_analyse_id"] == terminee
+
+    # Un projet sans analyse terminée → None (le bouton mène à la soumission)
+    second = _creer(client, "Roman vierge").json()
+    liste2 = client.get("/api/v1/projets").json()["projets"]
+    vierge = next(p for p in liste2 if p["projet_id"] == second["projet_id"])
+    assert vierge["derniere_analyse_id"] is None
+
+
 def test_analyses_recentes_limite_a_dix(client):
     projet = _creer(client).json()
     for i in range(12):

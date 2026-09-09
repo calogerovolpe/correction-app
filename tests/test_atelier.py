@@ -185,7 +185,10 @@ def test_reevaluer_remplace_les_corrections_du_paragraphe(client, monkeypatch):
     reponse = client.post(f"/analyses/{identifiant}/reevaluer",
                           data={"paragraphe_id": "p-1"})
     assert reponse.status_code == 200
-    assert "c-r0001" in reponse.text  # les nouvelles corrections remplacent les anciennes
+    # FA2 — identité documentaire : le compteur des ids de réévaluation est
+    # CONTINU à l'échelle du document (après c-0001, le prochain id est
+    # c-r0002 — jamais de c-r0001 recyclé).
+    assert "c-r0002" in reponse.text  # les nouvelles corrections remplacent les anciennes
     assert "c-0001" not in reponse.text  # l'ancienne correction Forme n'est plus là
     assert "partent" in reponse.text     # le texte courant est conservé
 
@@ -251,6 +254,134 @@ def test_prefill_dernieres_options_sur_e3(client, monkeypatch):
     assert 'value="chapitre" checked' not in page.text
     assert 'id="case-technique" >' in page.text        # décochée (dernier choix mémorisé)
     assert 'id="case-style" checked' not in page.text
+
+
+# --- Jalon FA2 : identité documentaire + réévaluation parallèle ----------------
+
+from app.services import atelier as service_atelier
+from app.services import reconstruction as service_reconstruction
+from app.services.texte_riche import ParagrapheRiche, RunFormat
+
+REPONSE_REEVAL_FORME = json.dumps(
+    {
+        "corrections": [
+            {
+                "id": "c-r9999", "phase": "forme", "type": "accord_sujet_verbe",
+                "paragraphe_id": "p-1", "debut": 14, "fin": 18,
+                "contexte_avant": "Les cavaliers ", "original": "part",
+                "correction": "partent", "explication": "Réévalué.",
+                "regle": "Accord", "variantes": [],
+            }
+        ]
+    },
+    ensure_ascii=False,
+)
+
+
+def _paragraphe_fa2(pid: str, texte: str) -> ParagrapheRiche:
+    return ParagrapheRiche(id=pid, runs=[RunFormat(texte=texte)])
+
+
+def _analyse_fa2() -> dict:
+    """Analyse factice pour appeler le service atelier hors HTTP."""
+    return {"id": 9999, "categorie": "chapitre", "options_json": None}
+
+
+def _preparer_analyse_fa2(identifiant: int) -> None:
+    """Insère l'analyse factice en base (FK de `documents` requise par
+    `sauver_etat`)."""
+    from app import db
+
+    asyncio.run(db.executer(
+        "INSERT OR IGNORE INTO projets (projet_id, titre) VALUES ('P-FA2', 'FA2')", ()
+    ))
+    asyncio.run(db.executer(
+        "INSERT OR IGNORE INTO analyses (id, projet_id, texte_source, statut) "
+        "VALUES (?, 'P-FA2', 'Texte.', 'en_attente')",
+        (identifiant,),
+    ))
+
+
+def test_fa2_ids_reevaluation_continus_a_lechelle_du_document(
+    monkeypatch, base_donnees
+):
+    """RÉGRESSION FA2 : le compteur des ids de réévaluation est CONTINU à
+    l'échelle du document — réévaluer p-1 puis p-2 ne doit JAMAIS produire
+    deux fois le même id (compteur remis à zéro = collision c-r0001)."""
+    _modeles_distincts(monkeypatch)
+    mock = MockLLM(reponses={"m-forme": REPONSE_REEVAL_FORME})
+    monkeypatch.setattr(service_analyse, "_client_llm", lambda: mock)
+    etat = service_reconstruction.etat_initial(
+        [],
+        [
+            _paragraphe_fa2("p-1", "Les cavaliers part à l'aube."),
+            _paragraphe_fa2("p-2", "Les soldats part à l'aube."),
+        ],
+    )
+    analyse = _analyse_fa2()
+    _preparer_analyse_fa2(analyse["id"])
+    asyncio.run(service_atelier.reevaluer(analyse, etat, "p-1"))
+    asyncio.run(service_atelier.reevaluer(analyse, etat, "p-2"))
+    ids = sorted(e["correction"].id for e in etat["corrections"])
+    assert ids == ["c-r0001", "c-r0002"]  # suite continue, aucun doublon
+
+
+def test_fa2_nouvel_id_reevaluation_ne_recycle_pas_les_anciens(
+    monkeypatch, base_donnees
+):
+    """RÉGRESSION FA2 : réévaluer deux fois le MÊME paragraphe ne doit pas
+    réattribuer c-r0001 (un refus posé sur c-r0001 ne doit jamais s'appliquer
+    à la nouvelle correction — pas d'id recyclé, pas de refus fantôme)."""
+    _modeles_distincts(monkeypatch)
+    mock = MockLLM(reponses={"m-forme": REPONSE_REEVAL_FORME})
+    monkeypatch.setattr(service_analyse, "_client_llm", lambda: mock)
+    etat = service_reconstruction.etat_initial(
+        [], [_paragraphe_fa2("p-1", "Les cavaliers part à l'aube.")]
+    )
+    analyse = _analyse_fa2()
+    _preparer_analyse_fa2(analyse["id"])
+    asyncio.run(service_atelier.reevaluer(analyse, etat, "p-1"))
+    assert etat["corrections"][0]["correction"].id == "c-r0001"
+    # L'auteur refuse la correction réévaluée, puis relance la réévaluation
+    assert service_reconstruction.basculer_choix(etat, "c-r0001", "original") is True
+    asyncio.run(service_atelier.reevaluer(analyse, etat, "p-1"))
+    ids = [e["correction"].id for e in etat["corrections"]]
+    assert ids == ["c-r0002"]  # ni c-r0001 recyclé, ni refus hérité
+    assert etat["choix"] == {}
+
+
+class _ClientLent:
+    """Client LLM factice qui dort à chaque appel (mesure du parallélisme)."""
+
+    def __init__(self, duree: float):
+        self.duree = duree
+        self.appels = 0
+
+    async def completer(self, modele, messages, temperature=0.0,
+                        timeout=None, max_tokens=None):
+        self.appels += 1
+        await asyncio.sleep(self.duree)
+        return '{"corrections": []}'
+
+
+def test_fa2_reevaluation_execute_les_phases_en_parallele(
+    monkeypatch, base_donnees
+):
+    """RÉGRESSION FA2 : la réévaluation lance les phases actives EN PARALLÈLE
+    (asyncio.gather, comme le pipeline d'analyse initial) — 3 phases de 0,2 s
+    doivent tenir bien sous les 0,6 s d'une exécution séquentielle."""
+    lent = _ClientLent(0.2)
+    monkeypatch.setattr(service_analyse, "_client_llm", lambda: lent)
+    etat = service_reconstruction.etat_initial(
+        [], [_paragraphe_fa2("p-1", "Les cavaliers part à l'aube.")]
+    )
+    analyse = _analyse_fa2()
+    _preparer_analyse_fa2(analyse["id"])
+    debut = time.monotonic()
+    asyncio.run(service_atelier.reevaluer(_analyse_fa2(), etat, "p-1"))
+    duree = time.monotonic() - debut
+    assert lent.appels == 3  # forme + style + technique (chapitre)
+    assert duree < 0.45  # séquentiel : ≈ 0,6 s ; parallèle : ≈ 0,2 s
 
 
 # --- Jalon R1-a : onglets hybrides + projection par phase -----------------------

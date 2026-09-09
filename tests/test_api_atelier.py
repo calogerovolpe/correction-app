@@ -341,7 +341,9 @@ def test_reevaluer_remplace_les_corrections_du_paragraphe(client, monkeypatch):
     assert reponse.status_code == 200
     donnees = reponse.json()
     ids = [c["id"] for c in donnees["document"]["corrections_barre"]]
-    assert "c-r0001" in ids  # la correction réévaluée remplace l'ancienne
+    # FA2 — identité documentaire : suite CONTINUE (après c-0001, le nouvel id
+    # est c-r0002 — jamais c-r0001 recyclé, le compteur n'est pas remis à zéro).
+    assert "c-r0002" in ids  # la correction réévaluée remplace l'ancienne
 
 
 def test_suggestions_embellir_et_alternatives_a_la_demande(client, monkeypatch):

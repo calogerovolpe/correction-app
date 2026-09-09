@@ -88,17 +88,30 @@ def etat_initial(
 
 def _resoudre_chevauchements_formes(etat: dict, paragraphe_id: str) -> None:
     """Les corrections Forme actives qui se chevauchent : la première garde la
-    main, les suivantes sont obsolètes (coordonnées BASE — jamais décalées)."""
+    main, les suivantes sont obsolètes (coordonnées BASE — jamais décalées).
+
+    FA2 — résolution DYNAMIQUE : une Forme REFUSÉE par l'auteur (choix
+    « original ») n'est plus appliquée et ne bloque donc plus personne ; une
+    Forme obsolète UNIQUEMENT pour chevauchement est réactivée si sa
+    concurrente bloquante disparaît. Idempotent : réexécuté à chaque mutation
+    (choix Forme, réévaluation, état initial). Les obsolescences dues à une
+    modification manuelle (« Fragment modifié… ») restent, elles, persistantes."""
     formes = [
         e for e in etat["corrections"]
         if e["correction"].paragraphe_id == paragraphe_id
-        and e["correction"].phase == "forme" and e["etat"] == "active"
+        and e["correction"].phase == "forme"
+        and (
+            e["etat"] == "active"
+            or (e["motif"] or "").startswith("Chevauche")
+        )
     ]
     resolues: list[dict] = []
     for entree in sorted(
         formes, key=lambda e: (e["correction"].debut, e["correction"].fin)
     ):
         c = entree["correction"]
+        if etat.get("choix", {}).get(c.id) == "original":
+            continue  # une Forme refusée est un filtre : elle ne bloque pas
         if any(
             c.debut < f and c.fin > d
             for d, f in ((r["correction"].debut, r["correction"].fin) for r in resolues)
@@ -106,6 +119,8 @@ def _resoudre_chevauchements_formes(etat: dict, paragraphe_id: str) -> None:
             entree["etat"] = "obsolete"
             entree["motif"] = "Chevauche une autre correction Forme — non appliquée."
         else:
+            entree["etat"] = "active"
+            entree["motif"] = None
             resolues.append(entree)
 
 
@@ -379,12 +394,13 @@ def appliquer_modification(
         "fin": base_fin,
         "texte": texte_ins,
     })
+    # FA2 — obsolescence UNIFORME : toute correction active intersectée (Forme,
+    # Style, Technique) ne prétend plus décrire un fragment qui n'existe plus.
     for entree in etat["corrections"]:
         c = entree["correction"]
         if (
             c.paragraphe_id == paragraphe_id
             and entree["etat"] == "active"
-            and c.phase == "forme"
             and base_debut < c.fin and base_fin > c.debut
         ):
             entree["etat"] = "obsolete"
@@ -460,6 +476,9 @@ def basculer_choix(etat: dict, correction_id: str, decision: str) -> bool:
         etat.get("choix", {}).pop(c.id, None)
     else:
         return False
+    # FA2 — conflits dynamiques : le changement de choix peut libérer (ou
+    # re-bloquer) une Forme concurrente chevauchante sur ce paragraphe.
+    _resoudre_chevauchements_formes(etat, c.paragraphe_id)
     return True
 
 
@@ -491,10 +510,19 @@ def remplacer_corrections_paragraphe(
     # la projection COURANTE est figée AVANT le retrait : les nouvelles
     # corrections sont exprimées en coordonnées de ce texte courant
     fragments = _fragments(etat, paragraphe_id)
+    ids_anciens = {
+        e["correction"].id
+        for e in etat["corrections"]
+        if e["correction"].paragraphe_id == paragraphe_id
+    }
     etat["corrections"] = [
         e for e in etat["corrections"]
         if e["correction"].paragraphe_id != paragraphe_id
     ]
+    # FA2 — cycle de vie : les refus des corrections retirées sont purgés
+    # (aucun choix fantôme ne survit à la correction qu'il visait).
+    for cid in ids_anciens:
+        etat.get("choix", {}).pop(cid, None)
     ancrees: list[Correction] = []
     for c in nouvelles:
         try:

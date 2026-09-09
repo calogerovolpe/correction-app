@@ -410,3 +410,83 @@ def test_edition_directe_reinitialise_un_paragraphe_deja_modifie():
     assert etat["patches"] == []
     assert etat["corrections"] == []
     assert etat["base"][0].runs[0].texte == "Tout est neuf."
+
+
+# --- Jalon FA2 : identité documentaire, cycle de vie, conflits dynamiques ------
+
+
+def test_fa2_reevaluation_purge_les_choix_fantomes():
+    """RÉGRESSION FA2 : une réévaluation retire les corrections du paragraphe —
+    les refus (choix) portant sur ces ids doivent être purgés, sinon un refus
+    fantôme survivrait à la correction qu'il visait."""
+    etat = reconstruction.etat_initial(
+        [_corr("c-1", "forme", 14, 18, "part", "partent")], [_p()]
+    )
+    assert reconstruction.basculer_choix(etat, "c-1", "original") is True
+    assert etat["choix"] == {"c-1": "original"}
+    nouvelle = _corr("c-r1", "style", 14, 18, "part", "part")
+    reconstruction.remplacer_corrections_paragraphe(etat, "p-1", [nouvelle])
+    # c-1 n'existe plus : son refus ne doit plus traîner dans l'état
+    assert etat["choix"] == {}
+
+
+def test_fa2_alternative_obsolete_les_style_technique_intersectees():
+    """RÉGRESSION FA2 : après une alternative (patch manuel), une annotation
+    Style/Technique intersectée ne doit plus prétendre décrire un fragment qui
+    n'existe plus — politique d'obsolescence UNIFORME pour toutes les phases."""
+    etat = reconstruction.etat_initial(
+        [
+            _corr("c-1", "style", 28, 40, "vers la cité", "vers la cité"),
+            _corr("c-2", "technique", 36, 40, "cité", "cité"),
+        ],
+        [_p()],
+    )
+    reconstruction.appliquer_modification(etat, "p-1", 28, 40, "vers la vieille ville")
+    etats = {e["correction"].id: (e["etat"], e["motif"]) for e in etat["corrections"]}
+    assert etats["c-1"][0] == "obsolete"
+    assert "modifié" in etats["c-1"][1]
+    assert etats["c-2"][0] == "obsolete"
+
+
+def test_fa2_refuser_une_forme_prioritaire_reactive_la_concurrente():
+    """RÉGRESSION FA2 — gestion DYNAMIQUE des conflits : quand l'auteur refuse
+    la Forme qui en bloquait une autre (chevauchement), la concurrente redevient
+    applicable ; la ré-application du choix la re-bloque (idempotent)."""
+    etat = reconstruction.etat_initial(
+        [
+            _corr("c-1", "forme", 14, 18, "part", "partent"),
+            _corr("c-2", "forme", 16, 22, "art à", "avance à"),
+        ],
+        [_p()],
+    )
+    etats = {e["correction"].id: e["etat"] for e in etat["corrections"]}
+    assert etats == {"c-1": "active", "c-2": "obsolete"}  # la 1ʳᵉ garde la main
+
+    # Refus de la prioritaire → la concurrente redevient applicable
+    assert reconstruction.basculer_choix(etat, "c-1", "original") is True
+    etats = {e["correction"].id: e["etat"] for e in etat["corrections"]}
+    assert etats == {"c-1": "active", "c-2": "active"}
+
+    # Ré-application de la prioritaire → la concurrente est re-bloquée
+    assert reconstruction.basculer_choix(etat, "c-1", "corrige") is True
+    etats = {e["correction"].id: e["etat"] for e in etat["corrections"]}
+    assert etats == {"c-1": "active", "c-2": "obsolete"}
+
+
+def test_fa2_une_forme_refusee_ne_bloque_pas_la_concurrente():
+    """Une Forme REFUSÉE n'est plus appliquée : elle ne doit pas empêcher une
+    Forme chevauchante d'être résolue (re-résolution dynamique)."""
+    etat = reconstruction.etat_initial(
+        [
+            _corr("c-1", "forme", 14, 18, "part", "partent"),
+            _corr("c-2", "forme", 16, 22, "art à", "avance à"),
+        ],
+        [_p()],
+    )
+    # La base immuable reste intacte ; le refus est un filtre (R2)
+    reconstruction.basculer_choix(etat, "c-1", "original")
+    etat["choix"]["c-2"] = "original"
+    # Re-résolution : c-1 refusée, c-2 refusée → aucune ne bloque
+    etats = {e["correction"].id: e["etat"] for e in etat["corrections"]}
+    assert etats == {"c-1": "active", "c-2": "active"}
+    assert _courant(etat) == TEXTE  # les deux refusées → texte original

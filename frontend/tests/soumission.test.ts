@@ -36,6 +36,7 @@ function preparation(surcharge: Partial<PreparerSoumission> = {}): PreparerSoumi
       current_chapter_num: 3,
       last_chapter_title: 'La veille',
       created_at: '2026-09-09 12:00:00',
+      derniere_analyse_id: 11,
     },
     numero_attendu: 4,
     prefil: { categorie: 'chapitre', phases: { forme: true, style: true, technique: true } },

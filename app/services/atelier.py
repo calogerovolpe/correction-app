@@ -27,6 +27,7 @@ import copy
 import hashlib
 import json
 import logging
+import re
 from datetime import datetime
 
 from app import db
@@ -195,16 +196,35 @@ async def appliquer_alternative(
     await sauver_etat(analyse["id"], etat)
 
 
+def _prochain_numero_reevaluation(etat: dict) -> int:
+    """FA2 — identité documentaire : le compteur des ids de réévaluation est
+    CONTINU à l'échelle du document (jamais remis à zéro par appel). Inspecte
+    tous les ids existants (`c-XXXX` comme `c-rXXXX`) et retourne le prochain
+    numéro disponible — deux réévaluations de paragraphes distincts ne peuvent
+    plus produire le même id (collision constatée à l'audit post-F3)."""
+    numero = 0
+    for entree in etat["corrections"]:
+        correspondance = re.fullmatch(r"c-(?:r)?(\d+)", entree["correction"].id)
+        if correspondance:
+            numero = max(numero, int(correspondance.group(1)))
+    return numero
+
+
 async def _reevaluer_corrections(analyse, etat, paragraphe_id: str) -> list[Correction]:
     """Relance les phases actives de l'analyse sur le SEUL paragraphe modifié
-    (texte courant). Liste vide valide (jamais une panne)."""
+    (texte courant). Liste vide valide (jamais une panne).
+
+    FA2 : les phases s'exécutent EN PARALLÈLE (`asyncio.gather`, comme le
+    pipeline d'analyse initial) — zéro appel LLM ajouté, réévaluation plus
+    rapide ; l'ordre d'attribution des ids reste déterministe (ordre des
+    phases)."""
     texte = reconstruction.texte_paragraphe(etat, paragraphe_id)
     paragraphe = Paragraphe(id=paragraphe_id, texte=texte)
     options = json.loads(analyse["options_json"] or "{}")
     actives = service_analyse.phases_actives(analyse["categorie"] or "chapitre", options)
     client = service_analyse._client_llm()
-    nouvelles: list[Correction] = []
-    compteur = 0
+    phases: list[str] = []
+    taches = []
     for phase in actives:
         modele = _MODELE_REEVALUATION[phase]()
         if not modele:
@@ -212,9 +232,14 @@ async def _reevaluer_corrections(analyse, etat, paragraphe_id: str) -> list[Corr
         messages = service_prompts.prompt_phase_correction(
             phase, service_prompts.CONSIGNES_PHASES[phase], [paragraphe], settings.variante
         )
-        sortie = await client.completer(
+        phases.append(phase)
+        taches.append(client.completer(
             modele, messages, temperature=settings.temperature_correction
-        )
+        ))
+    sorties = await asyncio.gather(*taches)
+    nouvelles: list[Correction] = []
+    compteur = _prochain_numero_reevaluation(etat)
+    for phase, sortie in zip(phases, sorties):
         for correction in service_reconciliation.extraire_corrections(sortie, phase):
             compteur += 1
             renommee = correction.model_copy(

@@ -7,6 +7,7 @@
   import Modale from '../lib/composants/Modale.svelte';
   import { ErreurApiApp } from '../lib/api/client';
   import { activerProjet, analysesRecentes, creerProjet, listerProjets, supprimerProjet } from '../lib/api/projets';
+import { naviguer } from '../lib/router';
   import type { AnalyseLigne, Projet, StatutAnalyse } from '../lib/api/types';
 
   /** Accueil & projets E1 (jalon F1) : liste des manuscrits, création,
@@ -65,6 +66,26 @@
       await charger();
     } catch (e) {
       erreurAction = e instanceof ErreurApiApp ? e.message : "L'activation du projet a échoué.";
+    }
+  }
+
+  /** FA2 — bouton « Ouvrir » : entre dans le manuscrit. Une analyse terminée
+   *  ouvre l'atelier E5 directement ; un projet encore vierge mène à la
+   *  soumission du premier texte. Le projet est activé au passage (une seule
+   *  opération : l'activation puis la navigation). */
+  async function ouvrir(projet: Projet): Promise<void> {
+    erreurAction = '';
+    try {
+      if (!projet.actif) {
+        await activerProjet(projet.projet_id);
+      }
+      if (projet.derniere_analyse_id !== null) {
+        naviguer(`/atelier/${projet.derniere_analyse_id}`);
+      } else {
+        naviguer('/soumission');
+      }
+    } catch (e) {
+      erreurAction = e instanceof ErreurApiApp ? e.message : "L'ouverture du projet a échoué.";
     }
   }
 
@@ -164,6 +185,15 @@
                 {/if}
               </div>
               <div class="projets__actions">
+                <Bouton
+                  variante="primaire"
+                  title={projet.derniere_analyse_id !== null
+                    ? "Ouvrir le dernier résultat dans l'atelier"
+                    : "Ouvrir le projet et soumettre un premier texte"}
+                  onclick={() => void ouvrir(projet)}
+                >
+                  Ouvrir
+                </Bouton>
                 {#if !projet.actif}
                   <Bouton variante="secondaire" onclick={() => void activer(projet)}>Activer</Bouton>
                 {/if}
@@ -217,7 +247,11 @@
         <ul class="analyses">
           {#each analyses as analyse (analyse.id)}
             <li class="analyses__ligne">
-              <a class="analyses__lien" href="/analyses/{analyse.id}"># {analyse.id}</a>
+              <!-- FA2 : une analyse terminée ouvre l'atelier E5 ; les autres
+                   mènent au suivi (jamais de route hors SPA). -->
+              <a class="analyses__lien" href={analyse.statut === 'terminee'
+                ? `#/atelier/${analyse.id}`
+                : `#/analyses/${analyse.id}`}># {analyse.id}</a>
               <Badge texte={disposition(analyse.statut).libelle} variante={disposition(analyse.statut).variante} />
               {#if analyse.categorie}
                 <span class="analyses__categorie">{analyse.categorie}</span>

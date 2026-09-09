@@ -55,6 +55,10 @@ class Projet(BaseModel):
     current_chapter_num: int | None
     last_chapter_title: str | None
     created_at: str
+    # FA2 — bouton « Ouvrir » de l'accueil : id de la dernière analyse
+    # TERMINÉE du projet (l'atelier E5 n'est accessible que pour une analyse
+    # terminee) ; None → l'ouverture mène à la soumission.
+    derniere_analyse_id: int | None = None
 
 
 class ListeProjets(BaseModel):
@@ -182,8 +186,11 @@ def _serialiser_suivi(analyse: dict, resultat: ResultatAnalyse | None) -> Analys
     )
 
 
-def _serialiser_projet(ligne: dict, actif_id: str | None) -> Projet:
-    """Sérialise une ligne `projets` en réponse API (drapeau `actif` calculé)."""
+def _serialiser_projet(
+    ligne: dict, actif_id: str | None, derniere_analyse_id: int | None = None
+) -> Projet:
+    """Sérialise une ligne `projets` en réponse API (drapeau `actif` calculé,
+    dernière analyse terminée pour le bouton « Ouvrir » — FA2)."""
     return Projet(
         projet_id=ligne["projet_id"],
         titre=ligne["titre"],
@@ -192,17 +199,29 @@ def _serialiser_projet(ligne: dict, actif_id: str | None) -> Projet:
         current_chapter_num=ligne["current_chapter_num"],
         last_chapter_title=ligne["last_chapter_title"],
         created_at=ligne["created_at"],
+        derniere_analyse_id=derniere_analyse_id,
     )
 
 
 @router.get("/projets", response_model=ListeProjets)
 async def lister_projets() -> ListeProjets:
-    """Liste des projets (tri : plus récents d'abord), avec drapeau `actif`."""
+    """Liste des projets (tri : plus récents d'abord), avec drapeau `actif` et
+    l'id de la dernière analyse TERMINÉE de chacun (bouton « Ouvrir » — FA2)."""
     actif_id = await _projet_actif_id()
     lignes = await db.interroger(
         "SELECT * FROM projets ORDER BY created_at DESC, projet_id DESC"
     )
-    return ListeProjets(projets=[_serialiser_projet(l, actif_id) for l in lignes])
+    dernieres = await db.interroger(
+        "SELECT projet_id, MAX(id) AS derniere FROM analyses "
+        "WHERE statut = 'terminee' GROUP BY projet_id"
+    )
+    par_projet = {l["projet_id"]: l["derniere"] for l in dernieres}
+    return ListeProjets(
+        projets=[
+            _serialiser_projet(l, actif_id, par_projet.get(l["projet_id"]))
+            for l in lignes
+        ]
+    )
 
 
 @router.post("/projets", response_model=Projet, status_code=201)

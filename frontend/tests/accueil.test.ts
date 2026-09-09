@@ -34,6 +34,7 @@ function projet(surcharge: Partial<Projet> = {}): Projet {
     current_chapter_num: null,
     last_chapter_title: null,
     created_at: '2026-09-09 12:00:00',
+    derniere_analyse_id: null,
     ...surcharge,
   };
 }
@@ -217,7 +218,7 @@ describe('Accueil & projets (F1)', () => {
     expect(boutonSupprimer?.disabled).toBe(true);
   });
 
-  it('affiche les analyses récentes cliquables', async () => {
+  it('affiche les analyses récentes cliquables (FA2 : atelier si terminée)', async () => {
     reparerFetch([projet({ actif: true })], [
       { id: 7, statut: 'terminee', categorie: 'chapitre', extrait: 'Il faisait beau', cree_a: '2026-09-09 10:00:00' },
     ]);
@@ -226,6 +227,37 @@ describe('Accueil & projets (F1)', () => {
 
     expect(conteneur.textContent).toContain('terminée');
     const lien = conteneur.querySelector<HTMLAnchorElement>('.analyses__lien');
-    expect(lien?.getAttribute('href')).toBe('/analyses/7');
+    // FA2 : une analyse terminée ouvre l'ATELIER E5 (routeur hash, jamais de
+    // navigation hors SPA) ; un statut non final mènerait au suivi E4.
+    expect(lien?.getAttribute('href')).toBe('#/atelier/7');
+  });
+
+  it("le bouton Ouvrir d'un projet avec analyse terminée mène à l'atelier (FA2)", async () => {
+    reparerFetch(
+      [projet({ actif: true, derniere_analyse_id: 12 })],
+      [],
+    );
+    rendre(Accueil);
+    await attendre();
+
+    const boutonOuvrir = bouton('Ouvrir');
+    expect(boutonOuvrir).toBeDefined();
+    boutonOuvrir!.click();
+    await attendre();
+    expect(window.location.hash).toBe('#/atelier/12');
+  });
+
+  it("le bouton Ouvrir d'un projet vierge mène à la soumission (FA2)", async () => {
+    reparerFetch(
+      [projet({ actif: true, derniere_analyse_id: null })],
+      [],
+    );
+    rendre(Accueil);
+    await attendre();
+
+    const boutonOuvrir = bouton('Ouvrir');
+    boutonOuvrir!.click();
+    await attendre();
+    expect(window.location.hash).toBe('#/soumission');
   });
 });
