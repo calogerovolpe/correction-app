@@ -274,6 +274,62 @@ def test_editer_puis_reevaluer_sans_perte_de_texte(client, monkeypatch):
     )
 
 
+def test_fa3_charger_corrections_supporte_le_format_liste_legacy(client, monkeypatch):
+    """RÉGRESSION (bug constaté en production) : les analyses créées AVANT le
+    jalon R1-b stockaient `corrections.data_json` en LISTE PLATE. Le dictionnaire
+    par phase étant la norme depuis R1-b, un chargement naïf (`par_phase.values()`)
+    levait `AttributeError: 'list' object has no attribute 'values'` → Erreur 500
+    à l'ouverture de l'atelier. Le service doit accepter LES DEUX formats."""
+    import asyncio
+    import json as module_json
+
+    from app import db
+
+    _modeles_distincts(monkeypatch)
+    mock = MockLLM(reponses={"m-forme": REPONSE_FORME})
+    monkeypatch.setattr(service_analyse, "_client_llm", lambda: mock)
+    client.post("/api/v1/projets", json={"titre": "Mon roman"})
+    soumission = _soumettre(
+        client, {"texte": TEXTE, "categorie": "chapitre", "numero_chapitre": 1}
+    )
+    identifiant = soumission["id"]
+    assert _attendre(client, identifiant)["statut"] == "terminee"
+
+    # Réécrit `corrections.data_json` au format LEGACY (liste plate, J1–R1-a)
+    par_phase = module_json.loads(
+        asyncio.run(db.interroger(
+            "SELECT data_json FROM corrections WHERE analyse_id = ?", (identifiant,)
+        ))[0]["data_json"]
+    )
+    asyncio.run(db.executer(
+        "UPDATE corrections SET data_json = ? WHERE analyse_id = ?",
+        (module_json.dumps([c for l in par_phase.values() for c in l]), identifiant),
+    ))
+
+    reponse = client.get(f"/api/v1/analyses/{identifiant}/atelier")
+    assert reponse.status_code == 200  # 500 AVANT le correctif FA3
+    donnees = reponse.json()
+    assert donnees["nb_corrections"] == 1
+    assert donnees["document"]["corrections_barre"][0]["id"] == "c-0001"
+
+
+def test_fa3_charger_corrections_supporte_le_format_dict_par_phase(client, monkeypatch):
+    """Régression du format ACTUEL (R1-b) : le dict par phase continue d'être
+    chargé normalement après l'introduction de la rétrocompatibilité."""
+    _modeles_distincts(monkeypatch)
+    mock = MockLLM(reponses={"m-forme": REPONSE_FORME})
+    monkeypatch.setattr(service_analyse, "_client_llm", lambda: mock)
+    client.post("/api/v1/projets", json={"titre": "Mon roman"})
+    soumission = _soumettre(
+        client, {"texte": TEXTE, "categorie": "chapitre", "numero_chapitre": 1}
+    )
+    identifiant = soumission["id"]
+    assert _attendre(client, identifiant)["statut"] == "terminee"
+    reponse = client.get(f"/api/v1/analyses/{identifiant}/atelier")
+    assert reponse.status_code == 200
+    assert reponse.json()["nb_corrections"] == 1
+
+
 def test_appliquer_embellissement_aucun_etat_partiel(client, monkeypatch):
     """Embellissement : patch PUIS réévaluation. Si la réévaluation échoue
     (panne MockLLM), RIEN n'est appliqué — zéro état partiel."""

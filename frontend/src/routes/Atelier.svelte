@@ -77,11 +77,22 @@
   onMount(() => {
     document.addEventListener('mousedown', fermerSiHorsDe);
     document.addEventListener('keydown', appuiTouche);
-    void charger();
     return () => {
       document.removeEventListener('mousedown', fermerSiHorsDe);
       document.removeEventListener('keydown', appuiTouche);
     };
+  });
+
+  // FA3 — réactivité : le chargement est piloté par le CHANGEMENT d'analyseId
+  // (navigation directe entre analyses, retour sur une autre analyse). Fin de
+  // l'atelier figé sur « Chargement… » quand l'identifiant change sous les pieds
+  // du composant : chaque nouvelle analyse relance systématiquement le chargement.
+  let analyseChargee: number | null = null;
+  $effect(() => {
+    if (analyseId !== analyseChargee) {
+      analyseChargee = analyseId;
+      void charger();
+    }
   });
 
   onDestroy(() => {
@@ -495,6 +506,20 @@
 
   {#if chargement && !etat}
     <p class="chargement" role="status">Chargement de l'atelier…</p>
+  {:else if !etat}
+    <!-- FA3 — plus d'impasse : en cas d'échec de chargement (erreur 500, réseau…),
+         l'auteur dispose d'un bouton « Réessayer » et d'un retour à l'accueil. -->
+    <div class="atelier__echec-chargement">
+      <Bandeau variante="erreur">
+        {erreur || "Impossible de charger l'atelier — état introuvable."}
+      </Bandeau>
+      <div class="atelier__echec-actions">
+        <Bouton variante="secondaire" onclick={() => void charger()}>
+          Réessayer de charger l'atelier
+        </Bouton>
+        <a class="lien-retour" href="#/">Revenir à l'accueil</a>
+      </div>
+    </div>
   {:else if etat}
     <div class="atelier__controles">
       <OngletsPhase
@@ -604,6 +629,24 @@
   .chargement {
     color: var(--encre-douce);
     font-style: italic;
+  }
+  .atelier__echec-chargement {
+    display: grid;
+    gap: 1rem;
+    justify-items: start;
+  }
+  .atelier__echec-actions {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+  }
+  .atelier__echec-actions .lien-retour {
+    color: var(--accent-fonce);
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .atelier__echec-actions .lien-retour:hover {
+    text-decoration: underline;
   }
   .info-selection {
     margin: 0 0 0.5rem;

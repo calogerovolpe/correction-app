@@ -78,7 +78,9 @@ def preparer_document(
         actives = [e for e in entrees_pid if e["etat"] == "active"]
         if not actives and p.id not in modifies_set:
             nb_masques += 1
-            continue
+        # FA3 — document COMPLET : TOUS les paragraphes sont exposés (les
+        # paragraphes propres ne sont plus retirés de la réponse) ; le toggle
+        # client « masquer » filtre en mémoire sur cette liste complète.
         affiches.append({
             "id": p.id,
             "segments": _segments(p, actives, choix, groupes),
@@ -121,8 +123,16 @@ def _couvrants(marques: list[dict], a: int, b: int) -> list[dict]:
 
 
 def _segments(p: ParagrapheRiche, actives: list[dict], choix: dict, groupes: dict) -> list[dict]:
+    """Segments du paragraphe — FA3 : segmentation ATOMIQUE aux bornes.
+
+    Les points de découpe fusionnent les bornes du paragraphe, de chaque Forme
+    appliquée et de chaque marque (Style/Technique/Forme refusée) : une
+    annotation ne déborde JAMAIS sur le texte voisin d'un même run Word (fin du
+    sur-marquage au run entier). Les classes se CUMULENT sur un segment couvert
+    par plusieurs marques ; un bloc Forme n'est émis qu'une seule fois (les
+    intervalles internes à sa zone sont absorbés par le bloc del/ins entier)."""
     texte = extraire_texte_brut_paragraphe(p)
-    formes = sorted(
+    formes_actives = sorted(
         (
             e for e in actives
             if e["correction"].phase == "forme"
@@ -135,16 +145,31 @@ def _segments(p: ParagrapheRiche, actives: list[dict], choix: dict, groupes: dic
         if e["correction"].phase != "forme"
         or choix.get(e["correction"].id) == "original"
     ]
+    points = {0, len(texte)}
+    for entree in formes_actives + marques:
+        points.add(max(0, entree["correction"].debut))
+        points.add(min(len(texte), entree["correction"].fin))
+    bornes = sorted(points)
     segments: list[dict] = []
-    position = 0
-    for entree in formes:
-        c = entree["correction"]
-        if c.debut > position:
-            segments.extend(_segments_texte(p, position, c.debut, marques, groupes))
-        segments.append(_segment_forme(entree, p, c, marques, groupes))
-        position = c.fin
-    if position < len(texte):
-        segments.extend(_segments_texte(p, position, len(texte), marques, groupes))
+    forme_emise: str | None = None
+    for a, b in zip(bornes, bornes[1:]):
+        if a >= b:
+            continue
+        forme = next(
+            (
+                e for e in formes_actives
+                if e["correction"].debut <= a and b <= e["correction"].fin
+            ),
+            None,
+        )
+        if forme is not None:
+            if forme_emise != forme["correction"].id:
+                segments.append(
+                    _segment_forme(forme, p, forme["correction"], marques, groupes)
+                )
+                forme_emise = forme["correction"].id
+            continue
+        segments.extend(_segments_texte(p, a, b, marques, groupes))
     return segments
 
 

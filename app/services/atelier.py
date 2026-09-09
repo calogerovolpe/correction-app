@@ -72,17 +72,25 @@ def onglet_valide(onglet: str | None) -> str:
 
 
 async def charger_corrections(identifiant: int) -> list[Correction]:
-    """Lit `corrections.data_json` — dict PAR PHASE (R1-b) — et l'aplatit en
-    `list[Correction]` (ordre = phases de l'écriture, ordre d'émission)."""
+    """Lit `corrections.data_json` et l'aplatit en `list[Correction]`.
+
+    Deux formats acceptés (FA3 — rétrocompatibilité constatée en production) :
+    - dict PAR PHASE (R1-b, norme actuelle) : `{"forme": [...], "style": [...],
+      "technique": [...]}` ;
+    - liste PLATE (analyses d'avant R1-b encore en base) : `[{...}, {...}]` —
+      un chargement naïf levait `AttributeError: 'list' object has no attribute
+      'values'` et une Erreur 500 à l'ouverture de l'atelier."""
     lignes = await db.interroger(
         "SELECT data_json FROM corrections WHERE analyse_id = ?", (identifiant,)
     )
     if not lignes:
         return []
-    par_phase = json.loads(lignes[0]["data_json"])
+    donnees = json.loads(lignes[0]["data_json"])
+    if isinstance(donnees, list):
+        return [Correction.model_validate(d) for d in donnees]
     return [
         Correction.model_validate(d)
-        for corrections in par_phase.values()
+        for corrections in donnees.values()
         for d in corrections
     ]
 

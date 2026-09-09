@@ -148,5 +148,38 @@ describe('Atelier E5 (F3)', () => {
     await attendre();
 
     expect(conteneur.textContent).toContain('Analyse introuvable.');
+    // FA3 — plus d'impasse : le bloc d'échec de chargement propose Réessayer
+    // et un retour à l'accueil (fin de l'attente infinie « Chargement… »).
+    expect(conteneur.textContent).toContain("Réessayer de charger l'atelier");
+    expect(conteneur.textContent).toContain("Revenir à l'accueil");
+  });
+
+  it('le bouton Réessayer relance le chargement après un échec (FA3)', async () => {
+    let enPanne = true;
+    const fetch = reparerFetch(() =>
+      enPanne
+        ? reponseJson({ detail: 'Erreur serveur (500).' }, 500)
+        : reponseJson(etatAtelier('tout')),
+    );
+    rendre(Atelier, { analyseId: 7 });
+    await attendre();
+    await attendre();
+
+    expect(conteneur.textContent).toContain('Erreur serveur (500).');
+    const nbAppelsEnPanne = fetch.appels().length;
+
+    enPanne = false;
+    const boutonReessayer = Array.from(conteneur.querySelectorAll('button')).find(
+      (b) => b.textContent?.includes('Réessayer'),
+    );
+    expect(boutonReessayer).toBeTruthy();
+    boutonReessayer?.click();
+    await attendre();
+    await attendre();
+
+    expect(fetch.appels().length).toBeGreaterThan(nbAppelsEnPanne);
+    // l'atelier s'affiche enfin : couches, onglets, barre latérale
+    expect(conteneur.textContent).toContain('2 correction(s) active(s)');
+    expect(conteneur.querySelector('.ins--forme')).toBeTruthy();
   });
 });
