@@ -22,7 +22,7 @@
 | Base de données | SQLite WAL, `busy_timeout=15000`, accès `asyncio.to_thread`, verrou `threading.Lock` (`app/db.py`) |
 | LLM | **Mistral API uniquement**, `mistral-small-latest` ; client maison compatible OpenAI (`app/llm/client.py`) |
 | Conteneurisation | Dockerfile + docker-compose.yml (parité dev/prod) |
-| Tests | pytest — **170 tests** (dont **30 tests d'intégration TestClient/MockLLM sur `/api/v1/`** : 17 F2 + 13 atelier/projets F3/FA1/FA2) + **47 Vitest** (frontend Svelte) + E2E réel Mistral (`scripts/e2e_j25.py`, isolé `data_e2e/`) |
+| Tests | pytest — **176 tests** (dont **32 tests d'intégration TestClient/MockLLM sur `/api/v1/`** : 17 F2 + 15 atelier/projets F3/FA1/FA2/FA3) + **48 Vitest** (frontend Svelte) + E2E réel Mistral (`scripts/e2e_j25.py`, isolé `data_e2e/`) |
 
 ## Setup de développement
 

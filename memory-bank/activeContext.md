@@ -1,6 +1,6 @@
 # Contexte actif — où nous en sommes MAINTENANT
 
-> Fichier le plus souvent mis à jour. Dernière mise à jour : 2026-09-09 (jalon FA2 LIVRÉ — prochain jalon = FA3).
+> Fichier le plus souvent mis à jour. Dernière mise à jour : 2026-09-09 (jalon FA3 LIVRÉ — prochain jalon = FA4).
 
 ## Focus du moment
 
@@ -15,25 +15,24 @@ Ne JAMAIS enchaîner deux jalons dans la même session sans feu vert explicite d
   - Les jalons F0 à F3 sont LIVRÉS — F0 ✅ (`4cbb55c`) ; F1 ✅ (`cb6abc1`) ; F2 ✅ (`6cdfb22`) ; F3 ✅ (`023534a`).
   - **FA1 — Intégrité du ré-ancrage et non-perte de texte est LIVRÉ** ✅ (`76a0057`) — 162 pytest + 45 Vitest verts, `svelte-check` 0 erreur, **E2E réel Mistral rejoué OK** (`data_e2e/` réinitialisé : chapitre validé corrigé, chaîne `ok`, 1 backup).
   - **FA2 — Identité documentaire, cycle de vie, réévaluation parallèle + bouton « Ouvrir » est LIVRÉ** ✅ (`7405310`) — 170 pytest + 47 Vitest verts, `svelte-check` 0 erreur, **E2E réel Mistral rejoué OK** ; **purge des analyses de test #7 à #16 de `data/database.sqlite3`** (backup de sécurité `data/database.avant-purge-fa2.sqlite3` ; analyses 1–6 conservées).
+  - **FA3 — Segmentation atomique aux bornes, document complet + atelier résilient est LIVRÉ** ✅ (`c8da894`) — 176 pytest + 48 Vitest verts, `svelte-check` 0 erreur, **E2E réel Mistral rejoué OK** ; corrige AUSSI les deux incidents rapportés par l'auteur (« Chargement de l'atelier » bloqué + Erreur serveur 500 sur les analyses anciennes).
   - **F4 (Finitions UX) et F5 (Nettoyage & bascule) restent en pause** jusqu'à l'achèvement de la série corrective FA1→FA7.
-  - **Prochain jalon immédiat = FA3 — Segmentation atomique aux bornes et document complet.**
+  - **Prochain jalon immédiat = FA4 — Rendu Svelte fidèle, styles réels, formatage Word et robustesse UI.**
 
-## Changements récents (FA2 — Identité documentaire, cycle de vie, réévaluation parallèle, bouton « Ouvrir »)
+## Changements récents (FA3 — Segmentation atomique, document complet, atelier résilient)
 
-- **Identité documentaire** (`atelier.py`) : `_prochain_numero_reevaluation(etat)` — le compteur des ids de réévaluation est CONTINU à l'échelle du document (inspecte tous les `c-XXXX`/`c-rXXXX`) : plus aucune collision `c-r0001` entre deux réévaluations de paragraphes distincts, aucun id recyclé (pas de refus fantôme). 2 tests existants adaptés (`c-r0001` → `c-r0002` — comportement VOULU).
-- **Cycle de vie** (`reconstruction.py`) : `remplacer_corrections_paragraphe` purge `etat["choix"]` des corrections retirées (plus de refus fantôme) ; l'obsolescence après modification manuelle est UNIFORME pour toutes les phases (Forme, Style, Technique intersectées).
-- **Conflits dynamiques** (`reconstruction.py`) : `_resoudre_chevauchements_formes` est idempotent et réexécuté à chaque choix (`basculer_choix`) — une Forme REFUSÉE ne bloque plus personne ; une concurrente obsolète « pour chevauchement » est RÉACTIVÉE quand sa bloquante disparaît (les obsolescences « Fragment modifié manuellement » restent persistantes).
-- **Réévaluation parallèle** (`atelier.py`) : `asyncio.gather` sur les phases actives (comme le pipeline d'analyse) — même nombre d'appels LLM, ids attribués dans l'ordre des phases (déterministe).
-- **Bouton « Ouvrir » (demande de l'auteur)** : `Projet.derniere_analyse_id` (dernière analyse TERMINÉE, `app/routes/api.py` + `types.ts`) ; `Accueil.svelte` : bouton primaire « Ouvrir » par manuscrit → `#/atelier/{id}` (ou `#/soumission` si projet vierge), activation au passage ; les analyses récentes pointent vers `#/atelier/{id}` si terminées, `#/analyses/{id}` sinon (le lien hors-routeur-hash de F1 est corrigé).
-- **Purge des données de test (demande de l'auteur)** : analyses #7 à #16 (et leurs `documents`/`corrections`) supprimées de `data/database.sqlite3` — `PRAGMA integrity_check = ok`, analyses 1–6 conservées ; copie de sécurité avant purge : `data/database.avant-purge-fa2.sqlite3`.
-- **Tests** : +8 pytest (purge choix, obsolescence uniforme, réactivation dynamique ×2, ids continus, pas de recyclage, parallélisme par mesure de durée, `derniere_analyse_id` API) ; 2 tests existants adaptés au compteur continu ; +2 Vitest (bouton Ouvrir atelier / soumission) ; 1 test du lien analyses récentes adapté. **170 pytest + 47 Vitest verts**, `svelte-check` 0 erreur.
-- **Spec** : §11 **décision 42** — même commit.
+- **Segmentation ATOMIQUE aux bornes** (`rendu.py::_segments`) : les points de découpe fusionnent les bornes du paragraphe, de chaque Forme appliquée et de chaque marque (Style/Technique/refusée) — **fin du sur-marquage au run Word entier** : une Style sur « beta » ne colore plus tout le run « Alpha beta gamma. » ; les classes se CUMULENT sur un segment multi-marqué (un groupe de clic parmi les couvrants) ; un bloc Forme n'est émis qu'une fois (les intervalles internes à sa zone sont absorbés par le bloc del/ins entier — aucune duplication de texte).
+- **Document COMPLET** (`rendu.py::preparer_document`) : TOUS les paragraphes sont exposés dans `paragraphes` (fin du filtrage prématuré backend qui rendait le toggle « masquer » inopérant — décision 35 appliquée) ; `nb_masques` conservé ; le frontend filtrait déjà en mémoire (`paragraphesAffiches`) — il reçoit enfin de quoi réafficher.
+- **Rétrocompatibilité `corrections.data_json`** (`atelier.py::charger_corrections`) : accepte le dict par phase (R1-b) ET la liste plate legacy (analyses d'avant R1-b encore en base) — **corrige l'Erreur serveur 500** constatée à l'ouverture des analyses anciennes (`AttributeError: 'list' object has no attribute 'values'`).
+- **Atelier résilient** (`Atelier.svelte`) : le chargement est piloté par un `$effect` sur `analyseId` (toute variation relance le chargement — fin de l'atelier figé sur « Chargement de l'atelier… » lors d'une navigation directe entre analyses) ; en cas d'échec de chargement, bloc explicite avec bandeau d'erreur + **« Réessayer de charger l'atelier »** + « Revenir à l'accueil » — plus d'impasse.
+- **Tests** : +6 pytest (liste legacy 200 au lieu de 500, dict actuel régressé, bornes exactes Style, marques disjointes, multi-marquage cumulé, document complet + nb_masques) ; 2 anciens tests de rendu adaptés au document complet (décision 35) et 2 au marquage atomique (fin du sur-marquage run entier) ; +1 Vitest (Réessayer relance le chargement), 1 adapté (bloc d'échec). **176 pytest + 48 Vitest verts**, `svelte-check` 0 erreur.
+- **Spec** : §11 **décision 43** — même commit.
 - **E2E réel Mistral rejoué OK** (`data_e2e/` réinitialisé) : analyse 3 phases → nouvelle version → validation (chapitre corrigé, chaîne `ok`, 1 backup).
 
 ## État global
 
-- Jalons terminés : **J2.5 — Atelier v2**, **A — Fiabilité du cœur**, **R1-a — Onglets hybrides**, **R1-b — Stockage par phase**, **R2 — Base immuable + annotations**, **F0 — Socle**, **F1 — Accueil & projets E1**, **F2 — Soumission E3 + suivi E4**, **F3 — Atelier E5**, **FA1 — Intégrité du ré-ancrage**, **FA2 — Identité documentaire + « Ouvrir »**.
-- Tests : **170/170 verts** (`pytest`) + **47 tests Vitest** (frontend Svelte) ; `svelte-check` 0 erreur / 0 warning.
+- Jalons terminés : **J2.5 — Atelier v2**, **A — Fiabilité du cœur**, **R1-a — Onglets hybrides**, **R1-b — Stockage par phase**, **R2 — Base immuable + annotations**, **F0 — Socle**, **F1 — Accueil & projets E1**, **F2 — Soumission E3 + suivi E4**, **F3 — Atelier E5**, **FA1 — Intégrité du ré-ancrage**, **FA2 — Identité documentaire + « Ouvrir »**, **FA3 — Segmentation atomique + atelier résilient**.
+- Tests : **176/176 verts** (`pytest`) + **48 tests Vitest** (frontend Svelte) ; `svelte-check` 0 erreur / 0 warning.
 - **E2E réel Mistral OK** de bout en bout (`scripts/e2e_j25.py`, environnement isolé `data_e2e/`) : **soumission + suivi via `/api/v1/` (F2)**, puis analyse 3 phases → nouvelle version (texte courant repris) → validation (chapitre officiel corrigé, hash, chaîne N+1, backup natif créé). — **rejoué au jalon F2**.
 - Application validée de bout en bout avec Mistral Small.
 
@@ -200,8 +199,8 @@ Ne JAMAIS enchaîner deux jalons dans la même session sans feu vert explicite d
 1. **Série FA1→FA7 — Fiabilisation post-audit de l'Atelier E5 (ROADMAP ACTIVE)** :
    - **FA1 — Intégrité du ré-ancrage et non-perte de texte (reconstruction)** : ✅ **LIVRÉ** (`76a0057`) ;
    - **FA2 — Identité documentaire, cycle de vie et réévaluation parallèle** : ✅ **LIVRÉ** (+ bouton « Ouvrir » des projets et purge des analyses de test #7–#16, demandes de l'auteur) ;
-   - **FA3 — Segmentation atomique aux bornes et document complet** : ⬜ **PROCHAIN JALON IMMÉDIAT** (P0, bloquant) ;
-   - **FA4 — Rendu Svelte fidèle, styles réels, formatage Word et robustesse UI** : ⬜ (P0/P1) ;
+   - **FA3 — Segmentation atomique aux bornes et document complet** : ✅ **LIVRÉ** (+ correctifs des incidents « Chargement de l'atelier » bloqué et Erreur 500 sur analyses anciennes, rapportés par l'auteur) ;
+   - **FA4 — Rendu Svelte fidèle, styles réels, formatage Word et robustesse UI** : ⬜ **PROCHAIN JALON IMMÉDIAT** (P0/P1) ;
    - **FA5 — Robustesse LLM : Custom Structured Outputs, invariants et prompts** : ⬜ (P1) ;
    - **FA6 — Cohérence transactionnelle, concurrence et alignement d'API** : ⬜ (P1/P3) ;
    - **FA7 — Restitution pédagogique : diff, sidebar sticky, popovers et clavier** : ⬜ (P2).

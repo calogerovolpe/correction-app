@@ -29,7 +29,7 @@ La série **FA1→FA7** corrige ces failles dans un ordre strict de dépendance 
 |---|---|---|---|---|---|---|
 | 1 | **FA1** | Intégrité du ré-ancrage et non-perte de texte (reconstruction) | P0 (Bloquant) | Élevé | ✅ **Livré** | *(voir `progress.md`)* |
 | 2 | **FA2** | Identité documentaire, cycle de vie et réévaluation parallèle | P0/P1 (Majeur) | Moyen | ✅ **Livré** (+ bouton « Ouvrir » et purge analyses #7–#16, demandes de l'auteur) | *(voir `progress.md`)* |
-| 3 | **FA3** | Segmentation atomique aux bornes et document complet (rendu) | P0 (Bloquant) | Moyen | ⬜ À faire | — |
+| 3 | **FA3** | Segmentation atomique aux bornes et document complet (rendu) | P0 (Bloquant) | Moyen | ✅ **Livré** (+ correctifs « Chargement atelier » bloqué et Erreur 500 analyses anciennes, incidents rapportés par l'auteur) | *(voir `progress.md`)* |
 | 4 | **FA4** | Rendu Svelte fidèle, styles réels, formatage Word et robustesse UI | P0/P1 (Majeur) | Moyen | ⬜ À faire | — |
 | 5 | **FA5** | Robustesse LLM : Custom Structured Outputs, invariants et prompts | P1 (Majeur) | Moyen | ⬜ À faire | — |
 | 6 | **FA6** | Cohérence transactionnelle, concurrence et alignement d'API | P1/P3 (Moyen) | Moyen | ⬜ À faire | — |
