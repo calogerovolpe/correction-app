@@ -28,6 +28,15 @@ Ajouter une modification manuelle rend obsolètes les Forme actives
 intersectées ; une modification qui recouvrirait un patch manuel existant est
 REFUSÉE (`ZoneDejaModifiee`) — réévaluez le paragraphe ou choisissez un autre
 passage.
+
+Jalon FA1 (audit post-F3) — intégrité du ré-ancrage :
+- l'édition directe d'un paragraphe complet REBASE le paragraphe : son texte
+  saisi devient la nouvelle base de référence (fin du patch plein-paragraphe
+  qui remplaçait le paragraphe réécrit par le seul mot corrigé à la
+  réévaluation suivante) ;
+- dans `_convertir_vers_base`, un remplacement (patch manuel) n'est ancrable
+  que couvert EXACTEMENT : une correction qui en coupe une sous-plage est
+  écartée (`ZoneDejaModifiee`), jamais substituée à la zone mère.
 """
 
 import json
@@ -177,13 +186,27 @@ def _projeter_intervalle(fragments: list[dict], a: int, b: int) -> tuple[int, in
 
 
 def _convertir_vers_base(
-    fragments: list[dict], debut_courant: int, fin_courant: int
+    fragments: list[dict],
+    debut_courant: int,
+    fin_courant: int,
+    strict: bool = False,
 ) -> tuple[int, int]:
     """Retourne la zone de BASE couverte par un intervalle du texte COURANT
     [debut_courant, fin_courant). Idéale quand la sélection ne fait que
     traverser des fragments de base et/ou des remplacements ENTIERS ; toute
     sélection qui coupe un remplacement (zone déjà modifiée à la main) est
-    refusée — impossible à ré-ancrer proprement sur la base."""
+    refusée — impossible à ré-ancrer proprement sur la base.
+
+    Deux usages (FA1) :
+    - `strict=False` (sélection UTILISATEUR, `appliquer_modification`) : une
+      sélection CONTENUE dans un remplacement est ancrée sur la zone de base
+      ENTIÈRE de ce remplacement (l'auteur sélectionne dans le texte affiché ;
+      les Forme intersectées deviennent obsolètes, donc aucun écrasement) ;
+    - `strict=True` (ré-ancrage des CORRECTIONS de réévaluation) : un
+      remplacement n'est ancrable que couvert EXACTEMENT — jamais en
+      sous-plage. Ancrer une sous-plage sur [frag["debut"], frag["fin"])
+      remplacerait TOUTE la zone mère par le fragment corrigé (perte de texte
+      constatée à l'audit post-F3)."""
     if fin_courant <= debut_courant:
         return debut_courant, debut_courant
     base_debut: int | None = None
@@ -196,12 +219,18 @@ def _convertir_vers_base(
             d = frag["debut"] + max(0, debut_courant - pd)
             f = frag["fin"] - max(0, pf - fin_courant)
         else:
-            if debut_courant < pd or pf < fin_courant:
-                raise ZoneDejaModifiee(
-                    "La sélection coupe une zone déjà modifiée par un "
-                    "embellissement/une alternative — réévaluez le paragraphe "
-                    "ou choisissez un autre passage."
-                )
+            if debut_courant != pd or fin_courant != pf:
+                if strict:
+                    raise ZoneDejaModifiee(
+                        "La correction coupe une zone déjà modifiée — elle est "
+                        "écartée pour ne jamais remplacer la zone entière."
+                    )
+                if debut_courant < pd or pf < fin_courant:
+                    raise ZoneDejaModifiee(
+                        "La sélection coupe une zone déjà modifiée par un "
+                        "embellissement/une alternative — réévaluez le paragraphe "
+                        "ou choisissez un autre passage."
+                    )
             d, f = frag["debut"], frag["fin"]
         if base_debut is None:
             base_debut, base_fin = d, f
@@ -365,12 +394,17 @@ def appliquer_modification(
 
 
 def remplacer_texte_paragraphe(etat: dict, paragraphe_id: str, nouveau_texte: str) -> bool:
-    """Édition DIRECTE (jalon F3, décision 38) : remplace l'INTÉGRALITÉ du texte
-    courant du paragraphe par `nouveau_texte` — un PATCH unique couvrant toute la
-    base du paragraphe (jamais de splice + remappage des offsets). Tous les
-    patches et corrections antérieurs du paragraphe sont retirés : ils se
-    rapportaient à un texte qui n'existe plus (l'auteur a réécrit le paragraphe).
-    Le paragraphe est marqué modifié à la main. Retourne False si rien ne change."""
+    """Édition DIRECTE (jalon F3, décision 38 ; modèle FA1) : remplace
+    l'INTÉGRALITÉ du texte courant du paragraphe par `nouveau_texte`.
+
+    Modèle de REBASE (FA1, audit post-F3) : le paragraphe édité devient la
+    NOUVELLE BASE de référence du paragraphe (son runs unique porte le texte
+    saisi, formatage du premier run conservé). Fin du « patch plein-paragraphe »
+    qui, à la réévaluation suivante, faisait ré-ancrer une correction sur toute
+    la zone mère et remplaçait le paragraphe réécrit par le seul mot corrigé
+    (perte de texte). Tous les patches et corrections antérieurs du paragraphe
+    sont retirés : ils se rapportaient à un texte qui n'existe plus. Le
+    paragraphe est marqué modifié à la main. Retourne False si rien ne change."""
     if nouveau_texte == texte_paragraphe(etat, paragraphe_id):
         return False
     paragraphe = _paragraphe(etat, paragraphe_id)
@@ -388,12 +422,19 @@ def remplacer_texte_paragraphe(etat: dict, paragraphe_id: str, nouveau_texte: st
         e for e in etat["corrections"]
         if e["correction"].paragraphe_id != paragraphe_id
     ]
-    etat.setdefault("patches", []).append({
-        "paragraphe_id": paragraphe_id,
-        "debut": 0,
-        "fin": len(extraire_texte_brut_paragraphe(paragraphe)),
-        "texte": nouveau_texte,
-    })
+    # FA1 — REBASE : le paragraphe édité devient la NOUVELLE BASE de référence.
+    # Plus aucun patch plein-paragraphe : les corrections futures (réévaluation)
+    # s'ancrent naturellement sur le texte édité, sans jamais écraser celui-ci.
+    # Le formatage du premier run est conservé (règle J2.5 des remplacements).
+    premier = paragraphe.runs[0] if paragraphe.runs else None
+    paragraphe.runs = [
+        RunFormat(
+            texte=nouveau_texte,
+            gras=premier.gras if premier else False,
+            italique=premier.italique if premier else False,
+            souligne=premier.souligne if premier else False,
+        )
+    ]
     if paragraphe_id not in etat.setdefault("modifies", []):
         etat["modifies"].append(paragraphe_id)
     return True
@@ -457,8 +498,11 @@ def remplacer_corrections_paragraphe(
     ancrees: list[Correction] = []
     for c in nouvelles:
         try:
+            # FA1 — strict=True : une correction de réévaluation qui tombe
+            # à l'intérieur d'un remplacement (patch manuel ou Forme figée)
+            # est ÉCARTÉE — elle ne remplace jamais la zone mère entière.
             base_debut, base_fin = _convertir_vers_base(
-                fragments, c.debut, c.fin
+                fragments, c.debut, c.fin, strict=True
             )
         except ZoneDejaModifiee:
             JOURNAL.warning(

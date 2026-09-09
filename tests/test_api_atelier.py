@@ -231,6 +231,49 @@ def test_appliquer_alternative_remplace_le_fragment(client, monkeypatch):
     assert "vers la ville" in texte_affiche
 
 
+def test_editer_puis_reevaluer_sans_perte_de_texte(client, monkeypatch):
+    """RÉGRESSION FA1 (audit post-F3), workflow complet via /api/v1 : édition
+    directe du paragraphe PUIS réévaluation — le paragraphe réécrit n'est
+    JAMAIS remplacé par la seule correction réévaluée (rebase + ancrage sûr)."""
+    identifiant = _chapitre_termine(client, monkeypatch)
+    nouveau = "Texte entièrement réécrit par l'auteur pour son chapitre."
+    reponse = client.post(
+        f"/api/v1/analyses/{identifiant}/editer",
+        json={"paragraphe_id": "p-1", "texte": nouveau},
+    )
+    assert reponse.status_code == 200
+
+    # La réévaluation retourne une correction Forme sur UN SEUL mot du texte réécrit
+    mock = MockLLM(
+        reponses={
+            "m-forme": json.dumps(
+                {
+                    "corrections": [
+                        {
+                            "id": "c-r0001", "phase": "forme", "type": "amelioration",
+                            "paragraphe_id": "p-1", "debut": 6, "fin": 17,
+                            "contexte_avant": "Texte ", "original": "entièrement",
+                            "correction": "totalement", "explication": "Nuance plus juste.",
+                            "regle": "Lexique", "variantes": [],
+                        }
+                    ]
+                },
+                ensure_ascii=False,
+            )
+        }
+    )
+    monkeypatch.setattr(service_analyse, "_client_llm", lambda: mock)
+    reponse = client.post(
+        f"/api/v1/analyses/{identifiant}/reevaluer",
+        json={"paragraphe_id": "p-1"},
+    )
+    assert reponse.status_code == 200
+    # Le paragraphe réécrit est CONSERVÉ intégralement, seule la correction s'applique
+    assert _texte_affiche(reponse.json()) == (
+        "Texte totalement réécrit par l'auteur pour son chapitre."
+    )
+
+
 def test_appliquer_embellissement_aucun_etat_partiel(client, monkeypatch):
     """Embellissement : patch PUIS réévaluation. Si la réévaluation échoue
     (panne MockLLM), RIEN n'est appliqué — zéro état partiel."""

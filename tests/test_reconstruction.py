@@ -332,7 +332,11 @@ def test_migration_ancien_format_conserve_les_etats_obsoletes():
 # --- Jalon F3 : édition directe (remplacer_texte_paragraphe) ------------------
 
 
-def test_edition_directe_remplace_le_paragraphe_par_un_patch_entier():
+def test_edition_directe_rebase_le_paragraphe_comme_nouvelle_base():
+    """FA1 — modèle de REBASE : le paragraphe édité devient la NOUVELLE BASE de
+    référence (fin du patch plein-paragraphe qui écrasait le texte à la
+    réévaluation). Aucun patch résiduel : les corrections futures s'ancrent
+    naturellement sur le texte édité, sans écrasement."""
     etat = reconstruction.etat_initial(
         [
             _corr("c-1", "forme", 14, 18, "part", "partent"),
@@ -342,16 +346,50 @@ def test_edition_directe_remplace_le_paragraphe_par_un_patch_entier():
     )
     nouveau = "Les cavaliers partent doucement vers la ville."
     assert reconstruction.remplacer_texte_paragraphe(etat, "p-1", nouveau) is True
-    # Un patch unique couvrant TOUTE la base (jamais de splice + remappage)
-    patch = next(p for p in etat["patches"] if p["paragraphe_id"] == "p-1")
-    assert patch["debut"] == 0
-    assert patch["fin"] == len(TEXTE)
+    # REBASE : la base du paragraphe EST le texte édité — plus aucun patch
+    assert etat["base"][0].runs[0].texte == nouveau
+    assert not any(p["paragraphe_id"] == "p-1" for p in etat["patches"])
     # Les corrections et choix antérieurs du paragraphe sont retirés
     assert etat["corrections"] == []
     assert etat["choix"] == {}
     # Le texte courant = le texte édité ; le paragraphe est marqué modifié
     assert _courant(etat) == nouveau
     assert "p-1" in etat["modifies"]
+
+
+def test_fa1_reevaluation_apres_edition_directe_ne_perd_aucun_texte():
+    """RÉGRESSION FA1 (audit post-F3) : après une édition directe complète,
+    une réévaluation retournant une correction sur un seul mot ne doit JAMAIS
+    remplacer le paragraphe réécrit entier par ce seul mot."""
+    etat = reconstruction.etat_initial([], [_p()])
+    nouveau = "Texte entièrement réécrit par l'auteur pour son chapitre."
+    reconstruction.remplacer_texte_paragraphe(etat, "p-1", nouveau)
+    # La réévaluation (coords du texte COURANT = texte réécrit) cible « entièrement »
+    correction = _corr("c-r1", "forme", 6, 17, "entièrement", "totalement")
+    reconstruction.remplacer_corrections_paragraphe(etat, "p-1", [correction])
+    # Le paragraphe réécrit est CONSERVÉ, seule la correction est appliquée
+    assert _courant(etat) == "Texte totalement réécrit par l'auteur pour son chapitre."
+    # La correction est ancrée sur la nouvelle base (le texte réécrit)
+    c = etat["corrections"][0]["correction"]
+    assert (c.debut, c.fin) == (6, 17)
+
+
+def test_fa1_reevaluation_sur_un_patch_partiel_ne_detruit_pas_le_texte():
+    """RÉGRESSION FA1 (audit post-F3) : une correction de réévaluation qui tombe
+    STRICTEMENT À L'INTÉRIEUR d'un patch manuel partiel est écartée — elle ne
+    remplace JAMAIS le patch entier par une sous-plage (perte de texte)."""
+    etat = reconstruction.etat_initial([], [_p()])
+    reconstruction.appliquer_modification(etat, "p-1", 28, 40, "vers la vieille ville")
+    assert _courant(etat) == "Les cavaliers part à l'aube vers la vieille ville."
+    # Le LLM renvoie une correction sur un mot DU PATCH (coords courantes [33, 40))
+    interieure = _corr("c-r1", "forme", 33, 40, "la vieille", "l'antique")
+    reconstruction.remplacer_corrections_paragraphe(etat, "p-1", [interieure])
+    # La correction est écartée : le texte du patch est INTACT (aucune perte)
+    assert _courant(etat) == "Les cavaliers part à l'aube vers la vieille ville."
+    # En revanche, une correction couvrant le patch ENTIÈRE le remplace proprement
+    exacte = _corr("c-r2", "forme", 28, 49, "vers la vieille ville", "vers la cité antique")
+    reconstruction.remplacer_corrections_paragraphe(etat, "p-1", [exacte])
+    assert _courant(etat) == "Les cavaliers part à l'aube vers la cité antique."
 
 
 def test_edition_directe_noop_sans_changement():
@@ -368,5 +406,7 @@ def test_edition_directe_reinitialise_un_paragraphe_deja_modifie():
     assert _courant(etat) == "Nos cavaliers partent à l'aube vers la cité."
     assert reconstruction.remplacer_texte_paragraphe(etat, "p-1", "Tout est neuf.") is True
     assert _courant(etat) == "Tout est neuf."
-    assert len(etat["patches"]) == 1
+    # FA1 — rebase : plus AUCUN patch résiduel (la base EST le texte édité)
+    assert etat["patches"] == []
     assert etat["corrections"] == []
+    assert etat["base"][0].runs[0].texte == "Tout est neuf."
