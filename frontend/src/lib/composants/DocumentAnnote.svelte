@@ -70,7 +70,7 @@ function segmentTexte(s: SegmentAnnote): SegmentTexte {
           onannuler={onAnnulerEdition}
         />
       {:else}
-        {#each p.segments as s (s.type === 'forme' ? `f-${s.groupe}` : `t-${s.groupe ?? s.texte}`)}
+        {#each p.segments as s, index (`${p.id}-${index}-${s.type}`)}
           {@render segmenter(s)}
         {/each}
         {#if p.edite}

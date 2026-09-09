@@ -182,4 +182,36 @@ describe('Atelier E5 (F3)', () => {
     expect(conteneur.textContent).toContain('2 correction(s) active(s)');
     expect(conteneur.querySelector('.ins--forme')).toBeTruthy();
   });
+
+  it('rend les segments multi-marqués sans doublon de clé Svelte (FA4)', async () => {
+    // Régression : depuis la segmentation atomique FA3, UNE même marque (ex.
+    // `g-0004`) peut couvrir PLUSIEURS segments consécutifs, et des segments
+    // sans groupe peuvent porter des textes identiques. L'ancienne clé
+    // `f-${groupe}` / `t-${groupe ?? texte}` produisait des doublons ->
+    // `each_key_duplicate` (crash runtime, atelier figé sur « Chargement… »).
+    const etat = etatAtelier('tout');
+    etat.document.paragraphes[0].segments = [
+      { type: 'texte', texte: 'Lui, il voulait ', gras: false, italique: true, souligne: false, classes: '', groupe: null },
+      // deux segments DISTINCTS partageant le MÊME groupe de marque
+      { type: 'texte', texte: 'la voir', gras: false, italique: false, souligne: false, classes: 'mark-style', groupe: 'g-0004' },
+      { type: 'texte', texte: '. Le sable se hissait', gras: false, italique: false, souligne: false, classes: 'mark-style', groupe: 'g-0004' },
+      // texte neutre IDENTIQUE à un segment précédent (groupe null)
+      { type: 'texte', texte: 'Lui, il voulait ', gras: false, italique: true, souligne: false, classes: '', groupe: null },
+    ];
+
+    const erreursConsole: unknown[] = [];
+    const capturer = (e: ErrorEvent) => erreursConsole.push(e.error ?? e.message);
+    window.addEventListener('error', capturer);
+
+    reparerFetch(() => reponseJson(etat));
+    rendre(Atelier, { analyseId: 7 });
+    await attendre();
+    await attendre();
+    window.removeEventListener('error', capturer);
+
+    // Aucune exception runtime : le document s'affiche entièrement
+    expect(erreursConsole).toEqual([]);
+    expect(conteneur.textContent).toContain('. Le sable se hissait');
+    expect(conteneur.querySelector('.mark-style')).toBeTruthy();
+  });
 });
