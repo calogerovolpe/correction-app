@@ -8,6 +8,7 @@
     type ElementMenu,
   } from '../lib/composants/MenuContextuel.svelte';
   import OngletsPhase from '../lib/composants/OngletsPhase.svelte';
+  import InfoBulleMarque from '../lib/composants/InfoBulleMarque.svelte';
   import PopoverSuggestion from '../lib/composants/PopoverSuggestion.svelte';
   import ToggleMasquer from '../lib/composants/ToggleMasquer.svelte';
   import { ErreurApiApp } from '../lib/api/client';
@@ -64,6 +65,14 @@
     type: 'embellissement' | 'alternatives';
     suggestion: ReponseSuggestion;
   } | null>(null);
+  // FA7 — info-bulle contextuelle : la marque signalée (survol / focus clavier)
+  // et son élément DOM (positionnement de la bulle) ; `epingle` = ouverte par
+  // une sélection explicite (clic / Entrée) → ne se referme pas à la sortie.
+  let infobulle = $state<{ groupe: string; ancre: HTMLElement } | null>(null);
+  let infobulleEpingle = $state(false);
+  // FA7 — élément qui a ouvert le menu contextuel / popover (restauration du
+  // focus à la fermeture, piège de focus évité).
+  let declencheurFlottant = $state<HTMLElement | null>(null);
   let actionEnCours = $state(false);
   let selectionContexte = $state<{
     paragrapheId: string;
@@ -114,6 +123,9 @@
       etat = nouvelEtat;
       if (etat) {
         onglet = etat.onglet;
+        // FA7 — le flottement et l'info-bulle suivent le nouvel état
+        infobulle = null;
+        infobulleEpingle = false;
         reconcilierCorrectionActive();
       }
     } catch (e) {
@@ -129,10 +141,48 @@
     if (nouveau !== onglet) void charger(nouveau);
   }
 
-  function selectionnerGroupe(groupe: string): void {
+  /** FA7 — liaison bidirectionnelle texte ↔ explication :
+   *  - origine 'texte' (clic/Entrée sur une marque) : la ligne correspondante
+   *    de la barre latérale est sélectionnée et défile dans la vue (effet du
+   *    composant BarreLaterale) ; l'info-bulle est épinglée tant que la marque
+   *    est la cible ;
+   *  - origine 'barre' (clic sur une ligne de la barre latérale) : défilement
+   *    CENTRÉ de la première marque du groupe dans le manuscrit et FOCUS sur
+   *    cette marque (`scrollIntoView({ block: 'center' })` + focus()). */
+  function selectionnerGroupe(
+    groupe: string,
+    origine: 'texte' | 'barre' = 'texte',
+  ): void {
     if (!etat) return;
     correctionActive =
       etat.document.corrections_barre.find((c) => c.groupe === groupe) ?? null;
+    if (origine === 'barre') {
+      const marque = document.querySelector<HTMLElement>(
+        `#document-annote [data-groupe="${groupe}"]`,
+      );
+      if (marque) {
+        if (typeof marque.scrollIntoView === 'function') {
+          marque.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        }
+        marque.focus({ preventScroll: true });
+      }
+    } else if (infobulle?.groupe === groupe) {
+      // Sélection explicite de la marque signalée : la bulle reste visible.
+      infobulleEpingle = true;
+    }
+  }
+
+  /** FA7 — info-bulle contextuelle : ouverture au survol ou au focus clavier
+   *  d'une marque (résumé rapide sans quitter le texte des yeux). */
+  function signalerMarque(groupe: string, element: HTMLElement): void {
+    infobulleEpingle = false;
+    infobulle = { groupe, ancre: element };
+  }
+
+  /** Sortie de la marque : la bulle se referme sauf si elle a été épinglée
+   *  par une sélection explicite (clic / Entrée / Espace). */
+  function quitterMarque(): void {
+    if (!infobulleEpingle) infobulle = null;
   }
 
   /** FA4 — réconciliation PROPRE de la correction active (barre latérale) :
@@ -173,6 +223,17 @@
     masque && etat
       ? etat.document.paragraphes.filter(paragrapheCorrige)
       : (etat?.document.paragraphes ?? []),
+  );
+
+  // FA7 — groupe de la correction active (mise en évidence des marques) et
+  // correction ciblée par l'info-bulle contextuelle.
+  let groupeActif = $derived(correctionActive?.groupe ?? null);
+  const correctionInfobulle = $derived(
+    infobulle
+      ? (etat?.document.corrections_barre.find(
+          (c) => c.groupe === infobulle?.groupe,
+        ) ?? null)
+      : null,
   );
 
   function texteCourantParagraphe(paragrapheId: string): string {
@@ -248,11 +309,17 @@
     evenement.preventDefault();
     menu = null;
     popover = null;
+    // FA7 — le menu remplace le flottement en cours.
+    infobulle = null;
+    infobulleEpingle = false;
     selectionContexte = null;
 
     const cible = (evenement.target as HTMLElement).closest?.(
       '[data-groupe]',
     ) as HTMLElement | null;
+    // FA7 — mémorise le déclencheur pour RESTAURER le focus à la fermeture.
+    declencheurFlottant =
+      cible ?? (document.activeElement as HTMLElement | null);
     if (cible) {
       const groupe = cible.dataset.groupe ?? '';
       const correction = etat?.document.corrections_barre.find(
@@ -294,6 +361,13 @@
     const dansPopover = document.querySelector('.popover')?.contains(cible);
     if (menu && !dansMenu) menu = null;
     if (popover && !dansPopover) popover = null;
+    // FA7 — une info-bulle ÉPINGLÉE se referme au clic ailleurs (la bulle est
+    // pointer-events: none : un clic ne peut pas tomber dedans, garde-fou).
+    const dansInfobulle = document.querySelector('.infobulle')?.contains(cible);
+    if (infobulleEpingle && !dansInfobulle) {
+      infobulle = null;
+      infobulleEpingle = false;
+    }
   }
 
   function appuiTouche(evenement: KeyboardEvent): void {
@@ -301,6 +375,9 @@
       menu = null;
       popover = null;
       enEditionId = null;
+      // FA7 — Échap referme aussi l'info-bulle contextuelle.
+      infobulle = null;
+      infobulleEpingle = false;
     }
   }
 
@@ -325,11 +402,14 @@
     erreur = 'Une erreur inattendue est survenue.';
   }
 
+  /** FA7 — `cibleId` explicite : appelable depuis le menu contextuel (id mémorisé
+   *  dans `menu.action`) OU depuis les boutons du détail de la barre latérale
+   *  (alternative accessible au clic droit pour clavier/tactile). */
   async function choisir(
+    cibleId: string,
     actionCle: 'appliquer-forme' | 'garder-original',
   ): Promise<void> {
-    if (!menu?.action || actionEnCours) return;
-    const cibleId = menu.action;
+    if (!cibleId || actionEnCours) return;
     actionEnCours = true;
     erreur = '';
     success = '';
@@ -358,11 +438,31 @@
 
   function appliquerActionMenu(cle: string): void {
     if (cle === 'appliquer-forme' || cle === 'garder-original') {
-      void choisir(cle);
+      if (menu?.action) void choisir(menu.action, cle);
       return;
     }
-    if (cle === 'embellir') void demanderEmbellissement();
-    if (cle === 'alternatives') void demanderAlternatives();
+    // FA7 — les suggestions ouvrent un popover : le menu se referme (sa
+    // fermeture rend le focus au déclencheur avant l'ouverture du dialogue).
+    if (cle === 'embellir') {
+      menu = null;
+      void demanderEmbellissement();
+    }
+    if (cle === 'alternatives') {
+      menu = null;
+      void demanderAlternatives();
+    }
+  }
+
+  /** FA7 — alternative accessible au clic droit : boutons du détail de la
+   *  barre latérale (clavier et tactile, sans menu contextuel). */
+  function choisirFormeDepuisBarre(
+    correctionId: string,
+    decision: 'corrige' | 'original',
+  ): void {
+    void choisir(
+      correctionId,
+      decision === 'corrige' ? 'appliquer-forme' : 'garder-original',
+    );
   }
 
   async function demanderEmbellissement(): Promise<void> {
@@ -606,25 +706,30 @@
     <div class="atelier__grille">
       <div class="atelier__texte">
         <p class="info-selection">
-          Sélectionnez un passage puis <strong>clic droit</strong> pour demander
-          un <strong>embellissement</strong> ou une <strong>alternative</strong>.
+          Sélectionnez un passage puis <strong>clic droit</strong> (ou appui
+          long sur tablette) pour demander un <strong>embellissement</strong> ou
+          une <strong>alternative</strong>.
         </p>
         <DocumentAnnote
           paragraphes={paragraphesAffiches}
           enEditionId={enEditionId}
           texteEdition={texteEdition}
-          onSelectionnerGroupe={selectionnerGroupe}
+          onSelectionnerGroupe={(g) => selectionnerGroupe(g)}
           onDemanderEdition={demarrerEdition}
           onDemanderReevaluer={(p) => void reexecuterParagraphe(p)}
           onEditionChange={(t) => (texteEdition = t)}
           onValiderEdition={() => void validerEdition()}
           onAnnulerEdition={annulerEdition}
+          groupeActif={groupeActif}
+          onSignalerMarque={signalerMarque}
+          onQuitterMarque={quitterMarque}
         />
       </div>
       <BarreLaterale
         corrections={etat.document.corrections_barre}
         active={correctionActive}
         onSelectionnerGroupe={selectionnerGroupe}
+        onChoisirForme={choisirFormeDepuisBarre}
       />
     </div>
   {/if}
@@ -636,6 +741,8 @@
     y={menu.y}
     items={menu.items}
     onChoisir={appliquerActionMenu}
+    declencheur={declencheurFlottant}
+    onFermer={() => (menu = null)}
   />
 {/if}
 {#if popover}
@@ -647,7 +754,11 @@
     erreur={popover.suggestion.erreur}
     onAppliquer={(t) => void appliquerProposition(t)}
     onAnnuler={() => (popover = null)}
+    declencheur={declencheurFlottant}
   />
+{/if}
+{#if infobulle && correctionInfobulle}
+  <InfoBulleMarque correction={correctionInfobulle} ancre={infobulle.ancre} />
 {/if}
 
 <style>

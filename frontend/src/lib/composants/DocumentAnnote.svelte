@@ -17,6 +17,12 @@
     onEditionChange: (texte: string) => void;
     onValiderEdition: () => void;
     onAnnulerEdition: () => void;
+    /** FA7 — groupe de la correction active (mise en évidence des marques). */
+    groupeActif: string | null;
+    /** FA7 — info-bulle contextuelle : signale une marque (survol ou focus
+     *  clavier) avec l'élément lui-même pour positionner la bulle. */
+    onSignalerMarque: (groupe: string, element: HTMLElement) => void;
+    onQuitterMarque: () => void;
   }
 
   let {
@@ -29,6 +35,9 @@
     onEditionChange,
     onValiderEdition,
     onAnnulerEdition,
+    groupeActif,
+    onSignalerMarque,
+    onQuitterMarque,
   }: Props = $props();
 
   /** Navigation clavier ←/→ entre les marques INTERACTIVES (boutons
@@ -112,8 +121,13 @@ function segmentTexte(s: SegmentAnnote): SegmentTexte {
     <button
       type="button"
       class="ins ins--forme {s.classes}"
+      class:marque-active={s.groupe === groupeActif}
       data-groupe={s.groupe}
       onclick={() => onSelectionnerGroupe(s.groupe)}
+      onmouseenter={(e) => onSignalerMarque(s.groupe, e.currentTarget)}
+      onmouseleave={() => onQuitterMarque()}
+      onfocus={(e) => onSignalerMarque(s.groupe, e.currentTarget)}
+      onblur={() => onQuitterMarque()}
     >
       {@render contenuEnrichi(s.ins, s.gras, s.italique, s.souligne)}
     </button>
@@ -121,8 +135,13 @@ function segmentTexte(s: SegmentAnnote): SegmentTexte {
     <button
       type="button"
       class="seg-texte {segmentTexte(s).classes}"
+      class:marque-active={segmentTexte(s).groupe === groupeActif}
       data-groupe={segmentTexte(s).groupe}
       onclick={() => onSelectionnerGroupe(segmentTexte(s).groupe!)}
+      onmouseenter={(e) => onSignalerMarque(segmentTexte(s).groupe!, e.currentTarget)}
+      onmouseleave={() => onQuitterMarque()}
+      onfocus={(e) => onSignalerMarque(segmentTexte(s).groupe!, e.currentTarget)}
+      onblur={() => onQuitterMarque()}
     >
       {@render contenuEnrichi(
         segmentTexte(s).texte,

@@ -3,7 +3,10 @@
 
   /** Popover de suggestion (embellissement / alternatives, jalon A / F3) :
    *  proposition du LLM affichée près du curseur, l'auteur APPLIQUE ou ANNULE
-   *  (aucune modification en arrière-plan avant validation). */
+   *  (aucune modification en arrière-plan avant validation). FA7 — gestion du
+   *  focus : focus initial sur le premier contrôle, piège de focus (Tab /
+   *  Maj+Tab restent dans le dialogue), RESTAURATION du focus sur l'élément
+   *  déclencheur à la fermeture (Échap ou clic extérieur gérés par l'atelier). */
 
   interface Props {
     type: 'embellissement' | 'alternatives';
@@ -13,9 +16,21 @@
     erreur?: string;
     onAppliquer: (texte: string) => void;
     onAnnuler: () => void;
+    /** FA7 — élément qui a ouvert le popover : le focus lui est rendu à la
+     *  fermeture. */
+    declencheur?: HTMLElement | null;
   }
 
-  let { type, texte, explication, alternatives, erreur, onAppliquer, onAnnuler }: Props = $props();
+  let {
+    type,
+    texte,
+    explication,
+    alternatives,
+    erreur,
+    onAppliquer,
+    onAnnuler,
+    declencheur = null,
+  }: Props = $props();
 
   function positionner(element: HTMLElement): { destroy: () => void } {
     const r = element.getBoundingClientRect();
@@ -37,9 +52,51 @@
     element.style.top = `${y}px`;
     return { destroy: () => undefined };
   }
+
+  function focusables(element: HTMLElement): HTMLElement[] {
+    return Array.from(element.querySelectorAll<HTMLElement>('button')).filter(
+      (b) => !b.hasAttribute('disabled'),
+    );
+  }
+
+  /** FA7 — focus initial sur le premier contrôle du dialogue ; à la fermeture
+   *  (démontage), le focus est rendu au déclencheur. */
+  function gererFocus(element: HTMLElement): { destroy: () => void } {
+    const elements = focusables(element);
+    (elements[0] ?? element).focus();
+    return {
+      destroy: () => {
+        if (declencheur?.isConnected) declencheur.focus();
+      },
+    };
+  }
+
+  /** FA7 — piège de focus : Tab / Maj+Tab cyclent À L'INTÉRIEUR du dialogue. */
+  function piegerFocus(evenement: KeyboardEvent): void {
+    if (evenement.key !== 'Tab') return;
+    const elements = focusables(evenement.currentTarget as HTMLElement);
+    if (elements.length === 0) return;
+    const premier = elements[0];
+    const dernier = elements[elements.length - 1];
+    if (evenement.shiftKey && document.activeElement === premier) {
+      evenement.preventDefault();
+      dernier.focus();
+    } else if (!evenement.shiftKey && document.activeElement === dernier) {
+      evenement.preventDefault();
+      premier.focus();
+    }
+  }
 </script>
 
-<div class="popover" role="dialog" aria-label="Proposition de l'IA" use:positionner>
+<div
+  class="popover"
+  role="dialog"
+  aria-label="Proposition de l'IA"
+  tabindex="-1"
+  use:positionner
+  use:gererFocus
+  onkeydown={piegerFocus}
+>
   {#if erreur}
     <p class="popover__erreur">{erreur}</p>
     <Bouton variante="secondaire" onclick={() => onAnnuler()}>Fermer</Bouton>

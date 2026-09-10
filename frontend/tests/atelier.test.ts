@@ -93,6 +93,9 @@ beforeEach(() => {
   conteneur = document.createElement('div');
   document.body.appendChild(conteneur);
   instances = [];
+  // FA7 — jsdom n'implémente pas scrollIntoView : stub partagé pour affirmer
+  // les appels de la liaison bidirectionnelle texte ↔ barre latérale.
+  Element.prototype.scrollIntoView = vi.fn();
 });
 
 afterEach(() => {
@@ -440,5 +443,246 @@ describe('Atelier E5 (F3)', () => {
     // rechargé (plus aucune impasse pour l'auteur).
     expect(conteneur.textContent).toContain('révision périmée');
     expect(conteneur.textContent).toContain("atelier rechargé avec l'état à jour");
+  });
+});
+
+describe('Atelier E5 — FA7 (restitution pédagogique)', () => {
+  it('affiche le diff, le badge règle et la trame pédagogique dans le détail — FA7', async () => {
+    const etat = etatAtelier('tout');
+    etat.document.corrections_barre[0].explication =
+      "Cause : le sujet est au pluriel. Règle : le verbe s'accorde avec son sujet. " +
+      "Correction : « part » devient « partent ». Effet : l'accord est rétabli.";
+    reparerFetch(() => reponseJson(etat));
+    rendre(Atelier, { analyseId: 7 });
+    await attendre();
+    await attendre();
+
+    // La première correction active est sélectionnée d'office (réconciliation)
+    // → le détail enrichi est visible SANS action de l'auteur.
+    // Diff visuel : Fragment d'origine (barré) → Proposition.
+    expect(conteneur.textContent).toContain("Fragment d'origine");
+    expect(conteneur.textContent).toContain('Proposition');
+    expect(conteneur.querySelector('.barre-diff__valeur--origine')).toBeTruthy();
+    expect(conteneur.querySelector('.barre-diff__valeur--proposition')).toBeTruthy();
+    // Badge / cartouche distinct pour la règle
+    expect(conteneur.querySelector('.badge-regle')).toBeTruthy();
+    expect(conteneur.textContent).toContain('Accord sujet-verbe');
+    // Trame pédagogique en 4 temps (FA5) : Cause → Règle → Correction → Effet
+    const temps = Array.from(conteneur.querySelectorAll('.barre-trame dt')).map(
+      (d) => d.textContent?.trim(),
+    );
+    expect(temps).toEqual(['Cause', 'Règle', 'Correction', 'Effet']);
+    expect(conteneur.textContent).toContain('le sujet est au pluriel');
+    expect(conteneur.textContent).toContain("l'accord est rétabli");
+  });
+
+  it('présente le fragment comme « signalé » quand la correction ne réécrit pas — FA7', async () => {
+    // Style marque SANS réécrire (original == correction) : pas de diff
+    // origine → proposition, mais un fragment mis en valeur.
+    reparerFetch(() => reponseJson(etatAtelier('tout')));
+    rendre(Atelier, { analyseId: 7 });
+    await attendre();
+    await attendre();
+
+    // Repli brut (explication sans trame) : l'explication reste lisible
+    expect(conteneur.textContent).toContain('Le sujet pluriel commande l’accord.');
+    // Sélection de la correction Style (c-0002) : fragment signalé, pas de diff
+    const lignes = conteneur.querySelectorAll('.barre-ligne');
+    (lignes[1] as HTMLElement).click();
+    await attendre();
+    expect(conteneur.textContent).toContain('Fragment signalé');
+    expect(conteneur.querySelector('.barre-diff__valeur--origine')).toBeNull();
+  });
+
+  it('sélectionne la ligne de la barre latérale au clic sur une marque — FA7', async () => {
+    reparerFetch(() => reponseJson(etatAtelier('tout')));
+    rendre(Atelier, { analyseId: 7 });
+    await attendre();
+    await attendre();
+
+    const marque = conteneur.querySelector('[data-groupe="g-0001"]') as HTMLElement;
+    marque.click();
+    await attendre();
+
+    const ligneActive = conteneur.querySelector('.barre-ligne--active');
+    expect(ligneActive).toBeTruthy();
+    expect(ligneActive?.textContent).toContain('Forme — accord sujet verbe');
+    // La marque active est mise en évidence dans le manuscrit
+    expect(conteneur.querySelector('.marque-active')).toBeTruthy();
+    // La ligne active défile dans la vue (liaison texte → explication)
+    expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
+  });
+
+  it('rejoint la marque dans le manuscrit depuis la barre latérale (focus) — FA7', async () => {
+    reparerFetch(() => reponseJson(etatAtelier('tout')));
+    rendre(Atelier, { analyseId: 7 });
+    await attendre();
+    await attendre();
+
+    const lignes = conteneur.querySelectorAll('.barre-ligne');
+    (lignes[1] as HTMLElement).click(); // Style — g-0002
+    await attendre();
+
+    // Défilement CENTRÉ + FOCUS sur la première marque du groupe
+    expect(Element.prototype.scrollIntoView).toHaveBeenCalledWith({
+      block: 'center',
+      behavior: 'smooth',
+    });
+    const actif = document.activeElement as HTMLElement | null;
+    expect(actif?.dataset?.groupe).toBe('g-0002');
+  });
+
+  it('affiche une info-bulle au focus d’une marque et la ferme avec Échap — FA7', async () => {
+    reparerFetch(() => reponseJson(etatAtelier('tout')));
+    rendre(Atelier, { analyseId: 7 });
+    await attendre();
+    await attendre();
+
+    const marque = conteneur.querySelector('button[data-groupe="g-0001"]') as HTMLElement;
+    marque.focus();
+    await attendre();
+
+    const bulle = conteneur.querySelector('#infobulle-marque');
+    expect(bulle).toBeTruthy();
+    expect(bulle?.getAttribute('role')).toBe('tooltip');
+    // Résumé rapide : titre, règle, diff court
+    expect(bulle?.textContent).toContain('Forme — accord sujet verbe');
+    expect(bulle?.textContent).toContain('Accord sujet-verbe');
+    expect(bulle?.textContent).toContain('partent');
+
+    document.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
+    );
+    await attendre();
+    expect(conteneur.querySelector('#infobulle-marque')).toBeNull();
+  });
+
+  it('navigue au clavier dans le menu contextuel et restaure le focus — FA7', async () => {
+    reparerFetch(() => reponseJson(etatAtelier('tout')));
+    rendre(Atelier, { analyseId: 7 });
+    await attendre();
+    await attendre();
+
+    const marque = conteneur.querySelector('button[data-groupe="g-0001"]') as HTMLElement;
+    marque.focus();
+    marque.dispatchEvent(
+      new MouseEvent('contextmenu', { bubbles: true, cancelable: true }),
+    );
+    await attendre();
+
+    const items = Array.from(
+      conteneur.querySelectorAll('[role="menuitem"]'),
+    ) as HTMLElement[];
+    expect(items.length).toBe(2);
+    // FA7 — focus initial sur le premier élément du menu
+    expect(document.activeElement).toBe(items[0]);
+
+    // ArrowDown / ArrowUp déplacent le focus d'un item à l'autre
+    items[0].dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }),
+    );
+    expect(document.activeElement).toBe(items[1]);
+    items[1].dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }),
+    );
+    expect(document.activeElement).toBe(items[0]);
+
+    // Échap ferme le menu et RESTAURE le focus sur la marque déclencheuse
+    document.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
+    );
+    await attendre();
+    expect(conteneur.querySelector('.menu-contextuel')).toBeNull();
+    expect(document.activeElement).toBe(marque);
+  });
+
+  it('applique une correction Forme depuis le détail (alternative au clic droit) — FA7', async () => {
+    reparerFetch((url) => reponseJson(etatAtelier('tout')));
+    rendre(Atelier, { analyseId: 7 });
+    await attendre();
+    await attendre();
+
+    // FA7 — alternative accessible (clavier / tactile) : boutons du détail
+    // de la barre latérale, sans menu contextuel.
+    const boutonAppliquer = Array.from(conteneur.querySelectorAll('button')).find(
+      (b) => b.textContent?.includes('Appliquer la correction'),
+    );
+    expect(boutonAppliquer).toBeTruthy();
+    boutonAppliquer?.click();
+    await attendre();
+    await attendre();
+
+    const appelPost = appelsCaptures().find((a) => a.includes('choix-forme'));
+    expect(appelPost).toBeTruthy();
+    expect(appelPost).toContain('revision=3');
+  });
+
+  it('ouvre le popover de suggestion avec focus piégé et restaure le focus — FA7', async () => {
+    reparerFetch((url) => {
+      if (url.includes('embellir')) {
+        return reponseJson({
+          texte: 'Version embellie.',
+          explication: 'Cause : rythme. Effet : lecture fluide.',
+        });
+      }
+      return reponseJson(etatAtelier('tout'));
+    });
+    rendre(Atelier, { analyseId: 7 });
+    await attendre();
+    await attendre();
+
+    // Sélection dans le paragraphe (simulée via getSelection) — Svelte 5
+    // insère des ancres en commentaires autour du texte : on vise le vrai
+    // nœud TEXTE du premier segment (nodeType 3), pas firstChild.
+    const paragraphe = conteneur.querySelector('.paragraphe') as HTMLElement;
+    const spanTexte = paragraphe.querySelector('.seg-texte') as HTMLElement;
+    const noeud = Array.from(spanTexte.childNodes).find(
+      (n) => n.nodeType === Node.TEXT_NODE && (n.textContent?.length ?? 0) > 0,
+    ) as Text;
+    const plage = document.createRange();
+    plage.setStart(noeud, 0);
+    plage.setEnd(noeud, noeud.length);
+    const selection = {
+      isCollapsed: false,
+      rangeCount: 1,
+      getRangeAt: () => plage,
+    } as unknown as Selection;
+    vi.stubGlobal('getSelection', vi.fn(() => selection));
+
+    paragraphe.dispatchEvent(
+      new MouseEvent('contextmenu', { bubbles: true, cancelable: true }),
+    );
+    await attendre();
+
+    const boutonEmbellir = Array.from(conteneur.querySelectorAll('button')).find(
+      (b) => b.textContent?.includes('Embellir la sélection'),
+    );
+    expect(boutonEmbellir).toBeTruthy();
+    boutonEmbellir?.click();
+    await attendre();
+    await attendre();
+
+    const popoverEl = conteneur.querySelector('.popover');
+    expect(popoverEl).toBeTruthy();
+    expect(popoverEl?.textContent).toContain('Version embellie.');
+    // FA7 — focus initial DANS le dialogue (piège de focus)
+    expect(popoverEl?.contains(document.activeElement)).toBe(true);
+
+    // Tab depuis le dernier contrôle ramène au premier (piège de focus)
+    const boutons = Array.from(
+      popoverEl!.querySelectorAll('button'),
+    ) as HTMLElement[];
+    boutons[boutons.length - 1].focus();
+    boutons[boutons.length - 1].dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }),
+    );
+    expect(document.activeElement).toBe(boutons[0]);
+
+    // Échap ferme le popover
+    document.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
+    );
+    await attendre();
+    expect(conteneur.querySelector('.popover')).toBeNull();
   });
 });

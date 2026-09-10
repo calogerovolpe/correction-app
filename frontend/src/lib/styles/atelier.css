@@ -96,3 +96,27 @@
   outline: 2px solid var(--encre);
   outline-offset: 2px;
 }
+
+/* FA7 — liaison texte ↔ explication : les marques du groupe ACTIF (correction
+   sélectionnée dans le manuscrit ou depuis la barre latérale) sont mises en
+   évidence (liseré accent, distinct du focus clavier). */
+.marque-active {
+  box-shadow: 0 0 0 2px var(--accent);
+  border-radius: 3px;
+}
+
+/* FA7 — badge « Règle » : cartouche distinct de l'explication, partagé par la
+   barre latérale et l'info-bulle. Contraste AA : #6e2d21 sur #f3e0d8 ≈ 8:1. */
+.badge-regle {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.08rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid var(--accent);
+  color: var(--accent-fonce);
+  background: var(--accent-doux);
+  margin-right: 0.3rem;
+}
