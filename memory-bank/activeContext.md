@@ -1,6 +1,6 @@
 # Contexte actif — où nous en sommes MAINTENANT
 
-> Fichier le plus souvent mis à jour. Dernière mise à jour : 2026-09-10 (jalon FA6 LIVRÉ — prochain jalon = FA7).
+> Fichier le plus souvent mis à jour. Dernière mise à jour : 2026-09-10 (jalon FA7 LIVRÉ — prochaine étape = F4).
 
 ## Focus du moment
 
@@ -19,8 +19,26 @@ Ne JAMAIS enchaîner deux jalons dans la même session sans feu vert explicite d
   - **FA4 — Rendu Svelte fidèle, styles réels, formatage Word et robustesse UI est LIVRÉ** ✅ (`00d5575`) — 177 pytest + 53 Vitest verts, `svelte-check` 0 erreur, SPA recompilé : formatage Word rendu (`<strong>`/`<em>`/`<u>` sémantiques), couleurs réelles des couches restaurées (reset `:where` à spécificité zéro), onglet actif conservé après action (`onglet` en query des POST `/api/v1`), réconciliation de la correction active + jeton anti-course.
   - **FA5 — Robustesse LLM : Custom Structured Outputs, invariants et prompts est LIVRÉ** ✅ — 192 pytest + 53 Vitest verts, `svelte-check` 0 erreur, **E2E réel Mistral rejoué OK** (`data_e2e/` réinitialisé : 9 corrections sous schéma strict, chapitre validé corrigé, chaîne `ok`, 1 backup) + sonde directe du schéma strict contre l'API Mistral (`scripts/sonde_fa5_schema.py`, statut 200, sortie validée par le contrat Pydantic).
   - **FA6 — Cohérence transactionnelle, concurrence et alignement d'API est LIVRÉ** ✅ (`012d386`) — **+ nouvelle fonctionnalité de l'auteur : choix de l'IA qui corrigera à la soumission (E3)** — 203 pytest + 58 Vitest verts, `svelte-check` 0 erreur, SPA recompilée, **E2E réel Mistral rejoué OK** (9 corrections, chapitre validé, chaîne `ok`, 1 backup).
-  - **F4 (Finitions UX) et F5 (Nettoyage & bascule) restent en pause** jusqu'à l'achèvement de la série corrective FA1→FA7.
-  - **Prochain jalon immédiat = FA7 — Restitution pédagogique : diff, sidebar sticky, popovers et clavier.**
+  - **FA7 — Restitution pédagogique : diff, sidebar sticky, popovers et clavier est LIVRÉ** ✅ (`71dd08a`) — **dernier jalon de la série FA1→FA7** — 203 pytest + 73 Vitest verts (58 + 15 nouveaux), `svelte-check` 0 erreur / 0 warning, SPA recompilée ; frontend seul (aucun changement backend/LLM → pas d'E2E Mistral requis).
+  - **F4 (Finitions UX) et F5 (Nettoyage & bascule) sortent de pause** — la série corrective FA1→FA7 est ACHÈVÉE.
+  - **Prochaine étape immédiate = F4 — Finitions UX & identité (toasts, responsive, microcopy, AA complet).**
+
+## Changements récents (FA7 — Restitution pédagogique : diff, sidebar sticky, popovers, clavier)
+
+- **Barre latérale STICKY et autonome au défilement** (`BarreLaterale.svelte`) : `position: sticky; top: 1rem; max-height: calc(100vh - 2rem); overflow-y: auto` — le manuscrit défile pendant que les explications restent sous les yeux de l'auteur ; repli `position: static` sous 900 px (grille à une colonne).
+- **Liaison visuelle bidirectionnelle texte ↔ explication** :
+  - Texte → sidebar : un clic/Entrée sur une marque met à jour la correction active, la ligne correspondante **défile doucement dans la vue** (`$effect` + `scrollIntoView({ block: 'nearest', behavior: 'smooth' })`) et les marques du groupe actif sont mises en évidence (classe `marque-active`, liseré accent, `atelier.css`).
+  - Sidebar → texte : un clic sur une ligne de la barre latérale fait un **défilement CENTRÉ** de la première marque du groupe (`scrollIntoView({ block: 'center', behavior: 'smooth' })`) + **focus** sur cette marque (`Atelier.selectionnerGroupe(groupe, 'barre')`).
+- **Détail enrichi de la correction** (`BarreLaterale.svelte` + module PUR `lib/pedagogie.ts`) :
+  - Diff visuel « **Fragment d'origine** » (barré, fond rouge pâle) → « **Proposition** » (vert) pour les corrections qui réécrivent ; « **Fragment signalé** » pour Style/Technique qui marquent sans réécrire (`original == correction`) ;
+  - Badge/cartouche distinct « Règle » (`.badge-regle`, contraste AA #6e2d21 sur #f3e0d8) ;
+  - **Trame pédagogique Cause → Règle → Correction → Effet** (générée depuis FA5, `TRAME_EXPLICATION`) découpée par `decouperTrame()` (fonction pure, ordre canonique vérifié, accents/pluriel tolérés) et rendue en liste de 4 temps titrés ; **repli brut** propre pour les explications sans trame (analyses anciennes).
+- **Info-bulle contextuelle accessible** (`InfoBulleMarque.svelte`, NOUVEAU composant) : résumé rapide (titre, badge règle, diff court, première phrase) au **survol ou au FOCUS clavier** d'une marque du manuscrit ; `role="tooltip"`, repositionnée à chaque scroll/resize (reste collée à son ancre) ; une sélection explicite (clic/Entrée/Espace) **épingle** la bulle, Échap ou clic ailleurs la referme ; pointer-events none (jamais d'obstruction).
+- **Accessibilité clavier et gestion du focus** :
+  - `MenuContextuel.svelte` : focus initial sur le premier `menuitem`, navigation **↑/↓/Début/Fin**, Tab referme le menu, **restauration du focus sur le déclencheur** à la fermeture (Échap/clic extérieur gérés par l'atelier comme avant) ;
+  - `PopoverSuggestion.svelte` : focus initial dans le dialogue, **piège de focus** (Tab/Maj+Tab cyclent à l'intérieur), **restauration du focus** à la fermeture ; `tabindex="-1"` sur les deux conteneurs (svelte-check 0 warning).
+- **Alternative tactile/clavier au clic droit** : boutons « ✔ Appliquer la correction » / « Garder l'original » dans le détail de la barre latérale pour les corrections Forme actives (`choisir()` refactorisé avec `cibleId` explicite) ; microcopy de l'invite de sélection mentionne l'appui long sur tablette.
+- **Tests** : +8 Vitest (trame 4 temps + diff + badge, fragment signalé, liaison marque→ligne, ligne→marque centrée+focus, info-bulle au focus + Échap, navigation clavier du menu + restauration du focus, alternative au clic droit, popover piège de focus) + 7 Vitest unitaires sur `pedagogie.ts` (`decouperTrame`, `premierePhrase`). **203 pytest + 73 Vitest verts**, `svelte-check` 0 erreur / 0 warning, SPA recompilée (`app/static/spa/`, build non versionné).
 
 ## Changements récents (FA6 — Choix de l'IA + cohérence transactionnelle)
 
