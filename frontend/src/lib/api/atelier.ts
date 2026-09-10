@@ -27,71 +27,82 @@ export function etatAtelier(
 
 /** Accepte ('corrige') ou refuse ('original') une correction Forme (filtre).
  *  FA4 : `onglet` (optionnel) demande la projection de l'onglet courant — la
- *  réponse ne fait plus sauter l'atelier vers « tout ». */
+ *  réponse ne fait plus sauter l'atelier vers « tout ».
+ *  FA6 : `revision` (optionnel) — contrôle de concurrence optimiste (409 si
+ *  l'état a changé ailleurs). */
 export function choisirForme(
   analyseId: number,
   payload: DecisionForme,
   onglet?: OngletAtelier,
+  revision?: number,
 ): Promise<EtatAtelier> {
   return api.envoyer<EtatAtelier>(
     `/analyses/${analyseId}/choix-forme`,
     payload,
-    { onglet: onglet ?? undefined },
+    { onglet: onglet ?? undefined, revision },
   );
 }
 
-/** Applique l'alternative choisie par l'auteur (clic droit sur sélection). */
+/** Applique l'alternative choisie par l'auteur (clic droit sur sélection).
+ *  FA6 : `revision` (optionnel) — contrôle de concurrence optimiste. */
 export function appliquerAlternative(
   analyseId: number,
   payload: ModificationSelection,
   onglet?: OngletAtelier,
+  revision?: number,
 ): Promise<EtatAtelier> {
   return api.envoyer<EtatAtelier>(
     `/analyses/${analyseId}/appliquer-alternative`,
     payload,
-    { onglet: onglet ?? undefined },
+    { onglet: onglet ?? undefined, revision },
   );
 }
 
 /** Édition directe sans IA temps réel : remplace le texte affiché du paragraphe
- *  (patch ancré base). « ↻ Re-corriger » relance le pipeline ensuite. */
+ *  (patch ancré base). « ↻ Re-corriger » relance le pipeline ensuite.
+ *  FA6 : `revision` (optionnel) — contrôle de concurrence optimiste. */
 export function editerParagraphe(
   analyseId: number,
   paragrapheId: string,
   texte: string,
   onglet?: OngletAtelier,
+  revision?: number,
 ): Promise<EtatAtelier> {
   return api.envoyer<EtatAtelier>(
     `/analyses/${analyseId}/editer`,
     { paragraphe_id: paragrapheId, texte },
-    { onglet: onglet ?? undefined },
+    { onglet: onglet ?? undefined, revision },
   );
 }
 
-/** Réévaluation manuelle des corrections d'un paragraphe (bouton « ↻ »). */
+/** Réévaluation manuelle des corrections d'un paragraphe (bouton « ↻ »).
+ *  FA6 : `revision` (optionnel) — contrôle de concurrence optimiste. */
 export function reevaluerParagraphe(
   analyseId: number,
   paragrapheId: string,
   onglet?: OngletAtelier,
+  revision?: number,
 ): Promise<EtatAtelier> {
   return api.envoyer<EtatAtelier>(
     `/analyses/${analyseId}/reevaluer`,
     { paragraphe_id: paragrapheId },
-    { onglet: onglet ?? undefined },
+    { onglet: onglet ?? undefined, revision },
   );
 }
 
 /** Applique l'embellissement choisi, PUIS réévalue les corrections du paragraphe
- *  (aucun état partiel si la réévaluation échoue). */
+ *  (aucun état partiel si la réévaluation échoue).
+ *  FA6 : `revision` (optionnel) — contrôle de concurrence optimiste. */
 export function appliquerEmbellissement(
   analyseId: number,
   payload: ModificationSelection,
   onglet?: OngletAtelier,
+  revision?: number,
 ): Promise<EtatAtelier> {
   return api.envoyer<EtatAtelier>(
     `/analyses/${analyseId}/appliquer-embellissement`,
     payload,
-    { onglet: onglet ?? undefined },
+    { onglet: onglet ?? undefined, revision },
   );
 }
 

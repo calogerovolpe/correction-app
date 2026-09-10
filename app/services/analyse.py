@@ -18,6 +18,7 @@ from datetime import datetime
 
 from app import db
 from app.config import settings
+from app.llm import catalogue
 from app.llm.client import ClientLLM
 from app.llm.prompts import CONSIGNES_PHASES, prompt_phase_correction
 from app.models import ErreurTroncatureLLM, PannePhase, ReponseCorrections
@@ -155,7 +156,15 @@ async def _executer_interne(identifiant: int) -> None:
     # Fail-fast (v6 §4) : zéro token d'analyse si un modèle indispensable manque
     await _maj(identifiant, etape="fail_fast")
     actives = phases_actives(categorie_declaree, options)
-    modeles = {phase: _MODELES[phase]() for phase in actives}
+    # FA6 — modèle choisi par l'auteur à la soumission (E3) : s'il figure au
+    # catalogue (`app/llm/catalogue.py`), il s'applique à TOUTES les phases de
+    # CETTE analyse ; sinon la configuration `.env` par phase reste maîtresse
+    # (repli transparent, jamais de blocage).
+    modele_ia = options.get("modele_ia")
+    if catalogue.modele_autorise(modele_ia):
+        modeles = {phase: str(modele_ia) for phase in actives}
+    else:
+        modeles = {phase: _MODELES[phase]() for phase in actives}
     non_configures = [phase for phase, modele in modeles.items() if not modele]
     if non_configures:
         await _maj(identifiant, statut="rejetee",
@@ -177,7 +186,7 @@ async def _executer_interne(identifiant: int) -> None:
     try:
         resultats = await asyncio.gather(
             *(
-                _executer_phase(client, phase, paragraphes)
+                _executer_phase(client, phase, paragraphes, modele=modeles[phase])
                 for phase in actives
             )
         )
@@ -215,7 +224,9 @@ async def _executer_interne(identifiant: int) -> None:
     await _maj(identifiant, statut="terminee", etape=None, fini_a=_maintenant())
 
 
-async def _executer_phase(client, phase: str, paragraphes) -> list:
+async def _executer_phase(
+    client, phase: str, paragraphes, modele: str | None = None
+) -> list:
     """Une phase : prompt -> complétion -> extraction (PannePhase possible)
     -> réconciliation par correction (rejets individuels, jamais d'arrêt).
 
@@ -225,14 +236,17 @@ async def _executer_phase(client, phase: str, paragraphes) -> list:
     FA5 — Structured Outputs : la complétion impose le schéma strict
     (`ReponseCorrections`) et un budget `max_tokens` calibré ; toute troncature
     (`finish_reason='length'`) est convertie en `PannePhase` explicite —
-    Option B, jamais d'ingestion d'un JSON partiel."""
+    Option B, jamais d'ingestion d'un JSON partiel.
+
+    FA6 — `modele` : le modèle choisi par l'auteur à la soumission (E3) ;
+    None → la configuration `.env` de la phase (`_MODELES`)."""
     messages = prompt_phase_correction(
         phase, CONSIGNES_PHASES[phase], paragraphes, settings.variante
     )
     budget = budget_sortie_tokens(sum(len(p.texte) for p in paragraphes))
     try:
         sortie = await client.completer(
-            _MODELES[phase](), messages,
+            modele if modele else _MODELES[phase](), messages,
             temperature=settings.temperature_correction,
             max_tokens=budget,
             schema_modele=ReponseCorrections,

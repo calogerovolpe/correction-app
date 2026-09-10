@@ -57,13 +57,25 @@ export interface AnalyseSuivi {
   resultat: ResultatAnalyse | null;
 }
 
-/** Corps du POST /api/v1/analyses (F2, E3) — équivalent JSON du formulaire E3. */
+/** Corps du POST /api/v1/analyses (F2, E3) — équivalent JSON du formulaire E3.
+ *  FA6 : `modele` = modèle texte Mistral choisi par l'auteur (catalogue) ;
+ *  absent → configuration `.env` par phase (repli transparent). */
 export interface SoumissionAnalyse {
   texte: string;
   categorie: CategorieAnalyse;
   numero_chapitre?: number | null;
   avec_codex?: boolean;
   phases?: PhasesSelection | null;
+  modele?: string | null;
+}
+
+/** FA6 — entrée du catalogue des modèles texte Mistral (sélection de l'IA
+ *  qui corrigera, affichée dans E3). */
+export interface ModeleIa {
+  id: string;
+  libelle: string;
+  badge: string | null;
+  description: string;
 }
 
 export interface PrefilSoumission {
@@ -72,12 +84,16 @@ export interface PrefilSoumission {
 }
 
 /** État de préparation de E3 (F2) : projet actif, numéro N+1 attendu, dernières
- *  configurations mémorisées (J2.5) et garde-fou de taille. */
+ *  configurations mémorisées (J2.5) et garde-fou de taille. FA6 : catalogue
+ *  des modèles texte + modèle par défaut + dernier choix valide mémorisé. */
 export interface PreparerSoumission {
   projet: Projet | null;
   numero_attendu: number;
   prefil: PrefilSoumission;
   max_caracteres: number;
+  modeles: ModeleIa[];
+  modele_defaut: string;
+  modele_memorise: string | null;
 }
 
 export interface ErreurApi {
@@ -154,6 +170,9 @@ export interface EtatAtelier {
   nb_corrections: number;
   compteurs: Record<string, number>;
   document: DocumentAnnote;
+  /** FA6 — compteur de cohérence transactionnelle : retransmis avec chaque
+   *  mutation (conflit de révision → 409, jamais d'écrasement silencieux). */
+  revision: number;
 }
 
 export interface DecisionForme {

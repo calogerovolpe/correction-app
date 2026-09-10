@@ -308,8 +308,21 @@
 
   function monterErreur(e: unknown): void {
     actionEnCours = false;
-    erreur =
-      e instanceof ErreurApiApp ? e.message : 'Une erreur inattendue est survenue.';
+    if (e instanceof ErreurApiApp) {
+      // FA6 — conflit de révision (409) : l'état a changé ailleurs ; on
+      // recharge automatiquement l'atelier pour resynchroniser l'affichage
+      // (aucune perte : l'action périmée n'a PAS été appliquée). Le message
+      // est affiché APRÈS le rechargement (charger() réinitialise `erreur`).
+      if (e.statut === 409) {
+        void charger().then(() => {
+          erreur = `${e.message} — atelier rechargé avec l'état à jour.`;
+        });
+        return;
+      }
+      erreur = e.message;
+      return;
+    }
+    erreur = 'Une erreur inattendue est survenue.';
   }
 
   async function choisir(
@@ -323,6 +336,7 @@
     try {
       // FA4 : l'onglet courant est transmis — la réponse re-projette CET onglet
       // (plus de saut intempestif vers « tout » après un choix Forme).
+      // FA6 : la révision courante est transmise (CAS — 409 si périmée).
       etat = await choisirForme(
         analyseId,
         {
@@ -330,6 +344,7 @@
           decision: actionCle === 'appliquer-forme' ? 'corrige' : 'original',
         },
         onglet,
+        etat?.revision,
       );
       onglet = etat.onglet;
       reconcilierCorrectionActive(cibleId);
@@ -410,6 +425,7 @@
             contexte,
           },
           onglet,
+          etat?.revision,
         );
       } else {
         etat = await appliquerAlternative(
@@ -421,6 +437,7 @@
             contexte,
           },
           onglet,
+          etat?.revision,
         );
       }
       onglet = etat.onglet;
@@ -445,7 +462,7 @@
     erreur = '';
     success = '';
     try {
-      etat = await editerParagraphe(analyseId, enEditionId, texteEdition, onglet);
+      etat = await editerParagraphe(analyseId, enEditionId, texteEdition, onglet, etat?.revision);
       onglet = etat.onglet;
       reconcilierCorrectionActive();
       enEditionId = null;
@@ -468,7 +485,7 @@
     erreur = '';
     success = '';
     try {
-      etat = await reevaluerParagraphe(analyseId, paragrapheId, onglet);
+      etat = await reevaluerParagraphe(analyseId, paragrapheId, onglet, etat?.revision);
       onglet = etat.onglet;
       reconcilierCorrectionActive();
       success = 'Corrections du paragraphe réévaluées.';

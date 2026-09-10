@@ -41,6 +41,23 @@ function preparation(surcharge: Partial<PreparerSoumission> = {}): PreparerSoumi
     numero_attendu: 4,
     prefil: { categorie: 'chapitre', phases: { forme: true, style: true, technique: true } },
     max_caracteres: 30000,
+    // FA6 — catalogue des modèles texte Mistral (sélection de l'IA)
+    modeles: [
+      {
+        id: 'mistral-small-latest',
+        libelle: 'Mistral Small',
+        badge: 'Recommandé',
+        description: 'Le meilleur équilibre.',
+      },
+      {
+        id: 'mistral-large-latest',
+        libelle: 'Mistral Large',
+        badge: 'Haute précision',
+        description: 'Le plus rigoureux.',
+      },
+],
+    modele_defaut: 'mistral-small-latest',
+    modele_memorise: null,
     ...surcharge,
   };
 }
@@ -188,6 +205,8 @@ it('soumet le texte v2 puis navigue vers le suivi', async () => {
     expect(corps.categorie).toBe('chapitre');
     expect(corps.numero_chapitre).toBe(4);
     expect(corps.phases).toEqual({ forme: true, style: true, technique: true });
+    // FA6 : le modèle pré-sélectionné (défaut) accompagne la soumission
+    expect(corps.modele).toBe('mistral-small-latest');
     expect(window.location.hash).toBe('#/analyses/1');
   });
 
@@ -232,5 +251,65 @@ it('soumet le texte v2 puis navigue vers le suivi', async () => {
 
     expect(conteneur.textContent).toContain('Aucun projet actif');
     expect(conteneur.textContent).toContain("Revenir à l'accueil");
+  });
+
+  // --- FA6 : sélection de l'IA qui corrigera (catalogue E3) -------------------
+
+  it('affiche le catalogue des IA et pré-sélectionne le modèle par défaut — FA6', async () => {
+    reparerFetch(preparation());
+    rendre(Soumission);
+    await attendre();
+    await attendre();
+
+    expect(conteneur.textContent).toContain('Intelligence de correction');
+    expect(conteneur.textContent).toContain('Mistral Small');
+    expect(conteneur.textContent).toContain('Mistral Large');
+    expect(conteneur.textContent).toContain('Recommandé');
+
+    const defaut = radio('mistral-small-latest');
+    expect(defaut?.checked).toBe(true);
+  });
+
+  it('transmet le modèle choisi par l\'auteur dans la soumission — FA6', async () => {
+    const filets: Filets = { demandes: [] };
+    reparerFetch(preparation(), filets);
+    rendre(Soumission);
+    await attendre();
+    await attendre();
+
+    const grandModele = radio('mistral-large-latest');
+    expect(grandModele).toBeTruthy();
+    grandModele!.checked = true;
+    grandModele!.dispatchEvent(new Event('change', { bubbles: true }));
+    await attendre();
+
+    const editeur = conteneur.querySelector<HTMLElement>('.editeur-word')!;
+    editeur.innerHTML = '<p>Bonjour</p>';
+    editeur.dispatchEvent(new Event('input', { bubbles: true }));
+    await attendre();
+
+    const formulaire = conteneur.querySelector<HTMLFormElement>('form')!;
+    formulaire.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    await attendre();
+    await attendre();
+
+    const demande = filets.demandes.find(
+      (d) => d.methode === 'POST' && d.url.endsWith('/api/v1/analyses'),
+    );
+    const corps = JSON.parse(demande!.corps ?? '{}');
+    expect(corps.modele).toBe('mistral-large-latest');
+  });
+
+  it('re-propose le dernier modèle choisi (mémorisation serveur) — FA6', async () => {
+    reparerFetch(preparation({ modele_memorise: 'mistral-large-latest' }));
+    rendre(Soumission);
+    await attendre();
+    await attendre();
+
+    // Aucun choix local : la pré-sélection vient de la mémoire serveur
+    const mémorisé = radio('mistral-large-latest');
+    expect(mémorisé?.checked).toBe(true);
+    const parDefaut = radio('mistral-small-latest');
+    expect(parDefaut?.checked).toBe(false);
   });
 });

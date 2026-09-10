@@ -80,6 +80,10 @@ def etat_initial(
         "choix": {},
         "patches": [],
         "modifies": [],
+        # FA6 — cohérence transactionnelle : compteur de révision incrémenté à
+        # CHAQUE sauvegarde (`sauver_etat`) et vérifié aux mutations (CAS) :
+        # deux onglets concurrents ne peuvent plus s'écraser silencieusement.
+        "revision": 1,
     }
     for pid in {p.id for p in etat["base"]}:
         _resoudre_chevauchements_formes(etat, pid)
@@ -559,6 +563,8 @@ def vers_json(etat: dict) -> str:
             "choix": etat.get("choix", {}),
             "patches": etat.get("patches", []),
             "modifies": etat.get("modifies", []),
+            # FA6 : le compteur de révision est persisté (CAS aux mutations).
+            "revision": int(etat.get("revision", 1)),
         },
         ensure_ascii=False,
     )
@@ -580,6 +586,9 @@ def depuis_json(brut: str) -> dict:
         "choix": donnees.get("choix", {}),
         "patches": donnees.get("patches", []),
         "modifies": donnees.get("modifies", []),
+        # FA6 : rétrocompatibilité — un état d'avant FA6 n'a pas de révision :
+        # valeur 1 (la prochaine sauvegarde passera à 2).
+        "revision": int(donnees.get("revision", 1)),
     }
 
 
@@ -619,6 +628,7 @@ def migrer_ancien_format(
         },
         "patches": [],
         "modifies": [],
+        "revision": 1,
     }
     for pid in {p.id for p in etat["base"]}:
         _resoudre_chevauchements_formes(etat, pid)

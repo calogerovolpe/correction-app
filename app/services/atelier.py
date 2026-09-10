@@ -128,12 +128,37 @@ async def charger_etat(analyse) -> dict:
 
 
 async def sauver_etat(identifiant: int, etat: dict) -> None:
-    """Persiste l'état courant (UPSERT de `documents`)."""
+    """Persiste l'état courant (UPSERT de `documents`).
+
+    FA6 — cohérence transactionnelle : la clé `revision` est incrémentée à
+    CHAQUE sauvegarde. Le frontend la reçoit dans le contrat de l'atelier et
+    la retransmet avec ses mutations : une requête qui porte une révision
+    périmée est refusée (409) au lieu d'écraser silencieusement l'action d'un
+    autre onglet (contrôle de concurrence optimiste — CAS)."""
+    etat["revision"] = int(etat.get("revision", 1)) + 1
     await db.executer(
         "INSERT INTO documents (analyse_id, document_json) VALUES (?, ?) "
         "ON CONFLICT(analyse_id) DO UPDATE SET document_json = excluded.document_json",
         (identifiant, reconstruction.vers_json(etat)),
     )
+
+
+def verifier_revision(etat: dict, revision: int | None) -> None:
+    """FA6 — contrôle de concurrence optimiste : si le client transmet une
+    révision qui ne correspond plus à l'état courant, la mutation est refusée
+    (409) AVANT toute modification — l'auteur recharge l'atelier au lieu de
+    perdre une action dans un écrasement silencieux. `revision=None` (routes
+    Jinja2, appels non révisés) ne vérifie rien : compatibilité conservée."""
+    if revision is None:
+        return
+    courante = int(etat.get("revision", 1))
+    if revision != courante:
+        raise ErreurAtelier(
+            "L'atelier a été modifié dans un autre onglet ou une autre session "
+            "(révision périmée). Rechargez la page pour récupérer l'état à jour "
+            "avant de réessayer.",
+            statut=409,
+        )
 
 
 def contexte_resultat(analyse, etat: dict, erreur=None, onglet="tout") -> dict:
@@ -166,9 +191,13 @@ def contexte_resultat(analyse, etat: dict, erreur=None, onglet="tout") -> dict:
 # --- Actions de l'atelier -----------------------------------------------------
 
 
-async def choisir_forme(analyse, etat: dict, correction_id: str, decision: str) -> None:
+async def choisir_forme(
+    analyse, etat: dict, correction_id: str, decision: str, revision: int | None = None
+) -> None:
     """Accepte ('corrige', défaut) ou refuse ('original') une correction Forme :
-    un simple FILTRE (R2) — aucun remappage, la projection se recalcule."""
+    un simple FILTRE (R2) — aucun remappage, la projection se recalcule.
+    FA6 : `revision` (optionnel) — CAS, 409 si l'état a changé ailleurs."""
+    verifier_revision(etat, revision)
     if decision not in ("corrige", "original"):
         raise ErreurAtelier("Décision inconnue.")
     if not reconstruction.basculer_choix(etat, correction_id, decision):
@@ -202,9 +231,12 @@ async def _appliquer_patch(
 
 
 async def appliquer_alternative(
-    analyse, etat: dict, paragraphe_id: str, fragment: str, texte: str, contexte: str = ""
+    analyse, etat: dict, paragraphe_id: str, fragment: str, texte: str,
+    contexte: str = "", revision: int | None = None,
 ) -> None:
-    """Applique l'alternative choisie par l'auteur (clic droit sur sélection)."""
+    """Applique l'alternative choisie par l'auteur (clic droit sur sélection).
+    FA6 : `revision` (optionnel) — CAS, 409 si l'état a changé ailleurs."""
+    verifier_revision(etat, revision)
     await _appliquer_patch(etat, paragraphe_id, fragment, texte, contexte)
     await sauver_etat(analyse["id"], etat)
 
@@ -268,8 +300,10 @@ async def _reevaluer_corrections(analyse, etat, paragraphe_id: str) -> list[Corr
     return nouvelles
 
 
-async def reevaluer(analyse, etat: dict, paragraphe_id: str) -> None:
-    """Réévaluation manuelle des corrections d'un paragraphe (bouton « ↻ »)."""
+async def reevaluer(analyse, etat: dict, paragraphe_id: str, revision: int | None = None) -> None:
+    """Réévaluation manuelle des corrections d'un paragraphe (bouton « ↻ »).
+    FA6 : `revision` (optionnel) — CAS, 409 si l'état a changé ailleurs."""
+    verifier_revision(etat, revision)
     try:
         nouvelles = await _reevaluer_corrections(analyse, etat, paragraphe_id)
     except Exception as erreur:  # noqa: BLE001 — l'atelier ne doit jamais se bloquer
@@ -281,12 +315,15 @@ async def reevaluer(analyse, etat: dict, paragraphe_id: str) -> None:
 
 
 async def appliquer_embellissement(
-    analyse, etat: dict, paragraphe_id: str, fragment: str, texte: str, contexte: str = ""
+    analyse, etat: dict, paragraphe_id: str, fragment: str, texte: str,
+    contexte: str = "", revision: int | None = None,
 ) -> None:
     """Applique l'embellissement choisi, PUIS réévalue les corrections du
     paragraphe. Zéro surprise (J2.5) : travail sur une COPIE — si la
     réévaluation échoue, RIEN n'est appliqué (aucun état partiel) et l'état du
-    contexte reste inchangé."""
+    contexte reste inchangé. FA6 : `revision` (optionnel) — CAS, 409 si
+    l'état a changé ailleurs."""
+    verifier_revision(etat, revision)
     copie = copy.deepcopy(etat)
     await _appliquer_patch(copie, paragraphe_id, fragment, texte, contexte)
     try:
@@ -303,12 +340,16 @@ async def appliquer_embellissement(
     etat.update(copie)
 
 
-async def editer_paragraphe(analyse, etat: dict, paragraphe_id: str, texte: str) -> None:
+async def editer_paragraphe(
+    analyse, etat: dict, paragraphe_id: str, texte: str, revision: int | None = None
+) -> None:
     """Édition DIRECTE sans IA temps réel (UX4, décision 38) : remplace le texte
     COURANT affiché du paragraphe par ce que l'auteur a saisi — un patch
     indépendant ancré sur la base (jamais de splice + remappage). Le paragraphe
     est marqué modifié ; ses corrections et patches antérieurs sont retirés
-    (ils se rapportaient à un texte qui n'existe plus)."""
+    (ils se rapportaient à un texte qui n'existe plus).
+    FA6 : `revision` (optionnel) — CAS, 409 si l'état a changé ailleurs."""
+    verifier_revision(etat, revision)
     if not texte:
         raise ErreurAtelier("Le texte édité est vide.")
     if not reconstruction.remplacer_texte_paragraphe(etat, paragraphe_id, texte):

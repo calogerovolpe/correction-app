@@ -26,6 +26,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app import db
 from app.config import settings
+from app.llm import catalogue
 from app.routes.web import (
     _TACHES,
     _analyse,
@@ -91,6 +92,10 @@ class SoumissionAnalyse(BaseModel):
     numero_chapitre: float | None = None
     avec_codex: bool = False
     phases: dict[str, bool] | None = None
+    # FA6 — modèle texte Mistral choisi par l'auteur pour CETTE analyse
+    # (catalogue `app/llm/catalogue.py`). Absent/inconnu → la configuration
+    # `.env` par phase reste maîtresse (repli transparent, jamais de blocage).
+    modele: str | None = None
 
 
 class ResultatAnalyse(BaseModel):
@@ -129,15 +134,32 @@ class PrefilSoumission(BaseModel):
     phases: PrefilPhases
 
 
+class ModeleIa(BaseModel):
+    """Entrée du catalogue des modèles texte Mistral (FA6) — destinée à l'UI
+    de sélection E3 (`libelle`/`badge`/`description` en vocabulaire simple)."""
+
+    id: str
+    libelle: str
+    badge: str | None = None
+    description: str = ""
+
+
 class PreparerSoumission(BaseModel):
     """État de préparation de E3 : projet actif, numéro attendu (N+1), dernières
     configurations mémorisées (J2.5) et garde-fou de taille (source unique du
-    compteur 30 000 caractères)."""
+    compteur 30 000 caractères).
+
+    FA6 — catalogue des modèles texte (`modeles`), modèle pré-sélectionné
+    (`modele_defaut` = configuration Forme actuelle) et dernier choix valide
+    mémorisé (`modele_memorise`, None sinon)."""
 
     projet: Projet | None
     numero_attendu: int | float
     prefil: PrefilSoumission
     max_caracteres: int
+    modeles: list[ModeleIa]
+    modele_defaut: str
+    modele_memorise: str | None = None
 
 
 def _choix_phases_payload(phases: dict[str, bool] | None) -> dict[str, bool | None]:
@@ -294,11 +316,14 @@ async def analyses_recentes() -> ListeAnalyses:
 @router.get("/soumission", response_model=PreparerSoumission)
 async def preparer_soumission() -> PreparerSoumission:
     """État de préparation de E3 (jalon F2) : projet actif, numéro N+1 attendu,
-    dernières configurations mémorisées (J2.5) et garde-fou de taille."""
+    dernières configurations mémorisées (J2.5) et garde-fou de taille.
+    FA6 : le catalogue des modèles texte Mistral (sélection de l'IA qui
+    corrigera) + le modèle par défaut + le dernier choix valide mémorisé."""
     projet = await _projet_actif()
     actif_id = await _projet_actif_id()
     attendu = numero_attendu(projet) if projet else 0.0
-    prefil = _normaliser_prefil(await _dernieres_options())
+    dernieres = await _dernieres_options()
+    prefil = _normaliser_prefil(dernieres)
     return PreparerSoumission(
         projet=_serialiser_projet(projet, actif_id) if projet else None,
         numero_attendu=int(attendu) if attendu == int(attendu) else attendu,
@@ -311,6 +336,9 @@ async def preparer_soumission() -> PreparerSoumission:
             ),
         ),
         max_caracteres=settings.max_caracteres,
+        modeles=[ModeleIa(**m) for m in catalogue.MODELES_TEXTE],
+        modele_defaut=catalogue.modele_par_defaut(),
+        modele_memorise=catalogue.modele_effectif(dernieres.get("modele_ia")),
     )
 
 
@@ -356,6 +384,9 @@ async def soumettre_analyse_api(payload: SoumissionAnalyse) -> AnalyseSuivi:
             num_chap = None
 
     choix = _choix_phases_payload(payload.phases)
+    # FA6 — modèle texte choisi par l'auteur : mémorisé SEULEMENT s'il figure
+    # au catalogue (sinon repli transparent sur la configuration `.env`).
+    modele_ia = catalogue.modele_effectif(payload.modele)
     options = {
         "categorie": cat_choisie,
         "numero_chapitre": num_chap,
@@ -364,19 +395,19 @@ async def soumettre_analyse_api(payload: SoumissionAnalyse) -> AnalyseSuivi:
         "style": choix.get("style"),
         "technique": choix.get("technique"),
     }
+    if modele_ia:
+        options["modele_ia"] = modele_ia
     # Mémoire des configurations : pré-remplissage de E3 pour le prochain texte (J2.5)
+    memoire = {
+        "categorie": cat_choisie,
+        "phases": {k: bool(v) for k, v in choix.items()},
+    }
+    if modele_ia:
+        memoire["modele_ia"] = modele_ia
     await db.executer(
         "INSERT INTO parametres (cle, valeur) VALUES ('dernieres_options', ?) "
         "ON CONFLICT(cle) DO UPDATE SET valeur = excluded.valeur",
-        (
-            json.dumps(
-                {
-                    "categorie": cat_choisie,
-                    "phases": {k: bool(v) for k, v in choix.items()},
-                },
-                ensure_ascii=False,
-            ),
-        ),
+        (json.dumps(memoire, ensure_ascii=False),),
     )
     identifiant, _ = await db.executer(
         "INSERT INTO analyses (projet_id, texte_source, options_json) VALUES (?, ?, ?)",
@@ -489,6 +520,8 @@ class EtatAtelier(BaseModel):
     nb_corrections: int
     compteurs: dict[str, int]
     document: DocumentAnnote
+    # FA6 — compteur de cohérence transactionnelle (CAS aux mutations).
+    revision: int = 1
 
 
 class DecisionForme(BaseModel):
@@ -529,6 +562,8 @@ async def _etat_atelier_payload(analyse, etat, onglet: str = "tout") -> EtatAtel
         nb_corrections=contexte["nb_corrections"],
         compteurs=contexte["compteurs"],
         document=DocumentAnnote.model_validate(contexte["document"]),
+        # FA6 — révision courante de l'état (le frontend la retransmet).
+        revision=int(etat.get("revision", 1)),
     )
 
 
@@ -554,7 +589,8 @@ async def etat_atelier(analyse_id: int, onglet: str = "tout") -> EtatAtelier:
 
 @router.post("/analyses/{analyse_id}/choix-forme", response_model=EtatAtelier)
 async def api_choix_forme(
-    analyse_id: int, payload: DecisionForme, onglet: str = "tout"
+    analyse_id: int, payload: DecisionForme,
+    onglet: str = "tout", revision: int | None = None,
 ) -> EtatAtelier:
     """Accepte ('corrige') ou refuse ('original') une correction Forme : un
     simple FILTRE (R2) — la projection se recalcule, aucun remappage.
@@ -568,7 +604,9 @@ async def api_choix_forme(
         raise HTTPException(status_code=400, detail="Analyse non terminée.")
     etat = await service_atelier.charger_etat(analyse)
     try:
-        await service_atelier.choisir_forme(analyse, etat, payload.correction_id, payload.decision)
+        await service_atelier.choisir_forme(
+            analyse, etat, payload.correction_id, payload.decision, revision=revision
+        )
     except ErreurAtelier as erreur:
         raise HTTPException(status_code=erreur.statut, detail=str(erreur)) from erreur
     return await _etat_atelier_payload(analyse, etat, onglet)
@@ -576,7 +614,8 @@ async def api_choix_forme(
 
 @router.post("/analyses/{analyse_id}/appliquer-alternative", response_model=EtatAtelier)
 async def api_appliquer_alternative(
-    analyse_id: int, payload: ModificationSelection, onglet: str = "tout"
+    analyse_id: int, payload: ModificationSelection,
+    onglet: str = "tout", revision: int | None = None,
 ) -> EtatAtelier:
     """Applique l'alternative choisie par l'auteur (clic droit sur sélection).
     FA4 : renvoie la projection de l'onglet courant (plus de saut vers « tout »)."""
@@ -589,7 +628,8 @@ async def api_appliquer_alternative(
     etat = await service_atelier.charger_etat(analyse)
     try:
         await service_atelier.appliquer_alternative(
-            analyse, etat, payload.paragraphe_id, payload.fragment, payload.texte, payload.contexte
+            analyse, etat, payload.paragraphe_id, payload.fragment, payload.texte,
+            payload.contexte, revision=revision,
         )
     except ErreurAtelier as erreur:
         raise HTTPException(status_code=erreur.statut, detail=str(erreur)) from erreur
@@ -598,7 +638,8 @@ async def api_appliquer_alternative(
 
 @router.post("/analyses/{analyse_id}/editer", response_model=EtatAtelier)
 async def api_editer_paragraphe(
-    analyse_id: int, payload: EditionParagraphe, onglet: str = "tout"
+    analyse_id: int, payload: EditionParagraphe,
+    onglet: str = "tout", revision: int | None = None,
 ) -> EtatAtelier:
     """Édition DIRECTE sans IA temps réel (UX4, décision 38) : remplace le texte
     courant affiché du paragraphe (patch ancré base) ; « ↻ Re-corriger » relance
@@ -611,7 +652,9 @@ async def api_editer_paragraphe(
         raise HTTPException(status_code=400, detail="Analyse non terminée.")
     etat = await service_atelier.charger_etat(analyse)
     try:
-        await service_atelier.editer_paragraphe(analyse, etat, payload.paragraphe_id, payload.texte)
+        await service_atelier.editer_paragraphe(
+            analyse, etat, payload.paragraphe_id, payload.texte, revision=revision
+        )
     except ErreurAtelier as erreur:
         raise HTTPException(status_code=erreur.statut, detail=str(erreur)) from erreur
     return await _etat_atelier_payload(analyse, etat)
@@ -619,7 +662,8 @@ async def api_editer_paragraphe(
 
 @router.post("/analyses/{analyse_id}/reevaluer", response_model=EtatAtelier)
 async def api_reevaluer(
-    analyse_id: int, payload: EditionParagraphe, onglet: str = "tout"
+    analyse_id: int, payload: EditionParagraphe,
+    onglet: str = "tout", revision: int | None = None,
 ) -> EtatAtelier:
     """Réévaluation manuelle des corrections d'un paragraphe (bouton « ↻ »).
     FA4 : renvoie la projection de l'onglet courant (plus de saut vers « tout »)."""
@@ -632,7 +676,7 @@ async def api_reevaluer(
     paragraphe_id = payload.paragraphe_id
     etat = await service_atelier.charger_etat(analyse)
     try:
-        await service_atelier.reevaluer(analyse, etat, paragraphe_id)
+        await service_atelier.reevaluer(analyse, etat, paragraphe_id, revision=revision)
     except ErreurAtelier as erreur:
         raise HTTPException(status_code=erreur.statut, detail=str(erreur)) from erreur
     return await _etat_atelier_payload(analyse, etat, onglet)
@@ -696,7 +740,8 @@ async def api_alternatives_json(demande: DemandeSuggestion) -> dict:
 
 @router.post("/analyses/{analyse_id}/appliquer-embellissement", response_model=EtatAtelier)
 async def api_appliquer_embellissement(
-    analyse_id: int, payload: ModificationSelection, onglet: str = "tout"
+    analyse_id: int, payload: ModificationSelection,
+    onglet: str = "tout", revision: int | None = None,
 ) -> EtatAtelier:
     """Applique l'embellissement choisi, PUIS réévalue les corrections du
     paragraphe. Zéro surprise : si la réévaluation échoue, RIEN n'est appliqué
@@ -710,7 +755,8 @@ async def api_appliquer_embellissement(
     etat = await service_atelier.charger_etat(analyse)
     try:
         await service_atelier.appliquer_embellissement(
-            analyse, etat, payload.paragraphe_id, payload.fragment, payload.texte, payload.contexte
+            analyse, etat, payload.paragraphe_id, payload.fragment, payload.texte,
+            payload.contexte, revision=revision,
         )
     except ErreurAtelier as erreur:
         raise HTTPException(status_code=erreur.statut, detail=str(erreur)) from erreur

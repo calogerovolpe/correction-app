@@ -490,3 +490,42 @@ def test_fa2_une_forme_refusee_ne_bloque_pas_la_concurrente():
     etats = {e["correction"].id: e["etat"] for e in etat["corrections"]}
     assert etats == {"c-1": "active", "c-2": "active"}
     assert _courant(etat) == TEXTE  # les deux refusées → texte original
+
+
+# --- FA6 : cohérence transactionnelle (révision de l'état) ---------------------
+
+
+def test_fa6_etat_initial_porte_une_revision():
+    """FA6 : l'état courant naît avec un compteur de révision (CAS)."""
+    etat = reconstruction.etat_initial([], [_p()])
+    assert etat["revision"] == 1
+
+
+def test_fa6_aller_retour_json_conserve_la_revision():
+    etat = reconstruction.etat_initial(
+        [_corr("c-1", "forme", 14, 18, "part", "partent")], [_p()]
+    )
+    etat["revision"] = 7
+    reconstruit = reconstruction.depuis_json(reconstruction.vers_json(etat))
+    assert reconstruit["revision"] == 7
+
+
+def test_fa6_depuis_json_sans_revision_repart_de_1():
+    """FA6 — rétrocompatibilité : un état persisté d'avant FA6 (sans clé
+    `revision`) se charge avec la valeur 1 (la prochaine sauvegarde → 2)."""
+    etat = reconstruction.etat_initial(
+        [_corr("c-1", "forme", 14, 18, "part", "partent")], [_p()]
+    )
+    brut = reconstruction.vers_json(etat)
+    import json
+
+    donnees = json.loads(brut)
+    del donnees["revision"]
+    reconstruit = reconstruction.depuis_json(json.dumps(donnees, ensure_ascii=False))
+    assert reconstruit["revision"] == 1
+
+
+def test_fa6_migration_ancien_format_repart_de_revision_1():
+    ancien = {"modele": 1, "paragraphes": [], "corrections": [], "choix": {}}
+    etat = reconstruction.migrer_ancien_format(ancien, [_p()], [])
+    assert etat["revision"] == 1

@@ -327,3 +327,71 @@ def test_analyse_inconnue_404(client):
     reponse = client.get("/api/v1/analyses/9999")
     assert reponse.status_code == 404
     assert reponse.json()["detail"] == "Analyse introuvable."
+
+
+# --- FA6 : catalogue des modèles texte + modèle choisi à la soumission ---------
+
+
+def test_preparer_soumission_expose_le_catalogue_de_modeles(client, dossier_donnees):
+    """FA6 : E3 reçoit le catalogue des modèles texte Mistral (avec badge et
+    description pour l'UI), le modèle par défaut (configuration Forme) et le
+    dernier choix valide mémorisé (None au départ)."""
+    _projet_courant(dossier_donnees, 3)
+    donnees = client.get("/api/v1/soumission").json()
+    ids = [m["id"] for m in donnees["modeles"]]
+    assert "mistral-small-latest" in ids
+    assert "mistral-large-latest" in ids
+    assert "open-mistral-nemo" in ids
+    assert "ministral-8b-latest" in ids
+    recommande = next(m for m in donnees["modeles"] if m["badge"] == "Recommandé")
+    assert recommande["id"] == "mistral-small-latest"
+    assert recommande["libelle"] and recommande["description"]
+    assert donnees["modele_defaut"]
+    assert donnees["modele_memorise"] is None  # aucun choix encore mémorisé
+
+
+def test_soumission_avec_modele_choisi_utilise_pour_toutes_les_phases(
+    client, monkeypatch, dossier_donnees
+):
+    """FA6 : le modèle choisi à la soumission s'applique à TOUTES les phases
+    de l'analyse (surcharge la configuration .env) et est mémorisé côté serveur."""
+    _modeles_distincts(monkeypatch)
+    mock = MockLLM(reponses={"m-forme": REPONSE_FORME})
+    monkeypatch.setattr(service_analyse, "_client_llm", lambda: mock)
+    client.post("/api/v1/projets", json={"titre": "Mon roman"})
+
+    soumission = _soumettre(
+        client,
+        {"texte": TEXTE, "categorie": "extrait", "modele": "mistral-large-latest"},
+    )
+    finale = _attendre(client, soumission["id"])
+    assert finale["statut"] == "terminee"
+    appels = [modele for modele, _ in mock.appels]
+    assert appels  # les phases actives ont tourné
+    assert set(appels) == {"mistral-large-latest"}  # IA choisie pour toutes
+
+    donnees = client.get("/api/v1/soumission").json()
+    assert donnees["modele_memorise"] == "mistral-large-latest"
+
+
+def test_soumission_modele_inconnu_repli_transparent_sur_configuration(
+    client, monkeypatch
+):
+    """FA6 : un modèle hors catalogue est ignoré — la configuration `.env` par
+    phase reste maîtresse (repli transparent, jamais de blocage)."""
+    _modeles_distincts(monkeypatch)
+    mock = MockLLM(reponses={"m-forme": REPONSE_FORME, "m-style": '{"corrections": []}'})
+    monkeypatch.setattr(service_analyse, "_client_llm", lambda: mock)
+    client.post("/api/v1/projets", json={"titre": "Mon roman"})
+
+    soumission = _soumettre(
+        client,
+        {"texte": TEXTE, "categorie": "extrait", "modele": "modele-fantome"},
+    )
+    finale = _attendre(client, soumission["id"])
+    assert finale["statut"] == "terminee"
+    appels = [modele for modele, _ in mock.appels]
+    assert set(appels) == {"m-forme", "m-style"}  # configuration par phase
+
+    donnees = client.get("/api/v1/soumission").json()
+    assert donnees["modele_memorise"] is None  # rien de mémorisé

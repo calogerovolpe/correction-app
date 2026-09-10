@@ -507,3 +507,85 @@ def test_valider_chapitre_officiel_et_refus_extrait(client, monkeypatch):
     reponse = client.post(f"/api/v1/analyses/{soumission['id']}/valider")
     assert reponse.status_code == 400
     assert "Seul un Chapitre" in reponse.json()["detail"]
+
+
+# --- FA6 : cohérence transactionnelle (révision, conflit 409) ------------------
+
+
+def test_fa6_revision_exposee_puis_incremente_par_mutation(client, monkeypatch):
+    """FA6 : le contrat atelier porte la révision courante ; chaque mutation
+    l'incrémente (le frontend la retransmettra à son tour)."""
+    identifiant = _chapitre_termine(client, monkeypatch)
+    initial = client.get(f"/api/v1/analyses/{identifiant}/atelier").json()
+    revision_avant = initial["revision"]
+    assert revision_avant >= 1
+
+    reponse = client.post(
+        f"/api/v1/analyses/{identifiant}/choix-forme",
+        json={"correction_id": "c-0001", "decision": "original"},
+    )
+    assert reponse.status_code == 200
+    apres = reponse.json()
+    assert apres["revision"] == revision_avant + 1
+
+    # Le rechargement lit la MÊME révision (persistée dans `documents`).
+    relu = client.get(f"/api/v1/analyses/{identifiant}/atelier").json()
+    assert relu["revision"] == revision_avant + 1
+
+
+def test_fa6_mutation_sans_revision_parametre_fonctionne_compatibilite(
+    client, monkeypatch
+):
+    """FA6 : `revision` est optionnel — les routes Jinja2 et les appels non
+    révisés continuent de fonctionner (aucune rupture de compatibilité)."""
+    identifiant = _chapitre_termine(client, monkeypatch)
+    reponse = client.post(
+        f"/api/v1/analyses/{identifiant}/choix-forme",
+        json={"correction_id": "c-0001", "decision": "original"},
+    )
+    assert reponse.status_code == 200
+
+
+def test_fa6_conflit_revision_onglet_perime_refuse_409(client, monkeypatch):
+    """FA6 — scénario de concurrence : l'onglet A applique une action (la
+    révision avance) ; l'onglet B, resté sur l'ancienne révision, tente une
+    action — refus 409 AVANT toute modification (aucun écrasement silencieux)."""
+    identifiant = _chapitre_termine(client, monkeypatch)
+    vue_b = client.get(f"/api/v1/analyses/{identifiant}/atelier").json()
+    revision_b = vue_b["revision"]
+
+    # Onglet A : action RÉVISÉE avec la révision courante → acceptée.
+    r_a = client.post(
+        f"/api/v1/analyses/{identifiant}/choix-forme",
+        params={"revision": revision_b},
+        json={"correction_id": "c-0001", "decision": "original"},
+    )
+    assert r_a.status_code == 200
+    revision_apres_a = r_a.json()["revision"]
+    assert revision_apres_a == revision_b + 1
+
+    # Onglet B (révision périmée) : refus explicite 409, état intouché.
+    r_b = client.post(
+        f"/api/v1/analyses/{identifiant}/choix-forme",
+        params={"revision": revision_b},
+        json={"correction_id": "c-0001", "decision": "corrige"},
+    )
+    assert r_b.status_code == 409
+    assert "Rechargez" in r_b.json()["detail"]
+
+    # La révision en base n'a PAS bougé (l'action périmée n'a rien modifié).
+    relu = client.get(f"/api/v1/analyses/{identifiant}/atelier").json()
+    assert relu["revision"] == revision_apres_a
+
+
+def test_fa6_conflit_revision_rejete_avant_toute_mutation(client, monkeypatch):
+    """FA6 : un conflit de révision est vérifié AVANT la validation métier —
+    même avec une correction inconnue, c'est le 409 qui est renvoyé."""
+    identifiant = _chapitre_termine(client, monkeypatch)
+    vue = client.get(f"/api/v1/analyses/{identifiant}/atelier").json()
+    r = client.post(
+        f"/api/v1/analyses/{identifiant}/choix-forme",
+        params={"revision": vue["revision"] + 99},
+        json={"correction_id": "c-0001", "decision": "original"},
+    )
+    assert r.status_code == 409

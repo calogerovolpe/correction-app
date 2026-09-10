@@ -7,7 +7,12 @@
   import { ErreurApiApp } from '../lib/api/client';
   import { preparerSoumission, soumettreAnalyse } from '../lib/api/analyses';
   import { naviguer } from '../lib/router';
-  import type { CategorieAnalyse, PhasesSelection, PreparerSoumission } from '../lib/api/types';
+  import type {
+    CategorieAnalyse,
+    ModeleIa,
+    PhasesSelection,
+    PreparerSoumission,
+  } from '../lib/api/types';
 
   /** Soumission E3 (jalon F2) : collage Word fidèle, catégorie, numéro N+1
    *  pré-rempli, matrice de phases dérogable, compteur 30 000 caractères,
@@ -21,6 +26,22 @@
   let phases: PhasesSelection = $state({ forme: true, style: true, technique: true });
   let numeroChapitre = $state('');
   let avecCodex = $state(true);
+
+  // FA6 — modèle d'IA choisi par l'auteur pour CETTE analyse (catalogue E3).
+  // Mémorisé localement : le dernier choix est re-proposé à la prochaine
+  // soumission, sans friction (le serveur mémorise aussi son côté).
+  const CLE_MODELE_IA = 'correction-app.modele-ia';
+  let modeleIa = $state('');
+
+  function choisirModele(choisi: ModeleIa): void {
+    modeleIa = choisi.id;
+    try {
+      localStorage.setItem(CLE_MODELE_IA, choisi.id);
+    } catch {
+      // localStorage indisponible (navigation privée) : choix valable pour
+      // cette session seulement — aucun blocage.
+    }
+  }
 
   let texteV2 = $state('');
   let compteur = $state(0);
@@ -51,6 +72,17 @@
       // Mémoire J2.5 : les dernières configurations s'affichent telles quelles.
       phases = { ...donnees.prefil.phases };
       numeroChapitre = afficherNumero(donnees.numero_attendu);
+      // FA6 — modèle d'IA : dernier choix local s'il reste au catalogue,
+      // sinon dernier choix mémorisé côté serveur, sinon le défaut configuré.
+      let memorise: string | null = null;
+      try {
+        memorise = localStorage.getItem(CLE_MODELE_IA);
+      } catch {
+        memorise = null;
+      }
+      const local = donnees.modeles.find((m) => m.id === memorise);
+      const serveur = donnees.modeles.find((m) => m.id === donnees.modele_memorise);
+      modeleIa = (local ?? serveur)?.id ?? donnees.modele_defaut;
     } catch (e) {
       erreurPreparation = e instanceof ErreurApiApp
         ? e.message
@@ -103,6 +135,7 @@
         numero_chapitre: categorie === 'chapitre' ? numeroSaisi() : null,
         avec_codex: avecCodex && categorie === 'chapitre',
         phases,
+        modele: modeleIa || null,
       });
       naviguer(`/analyses/${suivi.id}`);
     } catch (e) {
@@ -199,6 +232,38 @@
           </p>
         </fieldset>
       {/if}
+
+      <!-- FA6 — sélection de l'IA qui corrigera (modèles texte Mistral) -->
+      <fieldset class="soumission__groupe">
+        <legend>Intelligence de correction</legend>
+        <p class="aide">
+          Choisissez l'IA qui analysera ce texte. Votre choix s'applique à cette
+          soumission et est mémorisé pour la suivante.
+        </p>
+        <div class="choix-modele" role="radiogroup" aria-label="Modèle d'intelligence artificielle">
+          {#each preparation.modeles as modele (modele.id)}
+            <label
+              class="choix-modele__carte"
+              class:choix-modele__carte--active={modeleIa === modele.id}
+            >
+              <input
+                type="radio"
+                name="modele-ia"
+                value={modele.id}
+                checked={modeleIa === modele.id}
+                onchange={() => choisirModele(modele)}
+              />
+              <span class="choix-modele__entete">
+                <strong>{modele.libelle}</strong>
+                {#if modele.badge}
+                  <span class="choix-modele__badge">{modele.badge}</span>
+                {/if}
+              </span>
+              <span class="choix-modele__description">{modele.description}</span>
+            </label>
+          {/each}
+        </div>
+      </fieldset>
 
       <fieldset class="soumission__groupe">
         <legend>Types de correction</legend>
@@ -310,5 +375,55 @@
     color: var(--encre-douce);
     font-size: 0.9rem;
     line-height: 1.45;
+  }
+  /* FA6 — cartes de sélection du modèle d'IA (radio cards, WCAG AA) */
+  .choix-modele {
+    display: grid;
+    gap: 0.6rem;
+  }
+  .choix-modele__carte {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.25rem 0.6rem;
+    align-items: center;
+    border: 1px solid var(--bordure);
+    border-radius: var(--rayon);
+    background: var(--fond-page);
+    padding: 0.65rem 0.8rem;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease;
+  }
+  .choix-modele__carte:hover {
+    border-color: var(--accent);
+  }
+  .choix-modele__carte--active {
+    border-color: var(--accent);
+    background: var(--accent-doux);
+  }
+  .choix-modele__carte input {
+    accent-color: var(--accent);
+    width: 1rem;
+    height: 1rem;
+  }
+  .choix-modele__entete {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+  .choix-modele__badge {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--accent-fonce);
+    background: var(--fond-surface);
+    border: 1px solid var(--accent);
+    border-radius: 999px;
+    padding: 0.05rem 0.5rem;
+  }
+  .choix-modele__description {
+    grid-column: 2;
+    color: var(--encre-douce);
+    font-size: 0.88rem;
+    line-height: 1.4;
   }
 </style>

@@ -37,6 +37,7 @@ function etatAtelier(onglet: string): EtatAtelier {
     a_embellissement: false,
     nb_corrections: 2,
     compteurs: { forme: 1, style: 1 },
+    revision: 3,
     document: {
       paragraphes: [
         {
@@ -69,17 +70,23 @@ function etatAtelier(onglet: string): EtatAtelier {
 }
 
 /** Remplace `fetch` : la fabrique reçoit l'URL et retourne la réponse. */
+let urlsAppellees: string[] = [];
+
 function reparerFetch(fabrique: (url: string) => Response): { appels: () => string[] } {
-  const appels: string[] = [];
+  urlsAppellees = [];
   vi.stubGlobal(
     'fetch',
     vi.fn(async (url: RequestInfo | URL) => {
       const urlComplet = String(url);
-      appels.push(urlComplet);
+      urlsAppellees.push(urlComplet);
       return fabrique(urlComplet);
     }),
   );
-  return { appels: () => appels };
+  return { appels: () => urlsAppellees };
+}
+
+function appelsCaptures(): string[] {
+  return urlsAppellees;
 }
 
 beforeEach(() => {
@@ -367,5 +374,71 @@ describe('Atelier E5 (F3)', () => {
     caseMasquer.dispatchEvent(new Event('change', { bubbles: true }));
     await attendre();
     expect(conteneur.textContent).toContain('Paragraphe sans aucune correction.');
+  });
+
+  it('transmet la révision courante avec chaque mutation — FA6', async () => {
+    reparerFetch((url) => {
+      if (url.includes('choix-forme')) {
+        // La mutation est acceptée : la révision renvoyée avance.
+        const etat = etatAtelier('tout');
+        etat.revision = 4;
+        return reponseJson(etat);
+      }
+      return reponseJson(etatAtelier('tout'));
+    });
+    rendre(Atelier, { analyseId: 7 });
+    await attendre();
+    await attendre();
+
+    const marque = conteneur.querySelector('[data-groupe="g-0001"]') as HTMLElement;
+    marque.dispatchEvent(
+      new MouseEvent('contextmenu', { bubbles: true, cancelable: true }),
+    );
+    await attendre();
+    const boutonAppliquer = Array.from(conteneur.querySelectorAll('button')).find(
+      (b) => b.textContent?.includes('Appliquer la correction'),
+    );
+    boutonAppliquer?.click();
+    await attendre();
+    await attendre();
+
+    const appelPost = appelsCaptures().find((a) => a.includes('choix-forme'));
+    expect(appelPost).toBeTruthy();
+    // FA6 : la révision courante (3) est transmise en query de la mutation
+    expect(appelPost).toContain('revision=3');
+  });
+
+  it('resynchronise l\'atelier après un conflit de révision (409) — FA6', async () => {
+    let premierAppelPost = true;
+    reparerFetch((url) => {
+      if (url.includes('choix-forme')) {
+        if (premierAppelPost) {
+          premierAppelPost = false;
+          return reponseJson({ detail: 'L\'atelier a été modifié dans un autre onglet ou une autre session (révision périmée). Rechargez la page pour récupérer l\'état à jour avant de réessayer.' }, 409);
+        }
+      }
+      return reponseJson(etatAtelier('tout'));
+    });
+    rendre(Atelier, { analyseId: 7 });
+    await attendre();
+    await attendre();
+
+    const marque = conteneur.querySelector('[data-groupe="g-0001"]') as HTMLElement;
+    marque.dispatchEvent(
+      new MouseEvent('contextmenu', { bubbles: true, cancelable: true }),
+    );
+    await attendre();
+    const boutonAppliquer = Array.from(conteneur.querySelectorAll('button')).find(
+      (b) => b.textContent?.includes('Appliquer la correction'),
+    );
+    boutonAppliquer?.click();
+    await attendre();
+    await attendre();
+    await attendre();
+
+    // Le message de conflit est affiché ET l'atelier est automatiquement
+    // rechargé (plus aucune impasse pour l'auteur).
+    expect(conteneur.textContent).toContain('révision périmée');
+    expect(conteneur.textContent).toContain("atelier rechargé avec l'état à jour");
   });
 });
