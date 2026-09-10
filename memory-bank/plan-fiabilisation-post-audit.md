@@ -31,7 +31,7 @@ La série **FA1→FA7** corrige ces failles dans un ordre strict de dépendance 
 | 2 | **FA2** | Identité documentaire, cycle de vie et réévaluation parallèle | P0/P1 (Majeur) | Moyen | ✅ **Livré** (+ bouton « Ouvrir » et purge analyses #7–#16, demandes de l'auteur) | *(voir `progress.md`)* |
 | 3 | **FA3** | Segmentation atomique aux bornes et document complet (rendu) | P0 (Bloquant) | Moyen | ✅ **Livré** (+ correctifs « Chargement atelier » bloqué et Erreur 500 analyses anciennes, incidents rapportés par l'auteur) | *(voir `progress.md`)* |
 | 4 | **FA4** | Rendu Svelte fidèle, styles réels, formatage Word et robustesse UI | P0/P1 (Majeur) | Moyen | ✅ **Livré** | `00d5575` |
-| 5 | **FA5** | Robustesse LLM : Custom Structured Outputs, invariants et prompts | P1 (Majeur) | Moyen | ⬜ À faire | — |
+| 5 | **FA5** | Robustesse LLM : Custom Structured Outputs, invariants et prompts | P1 (Majeur) | Moyen | ✅ **Livré** (+ sonde directe du schéma strict contre l'API Mistral) | `467f9f6` |
 | 6 | **FA6** | Cohérence transactionnelle, concurrence et alignement d'API | P1/P3 (Moyen) | Moyen | ⬜ À faire | — |
 | 7 | **FA7** | Restitution pédagogique : diff, sidebar sticky, popovers et clavier | P2 (UX/a11y) | Faible | ⬜ À faire | — |
 | 8 | **F4** | Finitions UX & identité (toasts, responsive, microcopy, AA complet) | F4 existant | Faible | ⬜ En attente (après FA7) | — |
@@ -217,7 +217,7 @@ L'audit senior full-stack / LLM / UI-UX réalisé après le jalon F3 (`023534a`)
   - Le formatage Word et les couleurs des couches apparaissent fidèlement dans le navigateur.
   - Zéro saut d'onglet intempestif après une action de correction.
   - `svelte-check` à 0 erreur et 0 warning.
-### Jalon FA5 — Robustesse LLM : Custom Structured Outputs, invariants et prompts
+### Jalon FA5 — Robustesse LLM : Custom Structured Outputs, invariants et prompts — ✅ LIVRÉ (`467f9f6`)
 
 - **Objectif** : Durcir les sorties Mistral, éliminer les risques de troncature silencieuse et de schémas invalides, enrichir la pédagogie des explications (cause → règle → correction → effet) et renforcer l'anti-injection.
 - **Dépendances** : FA1 à FA4 terminés.
