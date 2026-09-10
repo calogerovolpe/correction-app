@@ -4,6 +4,8 @@
   import BarreLaterale from '../lib/composants/BarreLaterale.svelte';
   import Bouton from '../lib/composants/Bouton.svelte';
   import DocumentAnnote from '../lib/composants/DocumentAnnote.svelte';
+  import EtatVide from '../lib/composants/EtatVide.svelte';
+  import IndicateurChargement from '../lib/composants/IndicateurChargement.svelte';
   import MenuContextuel, {
     type ElementMenu,
   } from '../lib/composants/MenuContextuel.svelte';
@@ -12,6 +14,7 @@
   import PopoverSuggestion from '../lib/composants/PopoverSuggestion.svelte';
   import ToggleMasquer from '../lib/composants/ToggleMasquer.svelte';
   import { ErreurApiApp } from '../lib/api/client';
+  import { toastSucces } from '../lib/toasts';
   import {
     alternatives,
     appliquerAlternative,
@@ -49,7 +52,10 @@
   let etat = $state<EtatAtelier | null>(null);
   let chargement = $state(true);
   let erreur = $state('');
-  let success = $state('');
+  // F4 — les confirmations fugitives (correction appliquée, paragraphe mis à
+  // jour, chapitre validé…) passent par les toasts accessibles (succès polis)
+  // au lieu d'un bandeau figé au-dessus du manuscrit ; les erreurs restent
+  // INLINE (elles exigent une action : recharger, corriger…).
   let onglet = $state<OngletAtelier>('tout');
   let masque = $state(false);
   let correctionActive = $state<CorrectionBarre | null>(null);
@@ -412,7 +418,6 @@
     if (!cibleId || actionEnCours) return;
     actionEnCours = true;
     erreur = '';
-    success = '';
     try {
       // FA4 : l'onglet courant est transmis — la réponse re-projette CET onglet
       // (plus de saut intempestif vers « tout » après un choix Forme).
@@ -428,6 +433,11 @@
       );
       onglet = etat.onglet;
       reconcilierCorrectionActive(cibleId);
+      toastSucces(
+        actionCle === 'appliquer-forme'
+          ? 'Correction appliquée au texte.'
+          : "Original gardé — la proposition est écartée.",
+      );
     } catch (e) {
       monterErreur(e);
     } finally {
@@ -511,9 +521,9 @@
   async function appliquerProposition(texte: string): Promise<void> {
     if (!selectionContexte || !popover || actionEnCours) return;
     const { paragrapheId, fragment, contexte } = selectionContexte;
+    const typeSuggestion = popover.type;
     actionEnCours = true;
     erreur = '';
-    success = '';
     try {
       if (popover.type === 'embellissement') {
         etat = await appliquerEmbellissement(
@@ -544,6 +554,11 @@
       reconcilierCorrectionActive();
       popover = null;
       selectionContexte = null;
+      toastSucces(
+        typeSuggestion === 'embellissement'
+          ? 'Votre passage a été embelli — lisez-le en entier pour juger du rythme.'
+          : 'Alternative appliquée au passage sélectionné.',
+      );
     } catch (e) {
       monterErreur(e);
     } finally {
@@ -560,13 +575,12 @@
     if (!enEditionId || actionEnCours) return;
     actionEnCours = true;
     erreur = '';
-    success = '';
     try {
       etat = await editerParagraphe(analyseId, enEditionId, texteEdition, onglet, etat?.revision);
       onglet = etat.onglet;
       reconcilierCorrectionActive();
       enEditionId = null;
-      success = 'Paragraphe mis à jour.';
+      toastSucces('Paragraphe mis à jour.');
     } catch (e) {
       monterErreur(e);
     } finally {
@@ -583,12 +597,11 @@
     if (actionEnCours) return;
     actionEnCours = true;
     erreur = '';
-    success = '';
     try {
       etat = await reevaluerParagraphe(analyseId, paragrapheId, onglet, etat?.revision);
       onglet = etat.onglet;
       reconcilierCorrectionActive();
-      success = 'Corrections du paragraphe réévaluées.';
+      toastSucces('Corrections du paragraphe réévaluées.');
     } catch (e) {
       monterErreur(e);
     } finally {
@@ -600,7 +613,6 @@
     if (actionEnCours) return;
     actionEnCours = true;
     erreur = '';
-    success = '';
     try {
       const reponse = await nouvelleVersion(analyseId);
       naviguer(`/analyses/${reponse.nouvel_id}`);
@@ -615,10 +627,9 @@
     if (actionEnCours) return;
     actionEnCours = true;
     erreur = '';
-    success = '';
     try {
       const reponse = await validerAnalyse(analyseId);
-      success = `Chapitre ${reponse.titre} validé — version officielle enregistrée.`;
+      toastSucces(`Chapitre ${reponse.titre} validé — version officielle enregistrée.`);
     } catch (e) {
       monterErreur(e);
     } finally {
@@ -647,7 +658,7 @@
         desactive={actionEnCours}
         onclick={() => void reexecuterNouvelleVersion()}
       >
-        🔄 Re-corriger (nouvelle version)
+        <span aria-hidden="true">🔄</span> Re-corriger (nouvelle version)
       </Bouton>
       {#if etat?.est_chapitre}
         <Bouton
@@ -655,25 +666,22 @@
           desactive={actionEnCours}
           onclick={() => void valider()}
         >
-          ✅ Valider la version actuelle (officielle)
+          <span aria-hidden="true">✅</span> Valider la version actuelle (officielle)
         </Bouton>
       {:else}
         <a class="lien-action-principal" href="#/soumission">
-          📝 Soumettre un autre texte
+          <span aria-hidden="true">📝</span> Soumettre un autre texte
         </a>
       {/if}
     </div>
   </header>
 
-  {#if success}
-    <Bandeau variante="succes">{success}</Bandeau>
-  {/if}
   {#if erreur}
     <Bandeau variante="erreur">{erreur}</Bandeau>
   {/if}
 
   {#if chargement && !etat}
-    <p class="chargement" role="status">Chargement de l'atelier…</p>
+    <IndicateurChargement message="Chargement de l'atelier…" />
   {:else if !etat}
     <!-- FA3 — plus d'impasse : en cas d'échec de chargement (erreur 500, réseau…),
          l'auteur dispose d'un bouton « Réessayer » et d'un retour à l'accueil. -->
@@ -710,20 +718,30 @@
           long sur tablette) pour demander un <strong>embellissement</strong> ou
           une <strong>alternative</strong>.
         </p>
-        <DocumentAnnote
-          paragraphes={paragraphesAffiches}
-          enEditionId={enEditionId}
-          texteEdition={texteEdition}
-          onSelectionnerGroupe={(g) => selectionnerGroupe(g)}
-          onDemanderEdition={demarrerEdition}
-          onDemanderReevaluer={(p) => void reexecuterParagraphe(p)}
-          onEditionChange={(t) => (texteEdition = t)}
-          onValiderEdition={() => void validerEdition()}
-          onAnnulerEdition={annulerEdition}
-          groupeActif={groupeActif}
-          onSignalerMarque={signalerMarque}
-          onQuitterMarque={quitterMarque}
-        />
+        {#if paragraphesAffiches.length === 0}
+          <!-- F4 — état vide : tous les paragraphes sont masqués (toggle) —
+               on explique le geste pour les retrouver au lieu d'une page vide. -->
+          <EtatVide
+            titre="Aucun paragraphe à afficher"
+            message="Tous les paragraphes visibles sont sans correction. Décochez « Masquer les paragraphes sans correction » au-dessus pour retrouver le texte entier."
+            illustration="👀"
+          />
+        {:else}
+          <DocumentAnnote
+            paragraphes={paragraphesAffiches}
+            enEditionId={enEditionId}
+            texteEdition={texteEdition}
+            onSelectionnerGroupe={(g) => selectionnerGroupe(g)}
+            onDemanderEdition={demarrerEdition}
+            onDemanderReevaluer={(p) => void reexecuterParagraphe(p)}
+            onEditionChange={(t) => (texteEdition = t)}
+            onValiderEdition={() => void validerEdition()}
+            onAnnulerEdition={annulerEdition}
+            groupeActif={groupeActif}
+            onSignalerMarque={signalerMarque}
+            onQuitterMarque={quitterMarque}
+          />
+        {/if}
       </div>
       <BarreLaterale
         corrections={etat.document.corrections_barre}
@@ -805,10 +823,6 @@
     background: var(--accent-fonce);
     border-color: var(--accent-fonce);
   }
-  .chargement {
-    color: var(--encre-douce);
-    font-style: italic;
-  }
   .atelier__echec-chargement {
     display: grid;
     gap: 1rem;
@@ -856,6 +870,27 @@
     .atelier__controles {
       flex-direction: column;
       align-items: flex-start;
+    }
+  }
+
+  /* F4 — mobile : l'en-tête passe en colonne, les actions s'étirent pour des
+     cibles tactiles confortables (≥ 44 px), plus de chevauchement à 360 px. */
+  @media (max-width: 640px) {
+    .atelier__entete {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    .atelier__actions {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    .atelier__actions :global(.bouton) {
+      width: 100%;
+      justify-content: center;
+    }
+    .lien-action-principal {
+      justify-content: center;
+      text-align: center;
     }
   }
 </style>

@@ -1,5 +1,6 @@
 <script lang="ts">
   import NavBar from './lib/composants/NavBar.svelte';
+  import ConteneurToasts from './lib/composants/ConteneurToasts.svelte';
   import Accueil from './routes/Accueil.svelte';
   import Atelier from './routes/Atelier.svelte';
   import Soumission from './routes/Soumission.svelte';
@@ -25,9 +26,22 @@
   }
 </script>
 
+<!-- F4 — lien d'évitement : premier élément focusable, il saute directement
+     au contenu principal pour la navigation clavier / lecteurs d'écran.
+     Attention : NE PAS laisser le hash changer (#contenu déclencherait le
+     routeur hash de l'application) — preventDefault + focus programmatique. -->
+<a
+  class="evitement"
+  href="#contenu"
+  onclick={(evenement) => {
+    evenement.preventDefault();
+    document.getElementById('contenu')?.focus();
+  }}
+>Aller au contenu principal</a>
+
 <div class="enveloppe">
   <NavBar />
-  <main>
+  <main id="contenu" tabindex="-1">
     {#if $routeCourante === '/'}
       <Accueil />
     {:else if $routeCourante === '/soumission'}
@@ -50,3 +64,6 @@
     <p>Correction de manuscrit — application locale, vos textes restent sur votre machine.</p>
   </footer>
 </div>
+
+<!-- F4 — notifications toast unifiées (succès polis, erreurs assertives). -->
+<ConteneurToasts />

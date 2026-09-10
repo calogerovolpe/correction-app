@@ -3,6 +3,7 @@
   import Badge from '../lib/composants/Badge.svelte';
   import Bandeau from '../lib/composants/Bandeau.svelte';
   import Carte from '../lib/composants/Carte.svelte';
+  import IndicateurChargement from '../lib/composants/IndicateurChargement.svelte';
   import { ErreurApiApp } from '../lib/api/client';
   import { statutAnalyse } from '../lib/api/analyses';
   import type { AnalyseSuivi, StatutAnalyse } from '../lib/api/types';
@@ -90,7 +91,7 @@
     <Bandeau variante="erreur">{erreur}</Bandeau>
     <a class="lien-retour" href="#/soumission">Revenir à la soumission</a>
   {:else if chargement && !analyse}
-    <p class="chargement" role="status">Récupération du statut…</p>
+    <IndicateurChargement message="Récupération du statut…" />
   {:else if analyse && estInconnu(analyse.statut)}
     <Bandeau variante="erreur">
       Statut « {analyse.statut ?? 'inconnu'} » non reconnu : aucune analyse
@@ -148,10 +149,6 @@
   .suivi h1 {
     margin: 0;
     font-size: 1.6rem;
-  }
-  .chargement {
-    color: var(--encre-douce);
-    font-style: italic;
   }
   .lien-retour {
     font-weight: 600;

@@ -4,20 +4,23 @@
   import Bouton from '../lib/composants/Bouton.svelte';
   import Carte from '../lib/composants/Carte.svelte';
   import EtatVide from '../lib/composants/EtatVide.svelte';
+  import IndicateurChargement from '../lib/composants/IndicateurChargement.svelte';
   import Modale from '../lib/composants/Modale.svelte';
   import { ErreurApiApp } from '../lib/api/client';
   import { activerProjet, analysesRecentes, creerProjet, listerProjets, supprimerProjet } from '../lib/api/projets';
-import { naviguer } from '../lib/router';
+  import { naviguer } from '../lib/router';
+  import { toastErreur, toastSucces } from '../lib/toasts';
   import type { AnalyseLigne, Projet, StatutAnalyse } from '../lib/api/types';
 
-  /** Accueil & projets E1 (jalon F1) : liste des manuscrits, création,
-   *  activation, suppression avec confirmation, analyses récentes, états vides. */
+  /** Accueil & projets E1 (jalon F1, finitions F4) : liste des manuscrits,
+   *  création, activation, suppression avec confirmation, analyses récentes,
+   *  états vides soignés ; les retours d'actions passent par les toasts
+   *  accessibles (succès polis, erreurs assertives). */
 
   let projets: Projet[] = $state([]);
   let analyses: AnalyseLigne[] = $state([]);
   let chargement = $state(true);
   let erreur = $state('');
-  let erreurAction = $state('');
 
   let titre = $state('');
   let creationEnCours = $state(false);
@@ -47,25 +50,25 @@ import { naviguer } from '../lib/router';
     const nouveauTitre = titre.trim();
     if (!nouveauTitre || creationEnCours) return;
     creationEnCours = true;
-    erreurAction = '';
     try {
       await creerProjet(nouveauTitre);
       titre = '';
+      toastSucces(`Projet « ${nouveauTitre} » créé — à vos plumes !`);
       await charger();
     } catch (e) {
-      erreurAction = e instanceof ErreurApiApp ? e.message : 'La création du projet a échoué.';
+      toastErreur(e instanceof ErreurApiApp ? e.message : 'La création du projet a échoué.');
     } finally {
       creationEnCours = false;
     }
   }
 
   async function activer(projet: Projet): Promise<void> {
-    erreurAction = '';
     try {
       await activerProjet(projet.projet_id);
+      toastSucces(`« ${projet.titre} » est maintenant le projet actif.`);
       await charger();
     } catch (e) {
-      erreurAction = e instanceof ErreurApiApp ? e.message : "L'activation du projet a échoué.";
+      toastErreur(e instanceof ErreurApiApp ? e.message : "L'activation du projet a échoué.");
     }
   }
 
@@ -74,7 +77,6 @@ import { naviguer } from '../lib/router';
    *  soumission du premier texte. Le projet est activé au passage (une seule
    *  opération : l'activation puis la navigation). */
   async function ouvrir(projet: Projet): Promise<void> {
-    erreurAction = '';
     try {
       if (!projet.actif) {
         await activerProjet(projet.projet_id);
@@ -85,21 +87,21 @@ import { naviguer } from '../lib/router';
         naviguer('/soumission');
       }
     } catch (e) {
-      erreurAction = e instanceof ErreurApiApp ? e.message : "L'ouverture du projet a échoué.";
+      toastErreur(e instanceof ErreurApiApp ? e.message : "L'ouverture du projet a échoué.");
     }
   }
 
   async function confirmerSuppression(): Promise<void> {
     if (!projetASupprimer || suppressionEnCours) return;
     suppressionEnCours = true;
-    erreurAction = '';
     const cible = projetASupprimer;
     try {
       await supprimerProjet(cible.projet_id);
       projetASupprimer = null;
+      toastSucces(`Projet « ${cible.titre} » supprimé.`);
       await charger();
     } catch (e) {
-      erreurAction = e instanceof ErreurApiApp ? e.message : 'La suppression du projet a échoué.';
+      toastErreur(e instanceof ErreurApiApp ? e.message : 'La suppression du projet a échoué.');
       projetASupprimer = null;
     } finally {
       suppressionEnCours = false;
@@ -155,17 +157,23 @@ import { naviguer } from '../lib/router';
     <p class="alerte alerte--erreur" role="alert">{erreur}</p>
     <Bouton variante="secondaire" onclick={() => void charger()}>Réessayer</Bouton>
   {:else if chargement && projets.length === 0}
-    <p class="chargement" role="status">Chargement de vos projets…</p>
+    <IndicateurChargement message="Chargement de vos projets…" />
   {:else}
     <Carte titre="Vos manuscrits">
-      {#if erreurAction}
-        <p class="alerte alerte--erreur" role="alert">{erreurAction}</p>
-      {/if}
-
       {#if projets.length === 0}
+        {#snippet ctaPremierProjet()}
+          <Bouton
+            variante="primaire"
+            onclick={() => document.getElementById('titre-projet')?.focus()}
+          >
+            Créer mon premier projet
+          </Bouton>
+        {/snippet}
         <EtatVide
           titre="Aucun manuscrit pour le moment"
           message="Créez votre premier projet (votre roman) pour commencer à le corriger."
+          illustration="📖"
+          action={ctaPremierProjet}
         />
       {:else}
         <ul class="projets">
@@ -241,7 +249,8 @@ import { naviguer } from '../lib/router';
       {#if analyses.length === 0}
         <EtatVide
           titre="Aucune analyse récente"
-          message="Vos prochaines analyses de texte apparaîtront ici, pour retrouver facilement vos soumissions."
+          message="Vos prochaines analyses apparaîtront ici : soumettez un texte depuis « Soumettre un texte » pour le voir relu dans l'atelier."
+          illustration="📚"
         />
       {:else}
         <ul class="analyses">
@@ -293,10 +302,6 @@ import { naviguer } from '../lib/router';
     margin: 0;
     max-width: 60ch;
     color: var(--encre-douce);
-  }
-  .chargement {
-    color: var(--encre-douce);
-    font-style: italic;
   }
   .alerte {
     margin: 0;
@@ -394,5 +399,23 @@ import { naviguer } from '../lib/router';
     text-overflow: ellipsis;
     white-space: nowrap;
     max-width: 34ch;
+  }
+
+  /* F4 — mobile : les actions de projet passent en colonne tactile (cibles
+     confortables, pas de chevauchement), l'extrait d'analyse s'élargit. */
+  @media (max-width: 640px) {
+    .projets__projet {
+      flex-direction: column;
+      align-items: stretch;
+    }
+    .projets__actions {
+      flex-wrap: wrap;
+    }
+    .projets__actions :global(.bouton) {
+      flex: 1 1 auto;
+    }
+    .analyses__extrait {
+      max-width: 100%;
+    }
   }
 </style>

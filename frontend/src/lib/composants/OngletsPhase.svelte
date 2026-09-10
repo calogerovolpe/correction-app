@@ -77,6 +77,23 @@
     gap: 0.5rem;
     margin: 0 0 0.75rem;
   }
+  /* F4 — mobile/tablette : les onglets défilent horizontalement au lieu de
+     se compresser ou de déborder ; la barre de défilement est masquée
+     (le balayage reste possible au tactile, la navigation clavier aussi). */
+  @media (max-width: 640px) {
+    .onglets {
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      padding-bottom: 0.25rem;
+      scrollbar-width: none;
+    }
+    .onglets::-webkit-scrollbar {
+      display: none;
+    }
+    .onglet {
+      flex: 0 0 auto;
+    }
+  }
   .onglet {
     font: inherit;
     font-size: 0.9rem;

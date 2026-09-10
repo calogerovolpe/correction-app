@@ -155,7 +155,11 @@
   <section class="barre-section">
     <h3>Corrections ({corrections.length})</h3>
     {#if corrections.length === 0}
-      <p class="barre-vide">Aucune correction.</p>
+      <!-- F4 — état vide chaleureux : un onglet sans correction est une bonne
+           nouvelle, on le dit en toutes lettres (et en douceur). -->
+      <p class="barre-vide" role="status">
+        Rien à relire ici — votre texte est limpide sur cet onglet.
+      </p>
     {:else}
       <ul class="barre-liste">
         {#each corrections as correction (correction.id)}

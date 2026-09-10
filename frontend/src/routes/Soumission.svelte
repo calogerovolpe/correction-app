@@ -4,9 +4,11 @@
   import Bouton from '../lib/composants/Bouton.svelte';
   import EditeurWord from '../lib/composants/EditeurWord.svelte';
   import EtatVide from '../lib/composants/EtatVide.svelte';
+  import IndicateurChargement from '../lib/composants/IndicateurChargement.svelte';
   import { ErreurApiApp } from '../lib/api/client';
   import { preparerSoumission, soumettreAnalyse } from '../lib/api/analyses';
   import { naviguer } from '../lib/router';
+  import { toastSucces } from '../lib/toasts';
   import type {
     CategorieAnalyse,
     ModeleIa,
@@ -137,6 +139,9 @@
         phases,
         modele: modeleIa || null,
       });
+      // F4 — confirmation fugitive accessible : le toast survit à la
+      // navigation vers le suivi E4 (conteneur monté au niveau de l'app).
+      toastSucces('Texte soumis — l\'analyse démarre dans quelques secondes.');
       naviguer(`/analyses/${suivi.id}`);
     } catch (e) {
       erreurSoumission = e instanceof ErreurApiApp
@@ -154,7 +159,7 @@
     <Bandeau variante="erreur">{erreurPreparation}</Bandeau>
     <Bouton variante="secondaire" onclick={() => void chargerPreparation()}>Réessayer</Bouton>
   {:else if chargement}
-    <p class="chargement" role="status">Préparation du formulaire…</p>
+    <IndicateurChargement message="Préparation du formulaire…" />
   {:else if preparation && !preparation.projet}
     <EtatVide
       titre="Aucun projet actif"
@@ -190,8 +195,8 @@
       </p>
       {#if surplusCaracteres() > 0}
         <p class="depassement" role="alert">
-          Dépassez de {surplusCaracteres()} caractères la limite de
-          {preparation.max_caracteres} : la soumission sera refusée.
+          Vous dépassez la limite de {preparation.max_caracteres} caractères de
+          {surplusCaracteres()} : la soumission sera refusée.
         </p>
       {/if}
 
@@ -299,10 +304,6 @@
   .soumission h1 {
     margin: 0;
     font-size: 1.6rem;
-  }
-  .chargement {
-    color: var(--encre-douce);
-    font-style: italic;
   }
   .lien-retour {
     font-weight: 600;

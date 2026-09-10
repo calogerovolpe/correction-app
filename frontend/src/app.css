@@ -63,6 +63,59 @@ main {
   flex: 1 1 auto;
 }
 
+/* ---- Focus visible unifié (F4, WCAG 2.4.7) : tout élément focusable reçoit
+   un contour accent visible et cohérent ; les règles plus spécifiques
+   (marques du manuscrit, champs) restent maîtresses. ---- */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ---- Lien d'évitement (F4) : masqué visuellement, révélé au focus. ---- */
+.evitement {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 500;
+  padding: 0.5rem 0.9rem;
+  background: var(--fond-surface);
+  color: var(--accent-fonce);
+  border: 2px solid var(--accent);
+  border-radius: var(--rayon);
+  font-weight: 600;
+}
+.evitement:focus {
+  left: 0.5rem;
+  top: 0.5rem;
+}
+
+/* main devient une cible de focus programmatique (tabindex="-1") : aucun
+   contour parasite au clic souris, un contour net à l'arrivée clavier. */
+main:focus {
+  outline: none;
+}
+
+/* ---- Mouvement réduit : transitions et animations neutralisées pour les
+   personnes sensibles au mouvement (prefers-reduced-motion). ---- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ---- Responsive global (F4) : confort mobile du conteneur racine. ---- */
+@media (max-width: 640px) {
+  .enveloppe {
+    padding: 0.75rem;
+    gap: 1rem;
+  }
+}
+
 .pied {
   border-top: 1px solid var(--bordure);
   color: var(--encre-douce);

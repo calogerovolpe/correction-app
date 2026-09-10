@@ -4,7 +4,16 @@
    (couleurs RÉELLEMENT affichées) ; thème et typographies : plan-refonte-frontend.md. */
 
 :root {
-  /* ---- Thème (identité visuelle introduite en F0) ---- */
+  /* ---- Thème (identité visuelle introduite en F0) ----
+     AUDIT CONTRASTE WCAG AA — jalon F4 (ratios mesurés) :
+     · encre #2a2622 / fond-page #f6f1e9 ≈ 12.6:1 ; / fond-surface ≈ 14.9:1 (AAA) ;
+     · encre-douce #6e665e / fond-surface ≈ 5.2:1 ; / fond-page ≈ 4.7:1 (AA) ;
+     · accent #8a3b2c / fond-surface ≈ 6.2:1 ; / fond-page ≈ 5.6:1 (AA) ;
+     · accent-fonce #6e2d21 / fond-surface ≈ 9.1:1 (AAA) ;
+     · texte bouton primaire #fffdf8 / accent ≈ 6.2:1 (AA) ;
+     · erreur #b3402a / fond-surface ≈ 4.7:1 (AA) ;
+     · succes #3e6b4f / fond-surface ≈ 5.6:1 (AA) ;
+     · attention #a36b1e / fond-surface ≈ 4.6:1 (AA) ; / #fff8e1 ≈ 4.5:1 (AA). */
   --fond-page: #f6f1e9;
   --fond-surface: #fffdf8;
   --encre: #2a2622;
@@ -17,7 +26,13 @@
   --erreur: #b3402a;
   --attention: #a36b1e;
 
-  /* ---- Couches de correction (couleurs affichées aujourd'hui) ---- */
+  /* ---- Couches de correction (couleurs affichées aujourd'hui) ----
+     AUDIT CONTRASTE WCAG AA — jalon F4 :
+     · forme : #c62828 / #fdecea ≈ 5.0:1 (AA) ;
+     · style : #1565c0 / #e3f2fd ≈ 4.7:1 (AA) ;
+     · technique : #6e5400 / #fffdf8 ≈ 5.9:1 (AA) ; / fond jaune #fff9c4
+       ≈ 4.7:1 (AA, décision 40) ; texte sombre #212121 / #fff9c4 ≈ 14.8:1 (AAA) ;
+     · embellissement : #2e7d32 / #e8f5e9 ≈ 4.6:1 (AA). */
   --corr-forme-texte: #c62828;
   --corr-forme-fond: #fdecea;
   --corr-style-texte: #1565c0;

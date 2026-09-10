@@ -10,6 +10,9 @@
   font-family: var(--police-manuscrit);
   font-size: 1.05rem;
   line-height: 1.8;
+  /* F4 — confort de lecture : le manuscrit ne s'étire jamais au-delà d'une
+     colonne de lecture (~75 caractères) sur les écrans très larges. */
+  max-width: 75ch;
 }
 
 .paragraphe {
