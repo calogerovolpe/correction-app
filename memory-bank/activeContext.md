@@ -1,11 +1,11 @@
 # Contexte actif — où nous en sommes MAINTENANT
 
-> Fichier le plus souvent mis à jour. Dernière mise à jour : 2026-09-10 (jalon FA7 LIVRÉ — prochaine étape = F4).
+> Fichier le plus souvent mis à jour. Dernière mise à jour : 2026-09-10 (jalon F4 LIVRÉ — prochaine étape = F5).
 
 ## Focus du moment
 
-**Fiabilisation post-audit de l'Atelier E5 — série FA1→FA7 — AVANT F4, F5 et J3.**
-La roadmap détaillée est dans **`plan-fiabilisation-post-audit.md`** (même dossier) : **LA RELIRE EN DÉBUT DE SESSION**.
+**Refonte frontend — série F0→F5 — jalons F4 LIVRÉ, F5 (Nettoyage & bascule) EN ATTENTE.**
+La roadmap détaillée est dans **`plan-refonte-frontend.md`** (même dossier) : **LA RELIRE EN DÉBUT DE SESSION**.
 RÈGLE MAÎTRESSE : **1 JALON = 1 CONVERSATION DISTINCTE.**
 Ne JAMAIS enchaîner deux jalons dans la même session sans feu vert explicite de l'auteur.
 **NOUVELLE RÈGLE (2026-09-09)** : à la fin de CHAQUE action, communiquer les commits GitHub réalisés (hash, intitulé) et confirmer le push — `systemPatterns.md` règle n° 9.
@@ -13,15 +13,21 @@ Ne JAMAIS enchaîner deux jalons dans la même session sans feu vert explicite d
 - **Où on en est** :
   - La série R est LIVRÉE — R1-a ✅ (`245071b`) ; R1-b ✅ (`c911547`) ; R2 ✅ (`e886d3a`).
   - Les jalons F0 à F3 sont LIVRÉS — F0 ✅ (`4cbb55c`) ; F1 ✅ (`cb6abc1`) ; F2 ✅ (`6cdfb22`) ; F3 ✅ (`023534a`).
-  - **FA1 — Intégrité du ré-ancrage et non-perte de texte est LIVRÉ** ✅ (`76a0057`) — 162 pytest + 45 Vitest verts, `svelte-check` 0 erreur, **E2E réel Mistral rejoué OK** (`data_e2e/` réinitialisé : chapitre validé corrigé, chaîne `ok`, 1 backup).
-  - **FA2 — Identité documentaire, cycle de vie, réévaluation parallèle + bouton « Ouvrir » est LIVRÉ** ✅ (`7405310`) — 170 pytest + 47 Vitest verts, `svelte-check` 0 erreur, **E2E réel Mistral rejoué OK** ; **purge des analyses de test #7 à #16 de `data/database.sqlite3`** (backup de sécurité `data/database.avant-purge-fa2.sqlite3` ; analyses 1–6 conservées).
-  - **FA3 — Segmentation atomique aux bornes, document complet + atelier résilient est LIVRÉ** ✅ (`c8da894`) — 176 pytest + 48 Vitest verts, `svelte-check` 0 erreur, **E2E réel Mistral rejoué OK** ; corrige AUSSI les deux incidents rapportés par l'auteur (« Chargement de l'atelier » bloqué + Erreur serveur 500 sur les analyses anciennes).
-  - **FA4 — Rendu Svelte fidèle, styles réels, formatage Word et robustesse UI est LIVRÉ** ✅ (`00d5575`) — 177 pytest + 53 Vitest verts, `svelte-check` 0 erreur, SPA recompilé : formatage Word rendu (`<strong>`/`<em>`/`<u>` sémantiques), couleurs réelles des couches restaurées (reset `:where` à spécificité zéro), onglet actif conservé après action (`onglet` en query des POST `/api/v1`), réconciliation de la correction active + jeton anti-course.
-  - **FA5 — Robustesse LLM : Custom Structured Outputs, invariants et prompts est LIVRÉ** ✅ — 192 pytest + 53 Vitest verts, `svelte-check` 0 erreur, **E2E réel Mistral rejoué OK** (`data_e2e/` réinitialisé : 9 corrections sous schéma strict, chapitre validé corrigé, chaîne `ok`, 1 backup) + sonde directe du schéma strict contre l'API Mistral (`scripts/sonde_fa5_schema.py`, statut 200, sortie validée par le contrat Pydantic).
-  - **FA6 — Cohérence transactionnelle, concurrence et alignement d'API est LIVRÉ** ✅ (`012d386`) — **+ nouvelle fonctionnalité de l'auteur : choix de l'IA qui corrigera à la soumission (E3)** — 203 pytest + 58 Vitest verts, `svelte-check` 0 erreur, SPA recompilée, **E2E réel Mistral rejoué OK** (9 corrections, chapitre validé, chaîne `ok`, 1 backup).
-  - **FA7 — Restitution pédagogique : diff, sidebar sticky, popovers et clavier est LIVRÉ** ✅ (`71dd08a`) — **dernier jalon de la série FA1→FA7** — 203 pytest + 73 Vitest verts (58 + 15 nouveaux), `svelte-check` 0 erreur / 0 warning, SPA recompilée ; frontend seul (aucun changement backend/LLM → pas d'E2E Mistral requis).
-  - **F4 (Finitions UX) et F5 (Nettoyage & bascule) sortent de pause** — la série corrective FA1→FA7 est ACHÈVÉE.
-  - **Prochaine étape immédiate = F4 — Finitions UX & identité (toasts, responsive, microcopy, AA complet).**
+  - La série corrective FA1→FA7 est LIVRÉE ET ACHÈVÉE — FA1 ✅ (`76a0057`) ; FA2 ✅ (`7405310`) ; FA3 ✅ (`c8da894`) ; FA4 ✅ (`00d5575`) ; FA5 ✅ (`467f9f6`) ; FA6 ✅ (`012d386`) ; FA7 ✅ (`71dd08a`).
+  - **F4 — Finitions UX & identité est LIVRÉ** ✅ (`74d602e`) — 203 pytest + 83 Vitest verts (73 + 10 nouveaux), `svelte-check` 0 erreur / 0 warning, SPA recompilée ; frontend seul (aucun changement backend/LLM → pas d'E2E Mistral requis).
+  - **Prochaine étape immédiate = F5 — Nettoyage & bascule (retrait Jinja2/HTMX/Alpine, E2E `/api/v1`, spec consolidée à jour).**
+
+## Changements récents (F4 — Finitions UX & identité : toasts, états vides, AA, responsive, microcopy)
+
+- **Système de toasts accessibles** (`lib/toasts.ts` + `ConteneurToasts.svelte`, NOUVEAUX) : conteneur unique monté UNE fois dans `App.svelte` ; **deux zones live distinctes** — `role="status"` / `aria-live="polite"` pour succès et infos, `role="alert"` / `aria-live="assertive"` pour les erreurs bloquantes ; auto-fermeture minutée paramétrable (succès 5 s, info 6 s, erreur 8 s, 0 = jamais) + **bouton de fermeture accessible** (`aria-label="Fermer la notification"`) ; le store (`writable` svelte/store, convention `router.ts`) SURVIT à la navigation interne (le toast de soumission accompagne l'arrivée sur le suivi E4). API : `toastSucces` / `toastInfo` / `toastErreur` / `fermerToast` / `viderToasts` (tests). 10 Vitest dédiés.
+- **Migrations vers les toasts** : E5 Atelier (correction appliquée / original gardé, paragraphe mis à jour, réévaluation, alternative appliquée, embellissement, chapitre validé — l'état `success` et son bandeau figé sont SUPPRIMÉS) ; E1 Accueil (projet créé « à vos plumes », projet activé, projet supprimé ; `erreurAction` supprimée) ; E3 Soumission (« Texte soumis — l'analyse démarre »). **Les erreurs restent INLINE** (Bandeau `role="alert"`) : elles exigent une action de l'auteur (recharger, corriger le texte), contrairement aux confirmations fugitives.
+- **Indicateur de chargement unifié** (`IndicateurChargement.svelte`, NOUVEAU) : spinner CSS local-first (aucune ressource distante), `role="status"`, `prefers-reduced-motion` respecté (rotation ralentie, pas supprimée) — déployé sur E1 (« Chargement de vos projets… »), E3 (« Préparation du formulaire… »), E4 (« Récupération du statut… »), E5 (« Chargement de l'atelier… »).
+- **États vides soignés** : `EtatVide.svelte` enrichi (micro-illustration `aria-hidden` paramétrable : ✒️ par défaut, 📖 « Créer mon premier projet » E1 avec CTA focusant le champ titre, 📚 analyses récentes E1, 👀 repli du toggle masquer E5 « Aucun paragraphe à afficher ») ; barre latérale E5 : « Rien à relire ici — votre texte est limpide sur cet onglet » (`role="status"`).
+- **Accessibilité clavier/focus** : **lien d'évitement « Aller au contenu principal »** en tête de `App.svelte` (`preventDefault` + focus programmatique sur `main tabindex="-1"` — le hash ne doit PAS changer, sinon le routeur hash afficherait « Page introuvable ») ; **`:focus-visible` global** (contour accent 2px, `app.css`) ; emojis d'en-tête E5 (🔄 ✅ 📝) enveloppés dans `aria-hidden`.
+- **Audit formel WCAG AA** : ratios mesurés et documentés EN COMMENTAIRE dans `tokens.css` (thème : encre 12.6:1, encre-douce 5.2:1, accent 6.2:1, erreur 4.7:1, succès 5.6:1, attention 4.6:1 ; couches : Forme 5.0:1, Style 4.7:1, **Technique ocre #6e5400 sur fond jaune #fff9c4 ≈ 4.7:1 — décision 40 validée AA**, Embellissement 4.6:1) ; toasts verts/rouges blancs ≥ 4.7:1.
+- **Responsive complet** : mobile 360–768 px — en-tête E5 en colonne, actions étirées pleine largeur (cibles tactiles), actions projet E1 en colonne, onglets de phase à défilement horizontal (scrollbar masquée, clavier conservé), conteneur racine resserré à 640 px ; colonne de lecture manuscrite plafonnée à ~75ch (`atelier.css`) pour le confort sur écrans larges.
+- **Microcopy 100 % française et bienveillante** : « Vous dépassez la limite de 30 000 caractères de X » (au lieu du télégraphique « Dépassez de X »), messages pédagogiques dans les toasts (« lisez-le en entier pour juger du rythme »), aucune occurrence de jargon technique dans l'UI (LLM/chunk/no-op/payload absents des `.svelte` — vérifié par balayage, seuls commentaires/développeur).
+- **Tests** : +10 Vitest (`tests/toasts.test.ts` : store — unicité, durées par défaut, fermeture manuelle, auto-fermeture minutée avec fake timers, durée 0 persistante, raccourcis typés ; composant — zones `role`/`aria-live`, tri polie/assertive, bouton de fermeture). **203 pytest + 83 Vitest verts**, `svelte-check` 0 erreur / 0 warning, SPA recompilée. **Prochain jalon = F5 — Nettoyage & bascule (AUTRE conversation).**
 
 ## Changements récents (FA7 — Restitution pédagogique : diff, sidebar sticky, popovers, clavier)
 

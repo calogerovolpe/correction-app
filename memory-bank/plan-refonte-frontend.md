@@ -124,7 +124,7 @@ F0→F5 et ne seront plus exécutés séparément.**
 | F1 | Accueil & projets E1 : endpoints `/api/v1/projets`, création, activation, suppression avec confirmation + protection du projet actif, analyses récentes, états vides | ✅ | `cb6abc1` |
 | F2 | Soumission E3 + suivi E4 : endpoints `/api/v1/analyses`, collage Word fidèle, catégorie, numéro N+1, matrice de phases dérogable, compteur 30 000 car., statuts explicites, polling, fail-fast visible | ✅ | `6cdfb22` |
 | F3 | Atelier E5 : endpoints `/api/v1/analyses/{id}`, couches superposables, onglets par phase + compteurs, menu contextuel riche **[absorbe UX1]**, édition directe sans IA temps réel + « ↻ Re-corriger » **[absorbe UX4]**, barre latérale, toggle « masquer », navigation clavier, validation du texte affiché | ✅ | `023534a` |
-| F4 | Finitions UX & identité : cohérence visuelle, états vides, toasts, accessibilité/focus/contrastes/aria (vérification AA des nouvelles couleurs), responsive, layout ~1200 px **[absorbe UX2]**, microcopy | ⬜ | — |
+| F4 | Finitions UX & identité : cohérence visuelle, états vides, toasts, accessibilité/focus/contrastes/aria (vérification AA des nouvelles couleurs), responsive, layout ~1200 px **[absorbe UX2]**, microcopy | ✅ | `74d602e` |
 | F5 | Nettoyage & bascule : retrait Jinja2/HTMX/Alpine et routes HTML inutiles, spec + README + `systemPatterns`/`techContext` à jour, E2E Mistral rejoué (adapté à `/api/v1`), lanceur `.bat` vérifié | ⬜ | — |
 
 ## Jalon F0 — Socle
@@ -245,10 +245,15 @@ F0→F5 et ne seront plus exécutés séparément.**
 
 ## Prochain jalon à lancer
 
-> ⚠️ **PAUSE DE SÉCURITÉ (2026-09-09)** : suite à l'audit approfondi de l'Atelier post-F3 validé par l'auteur, **F4 et F5 sont mis en pause**. La priorité immédiate est la **série FA1→FA7** documentée dans `memory-bank/plan-fiabilisation-post-audit.md`.
-> **Le prochain jalon de travail est FA1 — Intégrité du ré-ancrage et non-perte de texte (reconstruction)**. F4 reprendra après l'achèvement de FA1→FA7.
+> ✅ **F4 — Finitions UX & identité LIVRÉ** (`74d602e`, 2026-09-10) — la pause de sécurité ouverte après l'audit post-F3 est LEVÉE (série FA1→FA7 achevée puis F4 livré).
+> **Le prochain jalon de travail est F5 — Nettoyage & bascule** : retrait de Jinja2/HTMX/Alpine et des routes HTML inutiles, adaptation de `scripts/e2e_j25.py` à l'API JSON `/api/v1`, mise à jour de la spec consolidée + README + `systemPatterns.md` + `techContext.md`, lanceur `.bat` vérifié.
 
 ## Jalon F4 — Finitions UX & identité
+
+> ✅ **LIVRÉ** (commit `74d602e`, 2026-09-10) — 203 pytest + 83 Vitest verts
+> (73 + 10 nouveaux, `tests/toasts.test.ts`), `svelte-check` 0 erreur /
+> 0 warning, SPA recompilée ; frontend seul (aucun changement backend/LLM →
+> pas d'E2E Mistral requis).
 
 1. **Cohérence visuelle** sur tous les écrans F0→F3 (thème appliqué partout).
 2. **États vides** systématiques ; **toasts** ; **accessibilité** : focus,
@@ -259,6 +264,23 @@ F0→F5 et ne seront plus exécutés séparément.**
 
 ### État du code À LA FIN de F4
 
+- **Toasts accessibles** : store `lib/toasts.ts` + `ConteneurToasts.svelte`
+  monté une fois dans `App.svelte` ; deux zones live (`role="status"` polie /
+  `role="alert"` assertive), auto-fermeture paramétrable + bouton de fermeture ;
+  succès E1/E3/E5 migrés vers les toasts, erreurs actionnables restant inline.
+- **Indicateur de chargement unifié** (`IndicateurChargement.svelte`,
+  spinner CSS + `prefers-reduced-motion`) sur E1/E3/E4/E5.
+- **États vides** : `EtatVide` illustré (`aria-hidden`) + CTA « Créer mon
+  premier projet » (E1), repli toggle masquer et barre latérale « texte
+  limpide » (E5).
+- **A11y** : lien d'évitement « Aller au contenu principal » (focus
+  programmatique, hash intact), `:focus-visible` global, emojis `aria-hidden`.
+- **Audit AA documenté** : ratios de TOUS les tokens commentés dans
+  `tokens.css` (accent Technique ocre `#6e5400` sur jaune `#fff9c4` ≈ 4.7:1,
+  décision 40 validée).
+- **Responsive** : mobile 360–768 px (en-tête E5 en colonne, actions étirées,
+  onglets à défilement horizontal, actions projet en colonne) ; colonne de
+  lecture manuscrite ~75ch.
 - Identité visuelle cohérente, accessible, responsive ; parité fonctionnelle
   complète avec Jinja2 en vue de la bascule.
 

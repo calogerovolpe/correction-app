@@ -34,7 +34,7 @@ La série **FA1→FA7** corrige ces failles dans un ordre strict de dépendance 
 | 5 | **FA5** | Robustesse LLM : Custom Structured Outputs, invariants et prompts | P1 (Majeur) | Moyen | ✅ **Livré** (+ sonde directe du schéma strict contre l'API Mistral) | `467f9f6` |
 | 6 | **FA6** | Cohérence transactionnelle, concurrence et alignement d'API | P1/P3 (Moyen) | Moyen | ✅ **Livré** (+ choix de l'IA de correction à la soumission, demandé par l'auteur — décisions 44/45) | `012d386` |
 | 7 | **FA7** | Restitution pédagogique : diff, sidebar sticky, popovers et clavier | P2 (UX/a11y) | Faible | ✅ **Livré** | `71dd08a` |
-| 8 | **F4** | Finitions UX & identité (toasts, responsive, microcopy, AA complet) | F4 existant | Faible | ⬜ En attente (après FA7) | — |
+| 8 | **F4** | Finitions UX & identité (toasts, responsive, microcopy, AA complet) | F4 existant | Faible | ✅ **Livré** | `74d602e` |
 | 9 | **F5** | Nettoyage final & bascule (retrait Jinja2/HTMX/Alpine, E2E v1) | F5 existant | Moyen | ⬜ En attente (après F4) | — |
 
 ---
