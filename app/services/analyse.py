@@ -20,7 +20,7 @@ from app import db
 from app.config import settings
 from app.llm.client import ClientLLM
 from app.llm.prompts import CONSIGNES_PHASES, prompt_phase_correction
-from app.models import PannePhase
+from app.models import ErreurTroncatureLLM, PannePhase, ReponseCorrections
 from app.services import chaine, reconciliation, texte_riche
 from app.services.normalisation import (
     decouper_paragraphes,
@@ -50,6 +50,19 @@ _MODELES = {
     "style": lambda: settings.modele_style,
     "technique": lambda: settings.modele_technique,
 }
+
+# FA5 — budget de sortie : le JSON des corrections peut être plus verbeux que
+# l'entrée (explications pédagogiques en 4 temps). Marge : ~1 token pour 3
+# caractères d'entrée, DOUBLÉ pour la rédaction des corrections, borné
+# [2048, 8192] (plafond sûr pour `mistral-small-latest`).
+BUDGET_TOKENS_MIN = 2048
+BUDGET_TOKENS_MAX = 8192
+
+
+def budget_sortie_tokens(nb_caracteres: int) -> int:
+    """Calibre `max_tokens` de sortie avec marge adaptée au texte analysé (FA5)."""
+    estime = (max(nb_caracteres, 0) // 3) * 2
+    return max(BUDGET_TOKENS_MIN, min(BUDGET_TOKENS_MAX, estime))
 
 
 def phases_actives(categorie: str, choix: dict) -> list[str]:
@@ -207,13 +220,29 @@ async def _executer_phase(client, phase: str, paragraphes) -> list:
     -> réconciliation par correction (rejets individuels, jamais d'arrêt).
 
     Les phases de correction tournent toujours à température 0.0 ; la jauge
-    de créativité ne concerne que l'Embellissement, désormais à la demande (J2.5)."""
+    de créativité ne concerne que l'Embellissement, désormais à la demande (J2.5).
+
+    FA5 — Structured Outputs : la complétion impose le schéma strict
+    (`ReponseCorrections`) et un budget `max_tokens` calibré ; toute troncature
+    (`finish_reason='length'`) est convertie en `PannePhase` explicite —
+    Option B, jamais d'ingestion d'un JSON partiel."""
     messages = prompt_phase_correction(
         phase, CONSIGNES_PHASES[phase], paragraphes, settings.variante
     )
-    sortie = await client.completer(
-        _MODELES[phase](), messages, temperature=settings.temperature_correction
-    )
+    budget = budget_sortie_tokens(sum(len(p.texte) for p in paragraphes))
+    try:
+        sortie = await client.completer(
+            _MODELES[phase](), messages,
+            temperature=settings.temperature_correction,
+            max_tokens=budget,
+            schema_modele=ReponseCorrections,
+            verifier_troncature=True,
+        )
+    except ErreurTroncatureLLM as erreur:
+        raise PannePhase(
+            phase,
+            f"dépassement de capacité de sortie (max_tokens={budget}) : {erreur}",
+        ) from erreur
     corrections = reconciliation.extraire_corrections(sortie, phase)
     par_dict = {p.id: p for p in paragraphes}
     validees = []

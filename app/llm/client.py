@@ -3,17 +3,40 @@
 Fournisseur unique : **Mistral par clé API** (décision A4) ; le client reste
 compatible OpenAI, un changement de fournisseur resterait possible par
 configuration seule. Le ping fail-fast (v6 §4.2) consomme `max_tokens=5` et
-retente `retries_ping` NOUVELLES tentatives (1 -> 2 pings max par modèle)."""
+retente `retries_ping` NOUVELLES tentatives (1 -> 2 pings max par modèle).
+
+FA5 — Robustesse LLM :
+- Custom Structured Outputs : `schema_modele` (Pydantic) est traduit en
+  `response_format={"type": "json_schema", "json_schema": {..., "strict": True}}`
+  (supporté nativement par l'API Mistral) ;
+- `verifier_troncature=True` : le `finish_reason` est inspecté systématiquement ;
+  `"length"` lève `ErreurTroncatureLLM` (réponse tronquée = anomalie critique,
+  jamais ingérée) — le ping et les appels Legacy restent inchangés."""
 
 import asyncio
 import logging
 from typing import Any
 
 import httpx
+from pydantic import BaseModel
 
 from app.config import settings
+from app.models import ErreurTroncatureLLM
 
 JOURNAL = logging.getLogger("correction.llm")
+
+
+def format_schema_strict(schema_modele: type[BaseModel]) -> dict[str, Any]:
+    """Traduit un modèle Pydantic en `response_format` Custom Structured Output
+    Mistral (FA5) : {"type": "json_schema", "json_schema": {"name", "strict", "schema"}}."""
+    return {
+        "type": "json_schema",
+        "json_schema": {
+            "name": schema_modele.__name__,
+            "strict": True,
+            "schema": schema_modele.model_json_schema(),
+        },
+    }
 
 
 class ClientLLM:
@@ -43,8 +66,17 @@ class ClientLLM:
         temperature: float = 0.0,
         timeout: float | None = None,
         max_tokens: int | None = None,
+        schema_modele: type[BaseModel] | None = None,
+        verifier_troncature: bool = False,
     ) -> str:
-        """Complétion non-stream (v6 §2.3) ; retourne le contenu du message."""
+        """Complétion non-stream (v6 §2.3) ; retourne le contenu du message.
+
+        FA5 : `schema_modele` active les Custom Structured Outputs (json_schema
+        strict généré depuis le contrat Pydantic) et `verifier_troncature=True`
+        inspecte le `finish_reason` — `"length"` lève `ErreurTroncatureLLM`
+        (JSON tronqué inexploitable) au lieu d'une erreur de syntaxe générique.
+        Le ping (`max_tokens=5`) n'active PAS la vérification : sa réponse est
+        volontairement coupée."""
         corps: dict[str, Any] = {
             "model": modele,
             "messages": messages,
@@ -53,6 +85,8 @@ class ClientLLM:
         }
         if max_tokens is not None:
             corps["max_tokens"] = max_tokens
+        if schema_modele is not None:
+            corps["response_format"] = format_schema_strict(schema_modele)
         async with httpx.AsyncClient(
             timeout=timeout or settings.timeout_phase, transport=self._transport
         ) as client:
@@ -61,7 +95,14 @@ class ClientLLM:
             )
             reponse.raise_for_status()
             donnees = reponse.json()
-        return donnees["choices"][0]["message"]["content"]
+        choix = donnees["choices"][0]
+        if verifier_troncature and choix.get("finish_reason") == "length":
+            raise ErreurTroncatureLLM(
+                "Réponse tronquée : le modèle a atteint la limite de tokens de sortie "
+                f"(finish_reason='length', max_tokens={max_tokens}). Le JSON est "
+                "incomplet — l'appel est rejeté plutôt qu'ingéré (FA5)."
+            )
+        return choix["message"]["content"]
 
     async def ping(
         self, modele: str, timeout: float | None = None, retries: int | None = None

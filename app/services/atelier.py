@@ -33,7 +33,12 @@ from datetime import datetime
 from app import db
 from app.config import settings
 from app.llm import prompts as service_prompts
-from app.models import Correction, ReponseAlternatives, ReponseEmbellissement
+from app.models import (
+    Correction,
+    ReponseAlternatives,
+    ReponseCorrections,
+    ReponseEmbellissement,
+)
 from app.routes.web import _TACHES
 from app.services import analyse as service_analyse
 from app.services import reconstruction
@@ -242,7 +247,11 @@ async def _reevaluer_corrections(analyse, etat, paragraphe_id: str) -> list[Corr
         )
         phases.append(phase)
         taches.append(client.completer(
-            modele, messages, temperature=settings.temperature_correction
+            modele, messages,
+            temperature=settings.temperature_correction,
+            max_tokens=service_analyse.budget_sortie_tokens(len(texte)),
+            schema_modele=ReponseCorrections,
+            verifier_troncature=True,
         ))
     sorties = await asyncio.gather(*taches)
     nouvelles: list[Correction] = []
@@ -326,6 +335,9 @@ async def suggerer_embellissement(
         sortie = await client.completer(
             settings.modele_embellissement, messages,
             temperature=settings.temperature_embellissement,
+            max_tokens=service_analyse.budget_sortie_tokens(len(paragraphe_texte)),
+            schema_modele=ReponseEmbellissement,
+            verifier_troncature=True,
         )
         reponse = ReponseEmbellissement.model_validate(
             json.loads(service_reconciliation.nettoyer_sortie_llm(sortie))
@@ -350,7 +362,12 @@ async def suggerer_alternatives(fragment: str, paragraphe_texte: str) -> dict:
     )
     client = service_analyse._client_llm()
     try:
-        sortie = await client.completer(settings.modele_style, messages, temperature=0.7)
+        sortie = await client.completer(
+            settings.modele_style, messages, temperature=0.7,
+            max_tokens=service_analyse.budget_sortie_tokens(len(paragraphe_texte)),
+            schema_modele=ReponseAlternatives,
+            verifier_troncature=True,
+        )
         reponse = ReponseAlternatives.model_validate(
             json.loads(service_reconciliation.nettoyer_sortie_llm(sortie))
         )

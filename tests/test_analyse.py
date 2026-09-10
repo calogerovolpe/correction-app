@@ -162,6 +162,33 @@ def test_panne_option_b_aucun_resultat_partiel(client, monkeypatch):
     assert "Résultat de l'analyse" not in page.text   # aucun résultat partiel
 
 
+def test_troncature_llm_option_b_diagnostic_explicite(client, monkeypatch):
+    """FA5 — finish_reason='length' : la réponse tronquée n'est JAMAIS ingérée ;
+    la phase devient une PannePhase explicite (Option B, échec propre avec le
+    budget dépassé dans le diagnostic) au lieu d'une erreur de syntaxe générique."""
+    _modeles_distincts(monkeypatch)
+    mock = MockLLM(troncature=True)
+    monkeypatch.setattr(service_analyse, "_client_llm", lambda: mock)
+    client.post("/projets", data={"titre": "Mon roman"}, follow_redirects=True)
+
+    identifiant = _lancer(client, {"texte": TEXTE, "categorie": "auto"})
+    assert _attendre(client, identifiant) == "echec"
+    page = client.get(f"/analyses/{identifiant}")
+    assert "Exécution interrompue" in page.text       # Option B, pas de résultat partiel
+    assert "max_tokens" in page.text                  # diagnostic distinct de la troncature
+
+
+def test_budget_sortie_tokens_calandre_avec_marge():
+    """FA5 : budget borné [2048, 8192], croissant avec la taille du texte."""
+    from app.services.analyse import BUDGET_TOKENS_MAX, budget_sortie_tokens
+
+    assert budget_sortie_tokens(0) == 2048            # plancher pour un petit texte
+    assert budget_sortie_tokens(300) == 2048
+    assert budget_sortie_tokens(9000) == 6000         # ~1 token / 3 caractères, ×2
+    assert budget_sortie_tokens(30000) == 8192        # plafond (texte au max du garde-fou)
+    assert budget_sortie_tokens(300000) == BUDGET_TOKENS_MAX  # borné même au délire
+
+
 def test_sortie_non_parsable_panne_de_phase(client, monkeypatch):
     _modeles_distincts(monkeypatch)
     mock = MockLLM(reponses={"m-forme": "Je ne peux pas répondre en JSON.",

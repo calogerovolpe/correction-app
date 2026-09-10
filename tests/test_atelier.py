@@ -358,7 +358,8 @@ class _ClientLent:
         self.appels = 0
 
     async def completer(self, modele, messages, temperature=0.0,
-                        timeout=None, max_tokens=None):
+                        timeout=None, max_tokens=None, schema_modele=None,
+                        verifier_troncature=False):
         self.appels += 1
         await asyncio.sleep(self.duree)
         return '{"corrections": []}'

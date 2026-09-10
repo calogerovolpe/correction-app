@@ -261,3 +261,73 @@ def test_marquage_style_original_egale_correction_conserve():
     )
     validees = reco.extraire_corrections(sortie, "style")
     assert [c.id for c in validees] == ["c-0001"]
+
+
+# --- Invariants métier du contrat Correction (FA5) ----------------------------
+
+
+def test_invariant_fin_superieure_a_debut():
+    """FA5 : `fin <= debut` est structurellement invalide (fin exclusif, debut
+    inclusif) — rejet Pydantic -> rejet individuel, sans arrêt du pipeline."""
+    with pytest.raises(ValueError):
+        _correction(debut=14, fin=14)
+    with pytest.raises(ValueError):
+        _correction(debut=18, fin=14)
+
+
+def test_invariant_champs_non_vides():
+    """FA5 : une correction sans type, sans fragment original ou sans
+    explication pédagogique n'a aucun sens pour l'auteur — rejet."""
+    for champ in ("type", "original", "explication"):
+        with pytest.raises(ValueError):
+            _correction(**{champ: ""})
+
+
+def test_correction_suppression_correction_vide_autorisee():
+    """La SUPPRESSION est légitime (ex. espace double, caractère superflu) :
+    `correction` peut être vide — seul `original` doit être non vide."""
+    correction = _correction(correction="")
+    assert correction.correction == ""
+
+
+def test_entree_bornes_incoherentes_rejetee_sans_arret():
+    """Pipeline : une entrée LLM avec fin <= debut est rejetée individuellement
+    (validation Pydantic), le reste de la liste est conservé."""
+    sortie = json.dumps(
+        {
+            "corrections": [
+                {
+                    "id": "c-0001", "phase": "forme", "type": "accord",
+                    "paragraphe_id": "p-1", "debut": 18, "fin": 14,
+                    "original": "part", "correction": "partent",
+                    "explication": "Accord.",
+                },
+                {
+                    "id": "c-0002", "phase": "forme", "type": "accord",
+                    "paragraphe_id": "p-1", "debut": 14, "fin": 18,
+                    "original": "part", "correction": "partent",
+                    "explication": "Accord.",
+                },
+            ]
+        },
+        ensure_ascii=False,
+    )
+    validees = reco.extraire_corrections(sortie, "forme")
+    assert [c.id for c in validees] == ["c-0002"]
+
+
+def test_schema_strict_reponse_corrections_genere_un_json_schema_complet():
+    """FA5 : `ReponseCorrections` sert de schéma strict pour les Structured
+    Outputs Mistral — toutes les propriétés du contrat y figurent."""
+    from app.models import ReponseCorrections
+
+    schema = ReponseCorrections.model_json_schema()
+    assert schema["properties"]["corrections"]["type"] == "array"
+    # Le contrat Correction est référencé via $defs/$ref (dédupliqué Pydantic)
+    proprietes = schema["$defs"]["Correction"]["properties"]
+    for champ in ("id", "phase", "type", "paragraphe_id", "debut", "fin",
+                  "original", "correction", "explication"):
+        assert champ in proprietes
+    # Invariants FA5 reflétés dans le schéma transmis au LLM
+    assert proprietes["original"].get("minLength") == 1
+    assert proprietes["explication"].get("minLength") == 1
