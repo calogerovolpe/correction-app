@@ -1,6 +1,6 @@
 # Contexte actif — où nous en sommes MAINTENANT
 
-> Fichier le plus souvent mis à jour. Dernière mise à jour : 2026-09-10 (jalon FA5 LIVRÉ — prochain jalon = FA6).
+> Fichier le plus souvent mis à jour. Dernière mise à jour : 2026-09-10 (jalon FA6 LIVRÉ — prochain jalon = FA7).
 
 ## Focus du moment
 
@@ -18,8 +18,21 @@ Ne JAMAIS enchaîner deux jalons dans la même session sans feu vert explicite d
   - **FA3 — Segmentation atomique aux bornes, document complet + atelier résilient est LIVRÉ** ✅ (`c8da894`) — 176 pytest + 48 Vitest verts, `svelte-check` 0 erreur, **E2E réel Mistral rejoué OK** ; corrige AUSSI les deux incidents rapportés par l'auteur (« Chargement de l'atelier » bloqué + Erreur serveur 500 sur les analyses anciennes).
   - **FA4 — Rendu Svelte fidèle, styles réels, formatage Word et robustesse UI est LIVRÉ** ✅ (`00d5575`) — 177 pytest + 53 Vitest verts, `svelte-check` 0 erreur, SPA recompilé : formatage Word rendu (`<strong>`/`<em>`/`<u>` sémantiques), couleurs réelles des couches restaurées (reset `:where` à spécificité zéro), onglet actif conservé après action (`onglet` en query des POST `/api/v1`), réconciliation de la correction active + jeton anti-course.
   - **FA5 — Robustesse LLM : Custom Structured Outputs, invariants et prompts est LIVRÉ** ✅ — 192 pytest + 53 Vitest verts, `svelte-check` 0 erreur, **E2E réel Mistral rejoué OK** (`data_e2e/` réinitialisé : 9 corrections sous schéma strict, chapitre validé corrigé, chaîne `ok`, 1 backup) + sonde directe du schéma strict contre l'API Mistral (`scripts/sonde_fa5_schema.py`, statut 200, sortie validée par le contrat Pydantic).
+  - **FA6 — Cohérence transactionnelle, concurrence et alignement d'API est LIVRÉ** ✅ (`012d386`) — **+ nouvelle fonctionnalité de l'auteur : choix de l'IA qui corrigera à la soumission (E3)** — 203 pytest + 58 Vitest verts, `svelte-check` 0 erreur, SPA recompilée, **E2E réel Mistral rejoué OK** (9 corrections, chapitre validé, chaîne `ok`, 1 backup).
   - **F4 (Finitions UX) et F5 (Nettoyage & bascule) restent en pause** jusqu'à l'achèvement de la série corrective FA1→FA7.
-  - **Prochain jalon immédiat = FA6 — Cohérence transactionnelle, concurrence et alignement d'API.**
+  - **Prochain jalon immédiat = FA7 — Restitution pédagogique : diff, sidebar sticky, popovers et clavier.**
+
+## Changements récents (FA6 — Choix de l'IA + cohérence transactionnelle)
+
+- **Catalogue des modèles texte Mistral** (`app/llm/catalogue.py`, NOUVEAU module) : 4 modèles texte de l'API avec métadonnées UI (`libelle`, `badge`, `description` en vocabulaire simple) — `mistral-small-latest` (**Recommandé**), `mistral-large-latest` (**Haute précision**), `open-mistral-nemo` (**Rapide**), `ministral-8b-latest` (**Compact**) ; fonctions `modele_autorise` / `modele_effectif` (repli transparent) / `modele_par_defaut` (= configuration Forme `.env`).
+- **Choix de l'IA à la soumission (demande de l'auteur)** : `GET /api/v1/soumission` expose `modeles` + `modele_defaut` + `modele_memorise` ; `POST /api/v1/analyses` accepte `modele` (validation catalogue, mémorisé dans `options_json.modele_ia` + `dernieres_options`) ; `analyse.py::_executer_interne` applique le modèle choisi à TOUTES les phases actives de l'analyse (fail-fast inclus — le ping porte sur le modèle choisi) ; modèle absent/inconnu → configuration `.env` par phase inchangée (jamais de blocage).
+- **UI E3** (`Soumission.svelte`) : fieldset « **Intelligence de correction** » — cartes radio stylisées (design tokens, WCAG AA, hover/actif `--accent`, badge pill « Recommandé », description douce) ; pré-sélection = dernier choix local (`localStorage`) > mémoire serveur > défaut ; le choix accompagne le payload (`modele`). 3 Vitest ajoutés (catalogue affiché, modèle transmis, mémoire re-proposée).
+- **Révision transactionnelle (CAS)** — `reconstruction.py` : clé `revision` dans l'état (initial 1), persistée dans `vers_json`/`depuis_json` (rétrocompatibilité : absent → 1), migration ancien format → 1 ; `atelier.sauver_etat` **incrémenté à chaque sauvegarde** ; `verifier_revision(etat, revision)` lève `ErreurAtelier(statut=409)` AVANT toute mutation si la révision transmise est périmée (`revision=None` → aucune vérification : compatibilité Jinja2).
+- **API atelier** (`app/routes/api.py`) : `EtatAtelier.revision` exposé ; les 5 routes de mutation (`choix-forme`, `editer`, `appliquer-alternative`, `appliquer-embellissement`, `reevaluer`) acceptent `revision` (query) et traduisent le conflit en **409 explicite** (« Rechargez la page »).
+- **Frontend atelier** (`Atelier.svelte`, `atelier.ts`, `types.ts`) : `revision` typée, transmise avec chaque mutation ; **sur 409 : resynchronisation automatique** (rechargement de l'atelier + bandeau « atelier rechargé avec l'état à jour » — plus aucune impasse, aucune écrasement silencieux).
+- **Spec** : §11 **décisions 44** (choix de l'IA) et **45** (cohérence transactionnelle) — même commit.
+- **Tests** : +11 pytest (catalogue + modèle choisi appliqué à toutes les phases + repli inconnu ; révision exposée/incrémentée/persistée ; conflit 409 avec état intouché ; compat sans révision ; révision dans l'état/round-trip/migration) et +5 Vitest (3 E3 modèle, révision transmise, 409 resynchronisé). **203 pytest + 58 Vitest verts**, `svelte-check` 0 erreur, SPA recompilée.
+- **E2E réel Mistral rejoué OK** (`data_e2e/` réinitialisé) : analyse 3 phases (9 corrections) → nouvelle version → validation (chapitre corrigé, chaîne `ok`, 1 backup).
 
 ## Changements récents (FA5 — Robustesse LLM : schémas stricts, troncature, prompts)
 
@@ -54,9 +67,9 @@ Ne JAMAIS enchaîner deux jalons dans la même session sans feu vert explicite d
 
 ## État global
 
-- Jalons terminés : **J2.5 — Atelier v2**, **A — Fiabilité du cœur**, **R1-a — Onglets hybrides**, **R1-b — Stockage par phase**, **R2 — Base immuable + annotations**, **F0 — Socle**, **F1 — Accueil & projets E1**, **F2 — Soumission E3 + suivi E4**, **F3 — Atelier E5**, **FA1 — Intégrité du ré-ancrage**, **FA2 — Identité documentaire + « Ouvrir »**, **FA3 — Segmentation atomique + atelier résilient**, **FA4 — Rendu fidèle + robustesse UI**, **FA5 — Robustesse LLM (Structured Outputs, invariants, prompts)**.
-- Tests : **192/192 verts** (`pytest`) + **53 tests Vitest** (frontend Svelte) ; `svelte-check` 0 erreur / 0 warning.
-- **E2E réel Mistral OK** de bout en bout (`scripts/e2e_j25.py`, environnement isolé `data_e2e/`) : **soumission + suivi via `/api/v1/` (F2)**, puis analyse 3 phases → nouvelle version (texte courant repris) → validation (chapitre officiel corrigé, hash, chaîne N+1, backup natif créé). — **rejoué au jalon FA5** (avec Custom Structured Outputs stricts + trame pédagogique des explications).
+- Jalons terminés : **J2.5 — Atelier v2**, **A — Fiabilité du cœur**, **R1-a — Onglets hybrides**, **R1-b — Stockage par phase**, **R2 — Base immuable + annotations**, **F0 — Socle**, **F1 — Accueil & projets E1**, **F2 — Soumission E3 + suivi E4**, **F3 — Atelier E5**, **FA1 — Intégrité du ré-ancrage**, **FA2 — Identité documentaire + « Ouvrir »**, **FA3 — Segmentation atomique + atelier résilient**, **FA4 — Rendu fidèle + robustesse UI**, **FA5 — Robustesse LLM (Structured Outputs, invariants, prompts)**, **FA6 — Choix de l'IA + cohérence transactionnelle**.
+- Tests : **203/203 verts** (`pytest`) + **58 tests Vitest** (frontend Svelte) ; `svelte-check` 0 erreur / 0 warning.
+- **E2E réel Mistral OK** de bout en bout (`scripts/e2e_j25.py`, environnement isolé `data_e2e/`) : **soumission + suivi via `/api/v1/` (F2)**, puis analyse 3 phases → nouvelle version (texte courant repris) → validation (chapitre officiel corrigé, hash, chaîne N+1, backup natif créé). — **rejoué au jalon FA6** (choix de l'IA à la soumission + révision transactionnelle de l'atelier).
 - Application validée de bout en bout avec Mistral Small.
 
 ## Changements récents (F3 — Atelier E5 Svelte + API `/api/v1`, commit `023534a`)

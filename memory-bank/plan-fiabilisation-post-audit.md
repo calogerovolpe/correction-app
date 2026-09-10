@@ -32,7 +32,7 @@ La série **FA1→FA7** corrige ces failles dans un ordre strict de dépendance 
 | 3 | **FA3** | Segmentation atomique aux bornes et document complet (rendu) | P0 (Bloquant) | Moyen | ✅ **Livré** (+ correctifs « Chargement atelier » bloqué et Erreur 500 analyses anciennes, incidents rapportés par l'auteur) | *(voir `progress.md`)* |
 | 4 | **FA4** | Rendu Svelte fidèle, styles réels, formatage Word et robustesse UI | P0/P1 (Majeur) | Moyen | ✅ **Livré** | `00d5575` |
 | 5 | **FA5** | Robustesse LLM : Custom Structured Outputs, invariants et prompts | P1 (Majeur) | Moyen | ✅ **Livré** (+ sonde directe du schéma strict contre l'API Mistral) | `467f9f6` |
-| 6 | **FA6** | Cohérence transactionnelle, concurrence et alignement d'API | P1/P3 (Moyen) | Moyen | ⬜ À faire | — |
+| 6 | **FA6** | Cohérence transactionnelle, concurrence et alignement d'API | P1/P3 (Moyen) | Moyen | ✅ **Livré** (+ choix de l'IA de correction à la soumission, demandé par l'auteur — décisions 44/45) | `012d386` |
 | 7 | **FA7** | Restitution pédagogique : diff, sidebar sticky, popovers et clavier | P2 (UX/a11y) | Faible | ⬜ À faire | — |
 | 8 | **F4** | Finitions UX & identité (toasts, responsive, microcopy, AA complet) | F4 existant | Faible | ⬜ En attente (après FA7) | — |
 | 9 | **F5** | Nettoyage final & bascule (retrait Jinja2/HTMX/Alpine, E2E v1) | F5 existant | Moyen | ⬜ En attente (après F4) | — |
@@ -263,7 +263,7 @@ L'audit senior full-stack / LLM / UI-UX réalisé après le jalon F3 (`023534a`)
   - Diagnostic distinct en cas de troncature par tokens.
 - **Handoff session suivante** : Commit `FA5 — Robustesse LLM : Custom Structured Outputs, invariants et prompts`, mise à jour `activeContext.md` (prochain jalon = FA6).
 
-### Jalon FA6 — Cohérence transactionnelle, concurrence et alignement d'API
+### Jalon FA6 — Cohérence transactionnelle, concurrence et alignement d'API — ✅ LIVRÉ (`012d386`)
 
 - **Objectif** : Sécuriser les mutations concurrentes de l'état atelier (versioning/révision), unifier les contrats `/api/v1` et éliminer les divergences avec les routes Jinja2 avant leur retrait.
 - **Dépendances** : FA1 à FA5 terminés.
